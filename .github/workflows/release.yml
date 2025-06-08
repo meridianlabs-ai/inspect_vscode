@@ -1,0 +1,73 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+    steps:
+      - uses: google-github-actions/release-please-action@v4
+        id: release
+        with:
+          release-type: node
+          config-file: .release-please-config.json
+
+  publish:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created }}
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: 'yarn'
+      
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+      
+      - name: Run linter
+        run: yarn lint
+      
+      - name: Run TypeScript compiler
+        run: yarn compile
+      
+      - name: Build extension
+        run: yarn package
+      
+      - name: Setup virtual display
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb
+      
+      - name: Run tests
+        run: xvfb-run -a yarn test
+      
+      - name: Package extension
+        run: yarn vsce package
+      
+      - name: Publish to VS Code Marketplace
+        run: yarn vsce publish --pat ${{ secrets.VSCE_PAT }}
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+      
+      - name: Publish to OpenVSIX
+        run: |
+          npm install -g ovsx
+          ovsx publish *.vsix --pat ${{ secrets.OVSX_PAT }}
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+      
+      - name: Upload VSIX to GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload ${{ needs.release-please.outputs.tag_name }} *.vsix
