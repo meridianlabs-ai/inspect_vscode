@@ -7,7 +7,7 @@ export interface EditorAssociation {
 
 export async function withEditorAssociation(
   association: EditorAssociation,
-  fn: () => Promise<void>,
+  fn: () => Promise<void>
 ) {
   // get existing associations
   const kEditorAssociations = "editorAssociations";
@@ -27,7 +27,7 @@ export async function withEditorAssociation(
   await config.update(
     kEditorAssociations,
     updatedAssociations,
-    ConfigurationTarget.Workspace,
+    ConfigurationTarget.Workspace
   );
 
   // execute and unwind update
@@ -37,7 +37,7 @@ export async function withEditorAssociation(
     await config.update(
       kEditorAssociations,
       existingAssociations,
-      ConfigurationTarget.Workspace,
+      ConfigurationTarget.Workspace
     );
   }
 }

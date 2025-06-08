@@ -7,10 +7,10 @@ export function activateLogNotify(
   context: ExtensionContext,
   logsWatcher: InspectLogsWatcher,
   settingsMgr: InspectSettingsManager,
-  viewManager: InspectViewManager,
+  viewManager: InspectViewManager
 ) {
   context.subscriptions.push(
-    logsWatcher.onInspectLogCreated(async (e) => {
+    logsWatcher.onInspectLogCreated(async e => {
       if (e.externalWorkspace) {
         return;
       }
@@ -34,7 +34,7 @@ export function activateLogNotify(
       const result = await window.showInformationMessage(
         `Eval complete: ${task}`,
         viewLog,
-        dontShowAgain,
+        dontShowAgain
       );
       if (result === viewLog) {
         // open the editor
@@ -42,6 +42,6 @@ export function activateLogNotify(
       } else if (result === dontShowAgain) {
         settingsMgr.setNotifyEvalComplete(false);
       }
-    }),
+    })
   );
 }

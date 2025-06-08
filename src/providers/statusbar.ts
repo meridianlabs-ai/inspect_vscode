@@ -5,11 +5,11 @@ import { inspectBinPath } from "../inspect/props";
 
 export function activateStatusBar(
   context: ExtensionContext,
-  inspectManager: InspectManager,
+  inspectManager: InspectManager
 ) {
   const statusItem = window.createStatusBarItem(
     "inspect-ai.version",
-    StatusBarAlignment.Right,
+    StatusBarAlignment.Right
   );
 
   // track changes to inspect

@@ -47,7 +47,7 @@ async function listen(port: number, hostName: string): Promise<boolean> {
 
 export async function isServerListening(
   port: number,
-  hostName: string,
+  hostName: string
 ): Promise<boolean> {
   const server = createServer();
   return new Promise((resolve, reject) => {

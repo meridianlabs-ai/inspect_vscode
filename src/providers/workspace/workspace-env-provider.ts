@@ -30,7 +30,7 @@ export class WorkspaceEnvManager implements Disposable {
     this.env = readEnv(envUri);
     this.lastUpdated_ = Date.now();
     const envRelativePath = workspaceRelativePath(
-      toAbsolutePath(envUri.fsPath),
+      toAbsolutePath(envUri.fsPath)
     );
     log.appendLine(`Watching ${envRelativePath}`);
     this.envWatcher_ = setInterval(() => {
@@ -64,7 +64,7 @@ export class WorkspaceEnvManager implements Disposable {
   public setValues(env: Record<string, string>) {
     const envUri = this.getEnvUri();
     const keys = Object.keys(env);
-    keys.forEach((key) => {
+    keys.forEach(key => {
       const value = env[key];
       if (value === "") {
         // Only actually clear the value if it has changed

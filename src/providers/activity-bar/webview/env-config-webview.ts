@@ -46,7 +46,7 @@ provideFASTDesignSystem().register(fastCombobox(), fastOption());
 const vscode = acquireVsCodeApi();
 
 // Process messages
-window.addEventListener("message", (e) => {
+window.addEventListener("message", e => {
   switch (e.data.type) {
     case "initialize":
       // Set the env values
@@ -117,7 +117,7 @@ function showProviderHelp() {
           modelHelpEl.appendChild(questionEl);
 
           const labelContainerEl = document.getElementById(
-            "provider-label-container",
+            "provider-label-container"
           );
           labelContainerEl?.appendChild(modelHelpEl);
           modelHelpEl.addEventListener("click", () => {
@@ -171,7 +171,7 @@ const attachListeners = () => {
   setEnvWhenKeyup("model-base-url", "modelBaseUrl");
 
   const showBaseUrlEl = document.getElementById(
-    "show-base-url",
+    "show-base-url"
   ) as HTMLAnchorElement;
   showBaseUrlEl.addEventListener("click", () => {
     toggleBaseUrl();
@@ -200,7 +200,7 @@ const setEnvWhenKeyup = (id: string, key: string, fn?: () => void) => {
         if (fn) {
           fn();
         }
-      }, kBounceInterval),
+      }, kBounceInterval)
     );
   }
 };
@@ -236,7 +236,7 @@ function openUrl(url: string) {
 
 function toggleBaseUrl() {
   const baseUrlContainerEl = document.getElementById(
-    "model-base-url-container",
+    "model-base-url-container"
   );
   if (baseUrlContainerEl) {
     const hidden = baseUrlContainerEl.classList.contains("hidden");

@@ -20,7 +20,7 @@ import { startup } from "../../core/log";
 // Activates the provider which tracks the currently active task (document and task name)
 export function activateWorkspaceTaskProvider(
   inspectManager: InspectManager,
-  context: ExtensionContext,
+  context: ExtensionContext
 ) {
   // The task manager
   const taskManager = new WorkspaceTaskManager(context);
@@ -31,7 +31,7 @@ export function activateWorkspaceTaskProvider(
       if (e.available) {
         await taskManager.refresh();
       }
-    }),
+    })
   );
 
   return taskManager;
@@ -60,7 +60,7 @@ export class WorkspaceTaskManager {
       kTaskFilePattern,
       false,
       false,
-      false,
+      false
     );
     this.context = context;
     const onChange = throttle(
@@ -68,7 +68,7 @@ export class WorkspaceTaskManager {
         await this.refresh();
       },
       5000,
-      { leading: true, trailing: true },
+      { leading: true, trailing: true }
     );
     this.watcher.onDidCreate(onChange);
     this.watcher.onDidDelete(onChange);
@@ -127,13 +127,13 @@ interface TaskCache {
 
 async function workspaceTasks(
   context: ExtensionContext,
-  workspacePath: AbsolutePath,
+  workspacePath: AbsolutePath
 ): Promise<TaskDescriptor[]> {
   const start = Date.now();
   const files = await workspace.findFiles("**/*.py", kExcludeGlob);
 
   // Filter files with skip prefixed
-  const validFiles = files.filter((file) => {
+  const validFiles = files.filter(file => {
     const relativePath = relative(workspacePath.path, file.fsPath);
     return !relativePath.startsWith("_") && !relativePath.startsWith(".");
   });
@@ -141,13 +141,13 @@ async function workspaceTasks(
   // Load the cache
   const taskFileCache = context.workspaceState.get<TaskCache>(
     "taskFileCache2",
-    {},
+    {}
   );
 
   const tasks: TaskDescriptor[] = [];
 
   // Try to cached file data, if possible
-  const fileStatPromises = validFiles.map(async (file) => {
+  const fileStatPromises = validFiles.map(async file => {
     const filePath = file.toString();
     const stat = await workspace.fs.stat(file);
     const cached = taskFileCache[filePath];
@@ -164,7 +164,7 @@ async function workspaceTasks(
 
   // Resolve file stats and filter out cached results
   const filesToProcess = (await Promise.all(fileStatPromises)).filter(
-    (file) => file !== null,
+    file => file !== null
   ) as { file: Uri; filePath: string; stat: FileStat }[];
 
   startup.info(`Inspecting ${filesToProcess.length} files for tasks`);
@@ -188,7 +188,7 @@ async function workspaceTasks(
       // Update cache in memory
       taskFileCache[filePath] = { updated: stat.mtime, descriptors: fileTasks };
       return fileTasks;
-    },
+    }
   );
 
   // Await all task collection and add to the tasks array
@@ -205,7 +205,7 @@ async function workspaceTasks(
 
 async function inspectTaskData(
   context: ExtensionContext,
-  folder: AbsolutePath,
+  folder: AbsolutePath
 ) {
   // Read the list of tasks
   const taskDescriptors = await workspaceTasks(context, folder);
@@ -214,7 +214,7 @@ async function inspectTaskData(
   const treeMap: Map<string, TaskPath> = new Map();
 
   // Got through the task descriptors and
-  taskDescriptors.forEach((descriptor) => {
+  taskDescriptors.forEach(descriptor => {
     // track the parent node as we make children
     let parentNode: TaskPath | undefined;
 
@@ -254,7 +254,7 @@ async function inspectTaskData(
   });
 
   // Return the root tree nodes
-  const vals = Array.from(treeMap.values()).filter((entry) => {
+  const vals = Array.from(treeMap.values()).filter(entry => {
     return entry.parent === undefined;
   });
 

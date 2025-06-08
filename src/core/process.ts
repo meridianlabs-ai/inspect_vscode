@@ -9,7 +9,7 @@ import { AbsolutePath } from "./path";
 export function runProcess(
   cmd: string | AbsolutePath,
   args: string[],
-  cwd?: AbsolutePath,
+  cwd?: AbsolutePath
 ) {
   // Process options
   const options: SpawnSyncOptionsWithStringEncoding = {
@@ -23,13 +23,13 @@ export function runProcess(
   const result = spawnSync(cmd, args, options);
   if (result.error) {
     throw new Error(
-      `The process could not be started\n${result.error.message}`,
+      `The process could not be started\n${result.error.message}`
     );
   } else if (result.status === 0) {
     return result.stdout;
   } else {
     throw new Error(
-      `Command failed with code ${result.status}: ${result.stderr}`,
+      `Command failed with code ${result.status}: ${result.stderr}`
     );
   }
 }
@@ -45,7 +45,7 @@ export function spawnProcess(
   lifecycle?: {
     onError?: (error: Error) => void;
     onClose?: (code: number) => void;
-  },
+  }
 ) {
   // Process options
   options = { detached: true, ...options };

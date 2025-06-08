@@ -65,7 +65,7 @@ const kInspectModels: Record<string, string> = {
 
 const inspectModels = () => {
   const descriptor = inspectVersionDescriptor();
-  return Object.keys(kInspectModels).filter((key) => {
+  return Object.keys(kInspectModels).filter(key => {
     const ver = kInspectModels[key];
     if (descriptor !== null) {
       return descriptor.version.compare(ver) > -1;
@@ -82,7 +82,7 @@ export class EnvConfigurationProvider implements WebviewViewProvider {
     private readonly extensionUri_: Uri,
     private readonly envManager_: WorkspaceEnvManager,
     private readonly stateManager_: WorkspaceStateManager,
-    private readonly inspectManager_: InspectManager,
+    private readonly inspectManager_: InspectManager
   ) {}
   private env: EnvConfiguration = {};
 
@@ -124,12 +124,12 @@ export class EnvConfigurationProvider implements WebviewViewProvider {
             // Save the most recently used model for this provider
             if (this.env.provider && data.default === "model") {
               const modelState = this.stateManager_.getModelState(
-                this.env.provider,
+                this.env.provider
               );
               modelState.lastModel = data.value;
               await this.stateManager_.setModelState(
                 this.env.provider,
-                modelState,
+                modelState
               );
             }
 
@@ -151,7 +151,7 @@ export class EnvConfigurationProvider implements WebviewViewProvider {
             await env.openExternal(Uri.parse(data.url));
             break;
         }
-      },
+      }
     );
 
     const initMsg = async () => {
@@ -183,7 +183,7 @@ export class EnvConfigurationProvider implements WebviewViewProvider {
             env: this.env,
           },
         });
-      }),
+      })
     );
 
     // If the interpreter changes, refresh the tasks
@@ -194,7 +194,7 @@ export class EnvConfigurationProvider implements WebviewViewProvider {
         } else {
           await noInspectMsg();
         }
-      }),
+      })
     );
 
     // Attach a listener to clean up resources when the webview is disposed
@@ -204,7 +204,7 @@ export class EnvConfigurationProvider implements WebviewViewProvider {
   }
   private disposables_: Disposable[] = [];
   private dispose() {
-    this.disposables_.forEach((disposable) => {
+    this.disposables_.forEach(disposable => {
       disposable.dispose();
     });
   }
@@ -212,7 +212,7 @@ export class EnvConfigurationProvider implements WebviewViewProvider {
   private htmlForWebview(webview: Webview) {
     // Get the local path to main script run in the webview, then convert it to a uri we can use in the webview.
     const scriptUri = webview.asWebviewUri(
-      Uri.joinPath(this.extensionUri_, "out", "env-config-webview.js"),
+      Uri.joinPath(this.extensionUri_, "out", "env-config-webview.js")
     );
     const codiconsUri = webview.asWebviewUri(
       Uri.joinPath(
@@ -220,8 +220,8 @@ export class EnvConfigurationProvider implements WebviewViewProvider {
         "assets",
         "www",
         "codicon",
-        "codicon.css",
-      ),
+        "codicon.css"
+      )
     );
 
     const codiconsFontUri = webview.asWebviewUri(
@@ -230,14 +230,14 @@ export class EnvConfigurationProvider implements WebviewViewProvider {
         "assets",
         "www",
         "codicon",
-        "codicon.ttf",
-      ),
+        "codicon.ttf"
+      )
     );
 
     // Use a nonce to only allow a specific script to be run.
     const nonce = getNonce();
 
-    const modelOptions = inspectModels().map((model) => {
+    const modelOptions = inspectModels().map(model => {
       return `<fast-option value="${model}">${model}</fast-option>`;
     });
 
@@ -404,7 +404,7 @@ const configToEnv = (config: EnvConfiguration): Record<string, string> => {
 const setConfiguration = (
   key: string,
   value: string,
-  state: EnvConfiguration,
+  state: EnvConfiguration
 ) => {
   switch (key) {
     case "provider":

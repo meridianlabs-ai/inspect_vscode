@@ -9,7 +9,7 @@ import { kInspectMaxLogFileSizeVersion } from "../providers/inspect/inspect-cons
 
 export function inspectEvalLogs(
   cwd: AbsolutePath,
-  log_dir?: Uri,
+  log_dir?: Uri
 ): string | undefined {
   const inspectBin = inspectBinPath();
   if (inspectBin) {
@@ -26,7 +26,7 @@ export function inspectEvalLogs(
 export function inspectEvalLog(
   cwd: AbsolutePath,
   log: string,
-  headerOnly?: number,
+  headerOnly?: number
 ): string | undefined {
   const inspectBin = inspectBinPath();
   if (inspectBin) {
@@ -45,7 +45,7 @@ export function inspectEvalLog(
         if (headerOnly === 0) {
           cmdArgs.push("--header-only");
         }
-      },
+      }
     );
 
     const output = runProcess(inspectBin, cmdArgs, cwd);
@@ -55,7 +55,7 @@ export function inspectEvalLog(
 
 export function inspectEvalLogHeaders(
   cwd: AbsolutePath,
-  logs: string[],
+  logs: string[]
 ): string | undefined {
   const inspectBin = inspectBinPath();
   if (inspectBin) {
@@ -75,7 +75,7 @@ export function inspectLogInfo(file: Uri): Promise<InspectLogInfo> {
   return new Promise((resolve, reject) => {
     // Create a read stream
     const fileStream = createReadStream(file.fsPath);
-    fileStream.on("error", (err) => {
+    fileStream.on("error", err => {
       reject(err);
     });
 
@@ -98,7 +98,7 @@ export function inspectLogInfo(file: Uri): Promise<InspectLogInfo> {
 
     // Process each line
     let lineCount = 0;
-    rl.on("line", (line) => {
+    rl.on("line", line => {
       // Perform additional processing on each line here
       if (!state.hasStatusKey) {
         const match = line.match(/\s*"status":\s*"(\S+)"/);
@@ -128,7 +128,7 @@ export function inspectLogInfo(file: Uri): Promise<InspectLogInfo> {
       resolve(state);
     });
 
-    rl.on("error", (err) => {
+    rl.on("error", err => {
       reject(err);
     });
   });

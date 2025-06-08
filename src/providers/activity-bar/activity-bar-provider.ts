@@ -28,14 +28,14 @@ export async function activateActivityBar(
   workspaceEnvMgr: WorkspaceEnvManager,
   inspectViewServer: InspectViewServer,
   logsWatcher: InspectLogsWatcher,
-  context: ExtensionContext,
+  context: ExtensionContext
 ) {
   start("Log Listing");
   const [logsCommands, logsDispose] = await activateLogListing(
     context,
     workspaceEnvMgr,
     inspectViewServer,
-    logsWatcher,
+    logsWatcher
   );
   context.subscriptions.push(...logsDispose);
   end("Log Listing");
@@ -47,7 +47,7 @@ export async function activateActivityBar(
     workspaceTaskMgr,
     activeTaskManager,
     inspectManager,
-    inspectLogviewManager,
+    inspectLogviewManager
   );
   context.subscriptions.push(treeDataProvider);
   end("Task Outline");
@@ -56,26 +56,26 @@ export async function activateActivityBar(
     context.extensionUri,
     workspaceEnvMgr,
     workspaceStateMgr,
-    inspectManager,
+    inspectManager
   );
   context.subscriptions.push(
     window.registerWebviewViewProvider(
       EnvConfigurationProvider.viewType,
-      envProvider,
-    ),
+      envProvider
+    )
   );
 
   const taskConfigProvider = new TaskConfigurationProvider(
     context.extensionUri,
     workspaceStateMgr,
     activeTaskManager,
-    inspectManager,
+    inspectManager
   );
   context.subscriptions.push(
     window.registerWebviewViewProvider(
       TaskConfigurationProvider.viewType,
-      taskConfigProvider,
-    ),
+      taskConfigProvider
+    )
   );
   const taskConfigCommands = [
     new RunConfigTaskCommand(activeTaskManager, inspectEvalMgr),

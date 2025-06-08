@@ -12,14 +12,14 @@ declare module "positron" {
     executeCode(
       languageId: string,
       code: string,
-      focus: boolean,
+      focus: boolean
     ): Thenable<boolean>;
   }
 
   export interface PositronLanguages {
     registerStatementRangeProvider(
       selector: vscode.DocumentSelector,
-      provider: StatementRangeProvider,
+      provider: StatementRangeProvider
     ): vscode.Disposable;
   }
 
@@ -27,7 +27,7 @@ declare module "positron" {
     provideStatementRange(
       document: vscode.TextDocument,
       position: vscode.Position,
-      token: vscode.CancellationToken,
+      token: vscode.CancellationToken
     ): vscode.ProviderResult<StatementRange>;
   }
 
@@ -41,7 +41,7 @@ declare module "positron" {
       viewType: string,
       title: string,
       preserveFocus?: boolean,
-      options?: PreviewOptions,
+      options?: PreviewOptions
     ): PreviewPanel;
   }
 

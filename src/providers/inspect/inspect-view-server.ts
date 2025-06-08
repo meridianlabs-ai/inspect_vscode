@@ -45,14 +45,14 @@ export class InspectViewServer implements Disposable {
     context.subscriptions.push(
       inspectManager.onInspectChanged(() => {
         this.shutdown();
-      }),
+      })
     );
   }
 
   public async evalLogs(log_dir: Uri): Promise<string | undefined> {
     if (this.haveInspectEvalLogFormat()) {
       return this.api_json(
-        `/api/logs?log_dir=${encodeURIComponent(log_dir.toString())}`,
+        `/api/logs?log_dir=${encodeURIComponent(log_dir.toString())}`
       );
     } else {
       return evalLogs(log_dir);
@@ -71,11 +71,11 @@ export class InspectViewServer implements Disposable {
 
   public async evalLog(
     file: string,
-    headerOnly: boolean | number,
+    headerOnly: boolean | number
   ): Promise<string | undefined> {
     if (this.haveInspectEvalLogFormat()) {
       return await this.api_json(
-        `/api/logs/${encodeURIComponent(file)}?header-only=${headerOnly}`,
+        `/api/logs/${encodeURIComponent(file)}?header-only=${headerOnly}`
       );
     } else {
       return evalLog(file, headerOnly);
@@ -85,7 +85,7 @@ export class InspectViewServer implements Disposable {
   public async evalLogSize(file: string): Promise<number> {
     if (this.haveInspectEvalLogFormat()) {
       return Number(
-        await this.api_json(`/api/log-size/${encodeURIComponent(file)}`),
+        await this.api_json(`/api/log-size/${encodeURIComponent(file)}`)
       );
     } else {
       throw new Error("evalLogSize not implemented");
@@ -95,7 +95,7 @@ export class InspectViewServer implements Disposable {
   public async evalLogDelete(file: string): Promise<number> {
     if (this.haveInspectEvalLogFormat()) {
       return Number(
-        await this.api_json(`/api/log-delete/${encodeURIComponent(file)}`),
+        await this.api_json(`/api/log-delete/${encodeURIComponent(file)}`)
       );
     } else {
       throw new Error("evalLogDelete not implemented");
@@ -105,11 +105,11 @@ export class InspectViewServer implements Disposable {
   public async evalLogBytes(
     file: string,
     start: number,
-    end: number,
+    end: number
   ): Promise<Uint8Array> {
     if (this.haveInspectEvalLogFormat()) {
       return this.api_bytes(
-        `/api/log-bytes/${encodeURIComponent(file)}?start=${start}&end=${end}`,
+        `/api/log-bytes/${encodeURIComponent(file)}?start=${start}&end=${end}`
       );
     } else {
       throw new Error("evalLogBytes not implemented");
@@ -130,7 +130,7 @@ export class InspectViewServer implements Disposable {
 
   public async evalLogPendingSamples(
     log_file: string,
-    etag?: string,
+    etag?: string
   ): Promise<string | undefined> {
     const params = new URLSearchParams();
     params.append("log", log_file);
@@ -153,7 +153,7 @@ export class InspectViewServer implements Disposable {
     return this.api_json(
       `/api/pending-samples?${params.toString()}`,
       headers,
-      handleError,
+      handleError
     );
   }
 
@@ -162,7 +162,7 @@ export class InspectViewServer implements Disposable {
     id: string | number,
     epoch: number,
     last_event?: number,
-    last_attachment?: number,
+    last_attachment?: number
   ): Promise<string | undefined> {
     // Url Params
     const params = new URLSearchParams();
@@ -188,7 +188,7 @@ export class InspectViewServer implements Disposable {
     return this.api_json(
       `/api/pending-sample-data?${params.toString()}`,
       {},
-      handleError,
+      handleError
     );
   }
 
@@ -261,19 +261,19 @@ export class InspectViewServer implements Disposable {
             {
               onClose: (code: number) => {
                 this.outputChannel_.appendLine(
-                  `Inspect View exited with code ${code} (pid=${this.serverProcess_?.pid})`,
+                  `Inspect View exited with code ${code} (pid=${this.serverProcess_?.pid})`
                 );
               },
               onError: (error: Error) => {
                 this.outputChannel_.appendLine(
-                  `Error starting Inspect View ${error.message}`,
+                  `Error starting Inspect View ${error.message}`
                 );
                 reject(error);
               },
-            },
+            }
           );
           this.outputChannel_.appendLine(
-            `Starting Inspect View on port ${this.serverPort_} (pid=${this.serverProcess_?.pid})`,
+            `Starting Inspect View on port ${this.serverPort_} (pid=${this.serverProcess_?.pid})`
           );
         });
       }
@@ -287,7 +287,7 @@ export class InspectViewServer implements Disposable {
   private async api_json(
     path: string,
     headers?: Record<string, string>,
-    handleError?: (status: number) => string | undefined,
+    handleError?: (status: number) => string | undefined
   ): Promise<string> {
     return (await this.api(path, false, headers, handleError)) as string;
   }
@@ -300,7 +300,7 @@ export class InspectViewServer implements Disposable {
     path: string,
     binary: boolean = false,
     headers: Record<string, string> = {},
-    handleError?: (status: number) => string | undefined,
+    handleError?: (status: number) => string | undefined
   ): Promise<string | Uint8Array> {
     // ensure the server is started and ready
     await this.ensureRunning();
@@ -318,7 +318,7 @@ export class InspectViewServer implements Disposable {
     // make request
     const response = await fetch(
       `http://localhost:${this.serverPort_}${path}`,
-      { method: "GET", headers },
+      { method: "GET", headers }
     );
     if (response.ok) {
       if (binary) {
@@ -382,7 +382,7 @@ function evalLogs(log_dir: Uri): Promise<string | undefined> {
       }>;
       return JSON.stringify({
         log_dir: log_dir.toString(true),
-        files: logsJson.map((log) => ({
+        files: logsJson.map(log => ({
           ...log,
           name: Uri.joinPath(workspaceRoot, log.name).toString(true),
         })),
@@ -391,14 +391,14 @@ function evalLogs(log_dir: Uri): Promise<string | undefined> {
     () => {
       // Return the original log content
       return inspectEvalLogs(activeWorkspacePath());
-    },
+    }
   );
   return Promise.resolve(response);
 }
 
 function evalLog(
   file: string,
-  headerOnly: boolean | number,
+  headerOnly: boolean | number
 ): Promise<string | undefined> {
   // Old clients pass a boolean value which we need to resolve
   // into the max number of MB the log can be before samples are excluded
@@ -408,7 +408,7 @@ function evalLog(
   }
 
   return Promise.resolve(
-    inspectEvalLog(activeWorkspacePath(), file, headerOnly),
+    inspectEvalLog(activeWorkspacePath(), file, headerOnly)
   );
 }
 

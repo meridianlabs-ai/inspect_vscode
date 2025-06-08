@@ -13,7 +13,7 @@ export const templates = {
 export const readTemplate = async (
   template: Template,
   context: ExtensionContext,
-  variables: Record<string, string> = {},
+  variables: Record<string, string> = {}
 ) => {
   // Compute the template path
   const extensionUri = context.extensionUri;
@@ -21,7 +21,7 @@ export const readTemplate = async (
     extensionUri,
     "assets",
     "templates",
-    template.name,
+    template.name
   );
 
   // Read and decode the text file
@@ -30,10 +30,10 @@ export const readTemplate = async (
   let templateContent = textDecoder.decode(templateRaw);
 
   // Replace variables
-  Object.keys(variables).forEach((key) => {
+  Object.keys(variables).forEach(key => {
     templateContent = templateContent.replaceAll(
       `{{<${key}>}}`,
-      variables[key],
+      variables[key]
     );
   });
 

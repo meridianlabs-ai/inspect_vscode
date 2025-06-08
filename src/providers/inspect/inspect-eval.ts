@@ -22,7 +22,7 @@ import { findEnvPythonPath } from "../../core/python";
 
 export async function activateEvalManager(
   stateManager: WorkspaceStateManager,
-  context: ExtensionContext,
+  context: ExtensionContext
 ): Promise<[Command[], InspectEvalManager]> {
   // Activate the manager
   const inspectEvalMgr = new InspectEvalManager(stateManager, context);
@@ -51,7 +51,7 @@ export async function activateEvalManager(
 export class InspectEvalManager {
   constructor(
     private readonly stateManager_: WorkspaceStateManager,
-    context: ExtensionContext,
+    context: ExtensionContext
   ) {
     this.context_ = context;
   }
@@ -67,7 +67,7 @@ export class InspectEvalManager {
         {
           modal: true,
           detail: "pip install --upgrade inspect-ai",
-        },
+        }
       );
       return;
     }
@@ -121,7 +121,7 @@ export class InspectEvalManager {
     // Forwards task params
     const taskParams = docState.params;
     if (taskParams) {
-      Object.keys(taskParams).forEach((key) => {
+      Object.keys(taskParams).forEach(key => {
         const value = taskParams[key];
         args.push(...["-T", `${key}=${value}`]);
       });
@@ -160,7 +160,7 @@ export class InspectEvalManager {
         workspaceDir.path,
         debugPort,
         env,
-        pythonPath ? pythonPath : undefined,
+        pythonPath ? pythonPath : undefined
       );
     } else {
       // Run the command
@@ -172,7 +172,7 @@ export class InspectEvalManager {
 const runEvalCmd = (args: string[], cwd: string, python?: AbsolutePath) => {
   // See if there a non-busy terminal that we can re-use
   const name = "Inspect Eval";
-  let terminal = window.terminals.find((t) => {
+  let terminal = window.terminals.find(t => {
     return t.name === name;
   });
   if (!terminal) {
@@ -200,7 +200,7 @@ const runDebugger = async (
   cwd: string,
   port: number,
   env?: Record<string, string>,
-  pythonPath?: AbsolutePath,
+  pythonPath?: AbsolutePath
 ) => {
   const name = "Inspect Eval";
   const debugConfiguration: DebugConfiguration = {

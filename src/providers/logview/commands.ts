@@ -16,7 +16,7 @@ export interface LogviewOptions {
 }
 
 export async function logviewCommands(
-  manager: InspectViewManager,
+  manager: InspectViewManager
 ): Promise<Command[]> {
   // Check whether the open in inspect view command should be enabled
   const descriptor = inspectVersionDescriptor();
@@ -27,7 +27,7 @@ export async function logviewCommands(
   await commands.executeCommand(
     "setContext",
     "inspect_ai.enableOpenInView",
-    enableOpenInView,
+    enableOpenInView
   );
 
   return [new ShowLogviewCommand(manager), new ShowOpenLogCommand()];
@@ -42,7 +42,7 @@ class ShowLogviewCommand implements Command {
     } catch (err: unknown) {
       await showError(
         "An error occurred while attempting to start Inspect View",
-        err instanceof Error ? err : Error(String(err)),
+        err instanceof Error ? err : Error(String(err))
       );
     }
   }

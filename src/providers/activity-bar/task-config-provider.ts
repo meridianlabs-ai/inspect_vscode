@@ -49,7 +49,7 @@ export class TaskConfigurationProvider implements WebviewViewProvider {
     private readonly extensionUri_: Uri,
     private readonly stateManager_: WorkspaceStateManager,
     private readonly taskManager_: ActiveTaskManager,
-    private readonly inspectManager_: InspectManager,
+    private readonly inspectManager_: InspectManager
   ) {}
 
   public async resolveWebviewView(webviewView: WebviewView) {
@@ -87,15 +87,15 @@ export class TaskConfigurationProvider implements WebviewViewProvider {
     const removeStaleTaskParams = async (activeTaskInfo: DocumentTaskInfo) => {
       const currentState = this.stateManager_.getTaskState(
         activeTaskInfo.document.fsPath,
-        activeTaskInfo.activeTask?.name,
+        activeTaskInfo.activeTask?.name
       );
       const keysToRemove = Object.keys(currentState.params || {}).filter(
-        (key) => {
+        key => {
           return !activeTaskInfo.activeTask?.params.includes(key);
-        },
+        }
       );
       if (keysToRemove.length > 0) {
-        keysToRemove.forEach((key) => {
+        keysToRemove.forEach(key => {
           if (currentState.params) {
             delete currentState.params[key];
           }
@@ -103,7 +103,7 @@ export class TaskConfigurationProvider implements WebviewViewProvider {
         await this.stateManager_.setTaskState(
           activeTaskInfo.document.fsPath,
           currentState,
-          activeTaskInfo.activeTask?.name,
+          activeTaskInfo.activeTask?.name
         );
       }
     };
@@ -112,8 +112,8 @@ export class TaskConfigurationProvider implements WebviewViewProvider {
       this.taskManager_.onActiveTaskChanged(
         async (e: ActiveTaskChangedEvent) => {
           await updateSidebarState(e.activeTaskInfo);
-        },
-      ),
+        }
+      )
     );
 
     // If the interpreter changes, refresh the tasks
@@ -125,14 +125,14 @@ export class TaskConfigurationProvider implements WebviewViewProvider {
         } else {
           await noInspectMsg();
         }
-      }),
+      })
     );
 
     this.disposables_.push(
       webviewView.onDidChangeVisibility(async () => {
         const activeTask = this.taskManager_.getActiveTaskInfo();
         await updateTaskInfo(activeTask);
-      }),
+      })
     );
 
     webviewView.webview.html = this.htmlForWebview(webviewView.webview);
@@ -148,7 +148,7 @@ export class TaskConfigurationProvider implements WebviewViewProvider {
 
       const currentState = this.stateManager_.getTaskState(
         activeTaskInfo.document.fsPath,
-        activeTaskInfo.activeTask?.name,
+        activeTaskInfo.activeTask?.name
       );
       await webviewView.webview.postMessage({
         type: "setActiveTask",
@@ -161,10 +161,10 @@ export class TaskConfigurationProvider implements WebviewViewProvider {
     };
 
     this.disposables_.push(
-      this.taskManager_.onActiveTaskChanged(async (e) => {
+      this.taskManager_.onActiveTaskChanged(async e => {
         await updateSidebarState(e.activeTaskInfo);
         await updateTaskInfo(e.activeTaskInfo);
-      }),
+      })
     );
 
     if (inspectVersion() === null) {
@@ -182,7 +182,7 @@ export class TaskConfigurationProvider implements WebviewViewProvider {
           const path = activeTask.document.fsPath;
           const currentState = this.stateManager_.getTaskState(
             path,
-            activeTask.activeTask?.name,
+            activeTask.activeTask?.name
           );
           switch (data.command) {
             case "setStateValue":
@@ -217,10 +217,10 @@ export class TaskConfigurationProvider implements WebviewViewProvider {
           await this.stateManager_.setTaskState(
             path,
             currentState,
-            activeTask.activeTask?.name,
+            activeTask.activeTask?.name
           );
         }
-      },
+      }
     );
 
     // Attach a listener to clean up resources when the webview is disposed
@@ -230,7 +230,7 @@ export class TaskConfigurationProvider implements WebviewViewProvider {
   }
   private disposables_: Disposable[] = [];
   private dispose() {
-    this.disposables_.forEach((disposable) => {
+    this.disposables_.forEach(disposable => {
       disposable.dispose();
     });
   }
@@ -238,7 +238,7 @@ export class TaskConfigurationProvider implements WebviewViewProvider {
   private htmlForWebview(webview: Webview) {
     // Get the local path to main script run in the webview, then convert it to a uri we can use in the webview.
     const scriptUri = webview.asWebviewUri(
-      Uri.joinPath(this.extensionUri_, "out", "task-config-webview.js"),
+      Uri.joinPath(this.extensionUri_, "out", "task-config-webview.js")
     );
     const codiconsUri = webview.asWebviewUri(
       Uri.joinPath(
@@ -246,8 +246,8 @@ export class TaskConfigurationProvider implements WebviewViewProvider {
         "assets",
         "www",
         "codicon",
-        "codicon.css",
-      ),
+        "codicon.css"
+      )
     );
 
     const codiconsFontUri = webview.asWebviewUri(
@@ -256,8 +256,8 @@ export class TaskConfigurationProvider implements WebviewViewProvider {
         "assets",
         "www",
         "codicon",
-        "codicon.ttf",
-      ),
+        "codicon.ttf"
+      )
     );
 
     // Use a nonce to only allow a specific script to be run.
@@ -323,6 +323,6 @@ const updateSidebarState = async (taskInfo?: DocumentTaskInfo) => {
   await commands.executeCommand(
     "setContext",
     "inspect_ai.task-configuration.task-active",
-    taskInfo !== undefined,
+    taskInfo !== undefined
   );
 };

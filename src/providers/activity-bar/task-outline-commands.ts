@@ -68,7 +68,7 @@ export class RunSelectedEvalCommand implements Command {
     const evalPromise = this.inspectEvalMgr_.startEval(
       toAbsolutePath(path),
       task,
-      false,
+      false
     );
     const resumeFocusCommand = "inspect_ai.task-outline-view.focus";
     scheduleReturnFocus(resumeFocusCommand);
@@ -94,7 +94,7 @@ export class EditSelectedTaskCommand implements Command {
   constructor(
     private readonly tree_: TreeView<TaskTreeItem>,
     private inspectLogviewManager_: InspectViewManager,
-    private activeTaskManager_: ActiveTaskManager,
+    private activeTaskManager_: ActiveTaskManager
   ) {}
   async execute() {
     if (this.tree_.selection.length > 1) {
@@ -142,16 +142,15 @@ export class EditSelectedTaskCommand implements Command {
           ? [taskSelection?.cell]
           : undefined;
         const targetColumnn = findTargetViewColumn(logViewColumn);
-        if (targetColumnn && selections ) {
-                  await window.showNotebookDocument(notebookDocument, {
-          selections,
-          preview: false,
-          viewColumn: targetColumnn,
-        });
-        if (selections) {
-          await commands.executeCommand("notebook.cell.edit");
-        }
-
+        if (targetColumnn && selections) {
+          await window.showNotebookDocument(notebookDocument, {
+            selections,
+            preview: false,
+            viewColumn: targetColumnn,
+          });
+          if (selections) {
+            await commands.executeCommand("notebook.cell.edit");
+          }
         }
       } else {
         // Find the task selection for the document (if any)
@@ -186,7 +185,7 @@ export const findTargetViewColumn = (logViewColumn?: ViewColumn) => {
   } else {
     // Try to find a source editor which contains a task
     const visibleEditors = window.visibleTextEditors;
-    const targetEditor = visibleEditors.find((editor) => {
+    const targetEditor = visibleEditors.find(editor => {
       return documentHasTasks(editor.document);
     });
     if (targetEditor) {
@@ -220,7 +219,7 @@ export class CreateTaskCommand implements Command {
     const taskName = await window.showInputBox({
       placeHolder: "Name of the task to create",
       prompt: "Task name",
-      validateInput: (input) => {
+      validateInput: input => {
         if (!isValidPythonFnName(input)) {
           return "The task name contains invalid characters.";
         }

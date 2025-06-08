@@ -31,7 +31,7 @@ export function hooksExtensionHost(): ExtensionHost {
       viewType: string,
       title: string,
       preserveFocus?: boolean,
-      options?: vscode.WebviewPanelOptions & vscode.WebviewOptions,
+      options?: vscode.WebviewPanelOptions & vscode.WebviewOptions
     ): HostWebviewPanel => {
       // create preview panel
       // eslint-disable-next-line @typescript-eslint/no-non-null-asserted-optional-chain
@@ -44,7 +44,7 @@ export function hooksExtensionHost(): ExtensionHost {
           enableForms: options?.enableForms,
           localResourceRoots: options?.localResourceRoots,
           portMapping: options?.portMapping,
-        },
+        }
       )!;
 
       // adapt to host interface

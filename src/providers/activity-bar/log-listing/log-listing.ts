@@ -38,7 +38,7 @@ export class LogListing {
   constructor(
     context: ExtensionContext,
     private readonly logDir_: Uri,
-    private readonly viewServer_: InspectViewServer,
+    private readonly viewServer_: InspectViewServer
   ) {
     this.mru_ = new LogListingMRU(context);
   }
@@ -119,7 +119,7 @@ export class LogListing {
           files: LogFile[];
         };
         const log_dir = normalizeWindowsUri(
-          logs.log_dir.endsWith("/") ? logs.log_dir : `${logs.log_dir}/`,
+          logs.log_dir.endsWith("/") ? logs.log_dir : `${logs.log_dir}/`
         );
         for (const file of logs.files) {
           file.name = normalizeWindowsUri(file.name).replace(`${log_dir}`, "");
@@ -128,13 +128,13 @@ export class LogListing {
         return tree;
       } else {
         log.error(
-          `No response retreiving logs from ${this.logDir_.toString(false)}`,
+          `No response retreiving logs from ${this.logDir_.toString(false)}`
         );
         return [];
       }
     } catch (error) {
       log.error(
-        `Unexpected error retreiving logs from ${this.logDir_.toString(false)}`,
+        `Unexpected error retreiving logs from ${this.logDir_.toString(false)}`
       );
       log.error(error instanceof Error ? error : String(error));
       return [];
@@ -143,7 +143,7 @@ export class LogListing {
 
   private findParentNode(
     nodes: LogNode[],
-    parentName: string,
+    parentName: string
   ): LogDirectory | undefined {
     for (const node of nodes) {
       if (node.type === "dir") {
@@ -211,10 +211,10 @@ function buildLogTree(logs: LogFile[]): LogNode[] {
       currentParent = ensureDirectory(currentPath, parentDir);
 
       if (parentDir?.type === "dir") {
-        if (!parentDir.children.some((child) => child.name === currentPath)) {
+        if (!parentDir.children.some(child => child.name === currentPath)) {
           parentDir.children.push(currentParent);
         }
-      } else if (!root.some((node) => node.name === currentPath)) {
+      } else if (!root.some(node => node.name === currentPath)) {
         root.push(currentParent);
       }
     }

@@ -32,11 +32,10 @@ export class InspectWebviewManager<T extends InspectWebview<S>, S> {
       context: ExtensionContext,
       server: InspectViewServer,
       state: S,
-      webviewPanel: HostWebviewPanel,
+      webviewPanel: HostWebviewPanel
     ) => T,
-    private host_: ExtensionHost,
+    private host_: ExtensionHost
   ) {
-
     context_.subscriptions.push(
       window.registerWebviewPanelSerializer(this.viewType_, {
         deserializeWebviewPanel: (panel: WebviewPanel, state?: S) => {
@@ -50,7 +49,7 @@ export class InspectWebviewManager<T extends InspectWebview<S>, S> {
           }
           return Promise.resolve();
         },
-      }),
+      })
     );
 
     this.focusManager_ = new FocusManager(context_);
@@ -125,9 +124,9 @@ export class InspectWebviewManager<T extends InspectWebview<S>, S> {
           () => {
             // Command executed successfully
           },
-          (error) => {
+          error => {
             log.append("Couldn't focus terminal.\n" + error);
-          },
+          }
         );
       }, 50);
     } else if (lastFocused === "editor") {
@@ -139,9 +138,9 @@ export class InspectWebviewManager<T extends InspectWebview<S>, S> {
             // Refocus the active document by calling showTextDocument with the active editor
             window.showTextDocument(editor.document, editor.viewColumn).then(
               () => {},
-              (error) => {
+              error => {
                 log.append("Couldn't focus editor.\n" + error);
-              },
+              }
             );
           }, 50);
         }
@@ -151,7 +150,7 @@ export class InspectWebviewManager<T extends InspectWebview<S>, S> {
       setTimeout(() => {
         if (window.activeNotebookEditor) {
           window.activeNotebookEditor.revealRange(
-            window.activeNotebookEditor.selection,
+            window.activeNotebookEditor.selection
           );
         }
       }, 50);
@@ -163,7 +162,7 @@ export class InspectWebviewManager<T extends InspectWebview<S>, S> {
       this.context_,
       this.server_,
       state,
-      panel,
+      panel
     );
     this.registerWebviewListeners(view);
     this.activeView_ = view;
@@ -172,7 +171,7 @@ export class InspectWebviewManager<T extends InspectWebview<S>, S> {
   private createWebview(
     context: ExtensionContext,
     state: S,
-    showOptions?: ShowOptions,
+    showOptions?: ShowOptions
   ): T {
     const previewPanel = this.host_.createPreviewPanel(
       this.viewType_,
@@ -186,14 +185,14 @@ export class InspectWebviewManager<T extends InspectWebview<S>, S> {
           ...this.localResourceRoots,
           Uri.joinPath(context.extensionUri, "assets", "www"),
         ],
-      },
+      }
     );
 
     const inspectWebView = new this.webviewType_(
       context,
       this.server_,
       state,
-      previewPanel,
+      previewPanel
     );
     return inspectWebView;
   }
@@ -239,7 +238,7 @@ export abstract class InspectWebview<T> extends Disposable {
 
   public constructor(
     private readonly _context: ExtensionContext,
-    webviewPanel: HostWebviewPanel,
+    webviewPanel: HostWebviewPanel
   ) {
     super();
 
@@ -247,7 +246,7 @@ export abstract class InspectWebview<T> extends Disposable {
     this._register(
       this._webviewPanel.onDidDispose(() => {
         this.dispose();
-      }),
+      })
     );
   }
 
@@ -281,7 +280,7 @@ export abstract class InspectWebview<T> extends Disposable {
     css: string[],
     headerHtml: string,
     bodyHtml: string,
-    allowUnsafe = false,
+    allowUnsafe = false
   ) {
     const nonce = getNonce();
 
@@ -293,7 +292,7 @@ export abstract class InspectWebview<T> extends Disposable {
       return (
         html +
         `<script src="${this.extensionResourceUrl(
-          script,
+          script
         ).toString()}" nonce="${nonce}"></script>\n`
       );
     }, "");
@@ -351,7 +350,7 @@ export abstract class InspectWebview<T> extends Disposable {
 
   protected extensionResourceUrl(parts: string[]): Uri {
     return this._webviewPanel.webview.asWebviewUri(
-      Uri.joinPath(this._context.extensionUri, ...parts),
+      Uri.joinPath(this._context.extensionUri, ...parts)
     );
   }
 

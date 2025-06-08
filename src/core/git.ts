@@ -12,8 +12,8 @@ export function ensureGitignore(dir: AbsolutePath, entries: string[]): boolean {
     const gitignore = lines(
       readFileSync(gitignorePath, {
         encoding: "utf-8",
-      }),
-    ).map((line) => line.trim());
+      })
+    ).map(line => line.trim());
     const requiredEntries: string[] = [];
     for (const requiredEntry of entries) {
       if (!gitignore.includes(requiredEntry)) {
@@ -51,6 +51,6 @@ function writeGitignore(dir: string, lines: string[]) {
   writeFileSync(
     path.join(dir, ".gitignore"),
     lines.join(lineEnding) + lineEnding,
-    { encoding: "utf-8" },
+    { encoding: "utf-8" }
   );
 }

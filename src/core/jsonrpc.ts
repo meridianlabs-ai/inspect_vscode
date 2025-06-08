@@ -32,7 +32,7 @@ export function webViewJsonRpcClient(vscode: {
 
 export type JsonRpcRequestTransport = (
   method: string,
-  params: unknown[] | undefined,
+  params: unknown[] | undefined
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ) => Promise<any>;
 
@@ -54,7 +54,7 @@ export interface JsonRpcError {
 export function jsonRpcError(
   message: string,
   data?: string | Record<string, unknown>,
-  code?: number,
+  code?: number
 ): JsonRpcError {
   if (typeof data === "string") {
     data = { description: data };
@@ -73,7 +73,7 @@ export function asJsonRpcError(error: unknown) {
       return jsonRpcError(
         err.message,
         err.data as string | Record<string, unknown> | undefined,
-        err.code as number | undefined,
+        err.code as number | undefined
       );
     }
   }
@@ -86,7 +86,7 @@ export interface JsonRpcPostMessageTarget {
 }
 
 export function jsonRpcPostMessageRequestTransport(
-  target: JsonRpcPostMessageTarget,
+  target: JsonRpcPostMessageTarget
 ): {
   request: JsonRpcRequestTransport;
   disconnect: () => void;
@@ -98,7 +98,7 @@ export function jsonRpcPostMessageRequestTransport(
   >();
 
   // listen for responses
-  const disconnect = target.onMessage((ev) => {
+  const disconnect = target.onMessage(ev => {
     const response = asJsonRpcResponse(ev);
     if (response) {
       const request = requests.get(response.id);
@@ -141,14 +141,14 @@ export function jsonRpcPostMessageServer(
   target: JsonRpcPostMessageTarget,
   methods:
     | Record<string, JsonRpcServerMethod>
-    | ((name: string) => JsonRpcServerMethod | undefined),
+    | ((name: string) => JsonRpcServerMethod | undefined)
 ) {
   // method lookup function
   const lookupMethod =
     typeof methods === "function" ? methods : (name: string) => methods[name];
 
   // listen for messages
-  return target.onMessage((data) => {
+  return target.onMessage(data => {
     const request = asJsonRpcRequest(data);
     if (request) {
       // lookup method
@@ -160,10 +160,10 @@ export function jsonRpcPostMessageServer(
 
       // dispatch method
       method(request.params || [])
-        .then((value) => {
+        .then(value => {
           target.postMessage(jsonRpcResponse(request, value));
         })
-        .catch((error) => {
+        .catch(error => {
           target.postMessage({
             jsonrpc: request.jsonrpc,
             id: request.id,
@@ -237,7 +237,7 @@ function jsonRpcResponse(request: JsonRpcRequest, result?: unknown) {
 function jsonRpcErrorResponse(
   request: JsonRpcRequest,
   code: number,
-  message: string,
+  message: string
 ) {
   return {
     jsonrpc: request.jsonrpc,
@@ -250,6 +250,6 @@ function methodNotFoundResponse(request: JsonRpcRequest) {
   return jsonRpcErrorResponse(
     request,
     kJsonRpcMethodNotFound,
-    `Method '${request.method}' not found.`,
+    `Method '${request.method}' not found.`
   );
 }

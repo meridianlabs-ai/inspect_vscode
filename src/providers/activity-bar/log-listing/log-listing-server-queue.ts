@@ -27,7 +27,7 @@ export class LogElementQueueProcessor {
     private readonly logListing: () => LogListing | undefined,
     private readonly context: vscode.ExtensionContext,
     private readonly onElementUpdated: (element: LogNode) => void,
-    private readonly batchSize: number = 10,
+    private readonly batchSize: number = 10
   ) {
     // Load cache from workspace storage
     const savedCache =
@@ -68,7 +68,7 @@ export class LogElementQueueProcessor {
     try {
       // Collect all URIs
       const elementUris = new Map<string, LogNode>();
-      elements.forEach((element) => {
+      elements.forEach(element => {
         const listing = this.logListing();
         const uri = listing?.uriForNode(element);
         if (uri) {
@@ -79,7 +79,7 @@ export class LogElementQueueProcessor {
 
       // Handle cached elements (if they're in the cache,
       // screen them out after populating them from cache)
-      const uris = allUris.filter((uri) => {
+      const uris = allUris.filter(uri => {
         const cached = this.elementCache.get(uri);
         if (cached) {
           const el = elementUris.get(uri);
@@ -110,7 +110,7 @@ export class LogElementQueueProcessor {
               element.iconPath = iconForStatus(
                 this.context,
                 element,
-                evalLog.status,
+                evalLog.status
               );
               element.tooltip = evalSummary(evalLog);
 
@@ -126,7 +126,7 @@ export class LogElementQueueProcessor {
                 // Persist the cache
                 await this.context.workspaceState.update(
                   kLogListCacheName,
-                  Array.from(this.elementCache.entries()),
+                  Array.from(this.elementCache.entries())
                 );
                 this.enforceCacheLimit();
               }
@@ -142,7 +142,7 @@ export class LogElementQueueProcessor {
       this.queue = [];
     } finally {
       // Remove processed elements
-      this.queue = this.queue.filter((item) => !elements.includes(item));
+      this.queue = this.queue.filter(item => !elements.includes(item));
       this.isProcessing = false;
 
       // Process remaining items if any
@@ -179,7 +179,7 @@ export class LogElementQueueProcessor {
 function iconForStatus(
   context: vscode.ExtensionContext,
   element: LogNode,
-  status?: string,
+  status?: string
 ) {
   if (element.name.endsWith(".eval")) {
     let modifier = undefined;
@@ -197,24 +197,22 @@ function iconForStatus(
 
     if (modifier) {
       return context.asAbsolutePath(
-        path.join("assets", "icon", `eval-treeview-${modifier}.svg`),
+        path.join("assets", "icon", `eval-treeview-${modifier}.svg`)
       );
     } else {
       return context.asAbsolutePath(
-        path.join("assets", "icon", "eval-treeview.svg"),
+        path.join("assets", "icon", "eval-treeview.svg")
       );
     }
   } else {
     return new vscode.ThemeIcon(
       "bracket",
-      new vscode.ThemeColor("symbolIcon.classForeground"),
+      new vscode.ThemeColor("symbolIcon.classForeground")
     );
   }
 }
 
-export function evalSummary(
-  log: EvalLog,
-): MarkdownString | undefined {
+export function evalSummary(log: EvalLog): MarkdownString | undefined {
   // build summary
   const summary = evalHeader(log);
 
@@ -262,7 +260,7 @@ function evalTarget(log: EvalLog): string {
     dataset.push(
       `(${log.eval.dataset.samples}${epochs} sample` +
         (log.eval.dataset.samples > 1 ? "s" : "") +
-        ")",
+        ")"
     );
   }
   if (dataset.length === 1) {
@@ -273,7 +271,7 @@ function evalTarget(log: EvalLog): string {
   // scorers
   if (log.results) {
     const scorer_names = new Set<string>(
-      log.results.scores.map((score) => score.scorer),
+      log.results.scores.map(score => score.scorer)
     );
     target.push("scorers: " + Array.from(scorer_names).join(", "));
   }
@@ -313,13 +311,11 @@ function isObject(value: unknown): value is Record<string, unknown> {
 }
 
 function evalResults(results: EvalResults): string[] {
-  const scorer_names = new Set<string>(
-    results.scores.map((score) => score.name),
-  );
+  const scorer_names = new Set<string>(results.scores.map(score => score.name));
   const reducer_names = new Set<string>(
     results.scores
-      .filter((score) => score.reducer !== null)
-      .map((score) => score.reducer || ""),
+      .filter(score => score.reducer !== null)
+      .map(score => score.reducer || "")
   );
   const show_reducer = reducer_names.size > 1 || !reducer_names.has("avg");
   const output: Record<string, string> = {};

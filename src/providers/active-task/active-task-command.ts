@@ -6,7 +6,7 @@ import { ActiveTaskManager } from "./active-task-provider";
 export class RunActiveTaskCommand implements Command {
   constructor(
     private readonly manager_: ActiveTaskManager,
-    private readonly inspectMgr_: InspectEvalManager,
+    private readonly inspectMgr_: InspectEvalManager
   ) {}
   async execute(): Promise<void> {
     const taskInfo = this.manager_.getActiveTaskInfo();
@@ -15,7 +15,7 @@ export class RunActiveTaskCommand implements Command {
       await this.inspectMgr_.startEval(
         docPath,
         taskInfo.activeTask?.name,
-        false,
+        false
       );
     }
   }
@@ -27,7 +27,7 @@ export class RunActiveTaskCommand implements Command {
 export class DebugActiveTaskCommand implements Command {
   constructor(
     private readonly manager_: ActiveTaskManager,
-    private readonly inspectMgr_: InspectEvalManager,
+    private readonly inspectMgr_: InspectEvalManager
   ) {}
   async execute(): Promise<void> {
     const taskInfo = this.manager_.getActiveTaskInfo();
@@ -36,7 +36,7 @@ export class DebugActiveTaskCommand implements Command {
       await this.inspectMgr_.startEval(
         docPath,
         taskInfo.activeTask?.name,
-        true,
+        true
       );
     }
   }

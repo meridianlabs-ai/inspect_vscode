@@ -25,7 +25,7 @@ import { debounce } from "lodash";
 // Activates the provider which tracks the currently active task (document and task name)
 export function activateActiveTaskProvider(
   inspectEvalManager: InspectEvalManager,
-  context: ExtensionContext,
+  context: ExtensionContext
 ): [Command[], ActiveTaskManager] {
   const activeTaskManager = new ActiveTaskManager(context);
 
@@ -52,13 +52,13 @@ export class ActiveTaskManager {
           async (event: TextEditorSelectionChangeEvent) => {
             await this.updateActiveTaskWithDocument(
               event.textEditor.document,
-              event.selections[0],
+              event.selections[0]
             );
           },
           300,
-          { trailing: true },
-        ),
-      ),
+          { trailing: true }
+        )
+      )
     );
 
     context.subscriptions.push(
@@ -70,26 +70,26 @@ export class ActiveTaskManager {
               window.activeNotebookEditor.selection
             ) {
               const cell = event?.notebook.cellAt(
-                window.activeNotebookEditor.selection.start,
+                window.activeNotebookEditor.selection.start
               );
               await this.updateActiveTaskWithDocument(
                 cell?.document,
-                new Selection(new Position(0, 0), new Position(0, 0)),
+                new Selection(new Position(0, 0), new Position(0, 0))
               );
             }
           },
           300,
-          { trailing: true },
-        ),
-      ),
+          { trailing: true }
+        )
+      )
     );
 
     context.subscriptions.push(
-      window.onDidChangeActiveTextEditor(async (event) => {
+      window.onDidChangeActiveTextEditor(async event => {
         if (event) {
           await this.updateActiveTaskWithDocument(event.document);
         }
-      }),
+      })
     );
   }
   private activeTaskInfo_: DocumentTaskInfo | undefined;
@@ -120,14 +120,14 @@ export class ActiveTaskManager {
       await commands.executeCommand(
         "setContext",
         "inspect_ai.activeTask",
-        taskActive,
+        taskActive
       );
     }
   }
 
   async updateActiveTaskWithDocument(
     document?: TextDocument,
-    selection?: Selection,
+    selection?: Selection
   ) {
     if (document && selection) {
       const activeTaskInfo =
@@ -144,8 +144,8 @@ export class ActiveTaskManager {
       const notebookDocument =
         await workspace.openNotebookDocument(documentUri);
       const cells = cellTasks(notebookDocument);
-      const cellTask = cells.find((c) => {
-        return c.tasks.find((t) => {
+      const cellTask = cells.find(c => {
+        return c.tasks.find(t => {
           return t.name === task;
         });
       });
@@ -172,7 +172,7 @@ export class ActiveTaskManager {
 
 function getTaskInfoFromDocument(
   document: TextDocument,
-  selection?: Selection,
+  selection?: Selection
 ): DocumentTaskInfo | undefined {
   // Try to get symbols to read task info for this document
   // Note that the retry is here since the symbol provider
@@ -190,7 +190,7 @@ function getTaskInfoFromDocument(
   // Find the first task that appears before the selection
   // or otherwise the first task
 
-  const activeTask = [...tasks].reverse().find((task) => {
+  const activeTask = [...tasks].reverse().find(task => {
     return task.line <= selectionLine;
   });
   return {
@@ -202,7 +202,7 @@ function getTaskInfoFromDocument(
 
 function getTaskInfo(
   document: TextDocument,
-  task: string,
+  task: string
 ): DocumentTaskInfo | undefined {
   // Try to get symbols to read task info for this document
   // Note that the retry is here since the symbol provider
@@ -213,7 +213,7 @@ function getTaskInfo(
   // Find the first task that appears before the selection
   // or otherwise the first task
 
-  const activeTask = [...tasks].reverse().find((t) => {
+  const activeTask = [...tasks].reverse().find(t => {
     return t.name === task;
   });
   return {

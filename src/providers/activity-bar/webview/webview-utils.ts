@@ -39,7 +39,7 @@ export const whenChanged = (id: string, fn: (value: string) => void) => {
 export const showEmptyPanel = (
   message: string,
   controlPanelId?: string,
-  targetId?: string,
+  targetId?: string
 ) => {
   if (controlPanelId) {
     setControlsVisible(controlPanelId, false);

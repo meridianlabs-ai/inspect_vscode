@@ -23,9 +23,9 @@ export interface SelectLocationQuickPickItem extends QuickPickItem {
 
 export async function selectLogDirectory(
   context: ExtensionContext,
-  envManager: WorkspaceEnvManager,
+  envManager: WorkspaceEnvManager
 ): Promise<Uri | null | undefined> {
-  return new Promise<Uri | null | undefined>((resolve) => {
+  return new Promise<Uri | null | undefined>(resolve => {
     // get the default workspace env dir
     const workspaceLogDir = envManager.getDefaultLogDir();
 
@@ -33,7 +33,7 @@ export async function selectLogDirectory(
     const mru = new LogListingMRU(context);
     const mruLocations = mru
       .get()
-      .filter((location) => location.toString() !== workspaceLogDir.toString());
+      .filter(location => location.toString() !== workspaceLogDir.toString());
 
     // build list of items
     const items: SelectLocationQuickPickItem[] = [];
@@ -139,7 +139,7 @@ export async function selectRemoteURL(): Promise<Uri | undefined> {
   const remoteUrl = await window.showInputBox({
     title: "Remote Log Directory",
     prompt: "Provide a remote log directory (e.g. s3://my-bucket/logs)",
-    validateInput: (value) => {
+    validateInput: value => {
       // don't try to validate empty string
       if (value.length === 0) {
         return null;

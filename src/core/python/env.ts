@@ -6,7 +6,7 @@ import { AbsolutePath, toAbsolutePath } from "../path";
 
 export function findEnvPythonPath(
   startDir: AbsolutePath,
-  baseDir: AbsolutePath,
+  baseDir: AbsolutePath
 ): AbsolutePath | null {
   let currentDir = startDir;
   while (currentDir.path !== baseDir.path) {
@@ -30,8 +30,8 @@ function findEnvPython(directory: AbsolutePath): string | null {
 
   // Filter only directories and check if any is an environment directory
   const envDir = items
-    .map((item) => path.join(directory.path, item))
-    .filter((filePath) => fs.statSync(filePath).isDirectory())
+    .map(item => path.join(directory.path, item))
+    .filter(filePath => fs.statSync(filePath).isDirectory())
     .find(isEnvDir);
 
   if (envDir) {

@@ -27,7 +27,7 @@ class InspectPropsCache implements Disposable {
   constructor(
     private binPath_: AbsolutePath | null,
     private version_: VersionDescriptor | null,
-    private viewPath_: AbsolutePath | null,
+    private viewPath_: AbsolutePath | null
   ) {
     this.eventHandle_ = pythonInterpreter().onDidChange(() => {
       log.info("Resetting Inspect props to null");
@@ -189,7 +189,7 @@ export function inspectLastEvalPaths(): AbsolutePath[] {
       : "last-eval-result";
 
   return [userRuntimeDir(kPythonPackageName), userDataDir(kPythonPackageName)]
-    .map((dir) => join(dir, "view", fileName))
+    .map(dir => join(dir, "view", fileName))
     .map(toAbsolutePath);
 }
 

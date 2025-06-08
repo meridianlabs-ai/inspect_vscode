@@ -11,7 +11,7 @@ export function appDataDir(appName: string, subdir?: string, roaming = false) {
 export function appConfigDir(
   appName: string,
   subdir?: string,
-  roaming = false,
+  roaming = false
 ) {
   return appDir(appName, userConfigDir, subdir, roaming);
 }
@@ -28,7 +28,7 @@ function appDir(
   appName: string,
   sourceFn: (appName: string, roaming?: boolean) => string,
   subdir?: string,
-  roaming?: boolean,
+  roaming?: boolean
 ) {
   const dir = sourceFn(appName, roaming);
   const fullDir = subdir ? path.join(dir, subdir) : dir;
@@ -91,7 +91,7 @@ function darwinUserDataDir(appName: string) {
     process.env.HOME || "",
     "Library",
     "Application Support",
-    appName,
+    appName
   );
 }
 
@@ -101,7 +101,7 @@ function darwinUserCacheDir(appName: string) {
     "Library",
     "Caches",
     "TemporaryItems",
-    appName,
+    appName
   );
 }
 

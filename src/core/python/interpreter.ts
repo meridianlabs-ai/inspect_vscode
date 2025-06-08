@@ -21,7 +21,7 @@ export async function initPythonInterpreter(): Promise<Disposable> {
     await pyExtension.activate();
   }
   pythonInterpreter_ = new PythonInterpreter(
-    pyExtension as Extension<PythonExtension> | undefined,
+    pyExtension as Extension<PythonExtension> | undefined
   );
   return pythonInterpreter_;
 }
@@ -43,7 +43,7 @@ export class PythonInterpreter implements Disposable {
     // subscribe to changes
     if (this.pyExtension_) {
       const api = this.pyExtension_.exports;
-      this.eventHandle_ = api.settings.onDidChangeExecutionDetails((e) => {
+      this.eventHandle_ = api.settings.onDidChangeExecutionDetails(e => {
         const execCommand = this.getExecCommand();
         if (execCommand) {
           this.execCommand_ = execCommand;
@@ -94,11 +94,11 @@ export class PythonInterpreter implements Disposable {
     if (this.pyExtension_) {
       const execDetails =
         this.pyExtension_.exports.settings.getExecutionDetails(
-          workspaceFolder.uri,
+          workspaceFolder.uri
         ) as { execCommand?: string[] };
       if (Array.isArray(execDetails?.execCommand)) {
         log.info(
-          "Found python exec command: " + execDetails?.execCommand.join(" "),
+          "Found python exec command: " + execDetails?.execCommand.join(" ")
         );
         return execDetails?.execCommand;
       } else {

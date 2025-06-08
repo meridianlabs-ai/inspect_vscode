@@ -13,7 +13,7 @@ export const readEnv = (file: Uri): Record<string, string> => {
 
   // Read the env file
   return envLines
-    .map((line) => {
+    .map(line => {
       return readLine(line);
     })
     .reduce(
@@ -23,7 +23,7 @@ export const readEnv = (file: Uri): Record<string, string> => {
         }
         return prev;
       },
-      {} as Record<string, string>,
+      {} as Record<string, string>
     );
 };
 
@@ -79,7 +79,7 @@ function readLine(line: string) {
   const key = trimmed.substring(0, eqIdx).trim();
   let value = trimmed.substring(eqIdx + 1).trim();
 
-  ["'", '"'].forEach((quote) => {
+  ["'", '"'].forEach(quote => {
     if (value.startsWith(quote) && value.endsWith(quote)) {
       value = value.substring(quote.length, value.length - quote.length);
     }
@@ -94,7 +94,7 @@ function readEnvLines(file: Uri) {
 }
 
 function toLine(key: string, value: string) {
-  const needsQuote = [" ", "'", '"'].some((char) => {
+  const needsQuote = [" ", "'", '"'].some(char => {
     return value.indexOf(char) > -1;
   });
 

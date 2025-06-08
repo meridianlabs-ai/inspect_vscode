@@ -31,7 +31,7 @@ provideFASTDesignSystem().register(fastCombobox(), fastOption());
 const vscode = acquireVsCodeApi();
 
 // Process messages
-window.addEventListener("message", (e) => {
+window.addEventListener("message", e => {
   switch (e.data.type) {
     case "initialize":
       showEmptyPanel("No task selected", "configuration-controls");
@@ -40,7 +40,7 @@ window.addEventListener("message", (e) => {
     case "noInspect":
       showEmptyPanel(
         "Inspect Package not installed.",
-        "configuration-controls",
+        "configuration-controls"
       );
       break;
 
@@ -71,7 +71,7 @@ window.addEventListener("message", (e) => {
               }
             }
             taskArgContainer.appendChild(textField);
-            whenChanged(id, (value) => {
+            whenChanged(id, value => {
               setStateParam(param, value);
             });
             count++;
@@ -80,7 +80,7 @@ window.addEventListener("message", (e) => {
             showEmptyPanel(
               "No arguments for this task",
               undefined,
-              "task-args",
+              "task-args"
             );
           }
         }
@@ -104,27 +104,27 @@ function restoreState(state?: DocumentState) {
 }
 
 function attachListeners() {
-  whenChanged("epochs", (value) => {
+  whenChanged("epochs", value => {
     setStateValue("epochs", value);
   });
 
-  whenChanged("limit", (value) => {
+  whenChanged("limit", value => {
     setStateValue("limit", value);
   });
 
-  whenChanged("temperature", (value) => {
+  whenChanged("temperature", value => {
     setStateValue("temperature", value);
   });
 
-  whenChanged("max_tokens", (value) => {
+  whenChanged("max_tokens", value => {
     setStateValue("maxTokens", value);
   });
 
-  whenChanged("top_p", (value) => {
+  whenChanged("top_p", value => {
     setStateValue("topP", value);
   });
 
-  whenChanged("top_k", (value) => {
+  whenChanged("top_k", value => {
     setStateValue("topK", value);
   });
 }

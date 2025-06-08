@@ -5,7 +5,7 @@ export async function selectFileUri(): Promise<Uri | undefined> {
   const uriOrPath = await window.showInputBox({
     title: "Select Log File",
     prompt: "Provide a path to a log file",
-    validateInput: async (value) => {
+    validateInput: async value => {
       // don't try to validate empty string
       if (value.length === 0) {
         return null;

@@ -13,7 +13,7 @@ const kInspectConfigNotifyEvalComplete = "notifyEvalComplete";
 // Manages the settings for the inspect extension
 export class InspectSettingsManager {
   constructor(private readonly onChanged_: (() => void) | undefined) {
-    workspace.onDidChangeConfiguration((event) => {
+    workspace.onDidChangeConfiguration(event => {
       if (event.affectsConfiguration(kInspectConfigSection)) {
         // Configuration for has changed
         this.settings_ = undefined;
@@ -43,7 +43,7 @@ export class InspectSettingsManager {
   private readSettings() {
     const configuration = workspace.getConfiguration(kInspectConfigSection);
     const notifyEvalComplete = configuration.get<boolean>(
-      kInspectConfigNotifyEvalComplete,
+      kInspectConfigNotifyEvalComplete
     );
     return {
       notifyEvalComplete:

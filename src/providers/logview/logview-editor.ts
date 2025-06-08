@@ -17,7 +17,7 @@ export const kInspectLogViewType = "inspect-ai.log-editor";
 class InspectLogReadonlyEditor implements vscode.CustomReadonlyEditorProvider {
   static register(
     context: vscode.ExtensionContext,
-    server: InspectViewServer,
+    server: InspectViewServer
   ): vscode.Disposable {
     const provider = new InspectLogReadonlyEditor(context, server);
     const providerRegistration = vscode.window.registerCustomEditorProvider(
@@ -28,28 +28,27 @@ class InspectLogReadonlyEditor implements vscode.CustomReadonlyEditorProvider {
           retainContextWhenHidden: false,
         },
         supportsMultipleEditorsPerDocument: false,
-      },
+      }
     );
     return providerRegistration;
   }
 
   constructor(
     private readonly context_: vscode.ExtensionContext,
-    private readonly server_: InspectViewServer,
+    private readonly server_: InspectViewServer
   ) {}
 
   // eslint-disable-next-line @typescript-eslint/require-await
   async openCustomDocument(
     uri: vscode.Uri,
     _openContext: vscode.CustomDocumentOpenContext,
-    _token: vscode.CancellationToken,
+    _token: vscode.CancellationToken
   ): Promise<vscode.CustomDocument> {
-
     // Parse any params from the Uri
     const queryParams = new URLSearchParams(uri.query);
     const sample_id = queryParams.get("sample_id");
     const epoch = queryParams.get("epoch");
-  
+
     // Return the document with additional info attached to payload
     return {
       uri: uri,
@@ -62,10 +61,12 @@ class InspectLogReadonlyEditor implements vscode.CustomReadonlyEditorProvider {
   async resolveCustomEditor(
     document: vscode.CustomDocument,
     webviewPanel: vscode.WebviewPanel,
-    _token: vscode.CancellationToken,
+    _token: vscode.CancellationToken
   ): Promise<void> {
-
-    const doc = document as vscode.CustomDocument & { sample_id?: string; epoch?: string };
+    const doc = document as vscode.CustomDocument & {
+      sample_id?: string;
+      epoch?: string;
+    };
     const sample_id = doc.sample_id;
     const epoch = doc.epoch;
 
@@ -79,7 +80,7 @@ class InspectLogReadonlyEditor implements vscode.CustomReadonlyEditorProvider {
         const fileSize = await this.server_.evalLogSize(docUriStr);
         if (fileSize > 1024 * 1000 * 100) {
           log.info(
-            `JSON log file ${document.uri.path} is to large for Inspect View, opening in text editor.`,
+            `JSON log file ${document.uri.path} is to large for Inspect View, opening in text editor.`
           );
           useLogViewer = false;
         }
@@ -108,17 +109,20 @@ class InspectLogReadonlyEditor implements vscode.CustomReadonlyEditorProvider {
         this.context_,
         this.server_,
         "file",
-        docUriNoParams,
+        docUriNoParams
       );
 
-    // set html
+      // set html
       const logViewState: LogviewState = {
         log_file: docUriNoParams,
         log_dir: dirname(docUriNoParams),
-        sample: (sample_id && epoch) ? {
-          id: sample_id,
-          epoch: epoch,
-        } : undefined,
+        sample:
+          sample_id && epoch
+            ? {
+                id: sample_id,
+                epoch: epoch,
+              }
+            : undefined,
       };
       webviewPanel.webview.html = this.logviewPanel_.getHtml(logViewState);
     } else {
@@ -127,7 +131,7 @@ class InspectLogReadonlyEditor implements vscode.CustomReadonlyEditorProvider {
         "vscode.openWith",
         document.uri,
         "default",
-        viewColumn,
+        viewColumn
       );
     }
   }
@@ -141,9 +145,9 @@ class InspectLogReadonlyEditor implements vscode.CustomReadonlyEditorProvider {
 
 export function activateLogviewEditor(
   context: vscode.ExtensionContext,
-  server: InspectViewServer,
+  server: InspectViewServer
 ) {
   context.subscriptions.push(
-    InspectLogReadonlyEditor.register(context, server),
+    InspectLogReadonlyEditor.register(context, server)
   );
 }

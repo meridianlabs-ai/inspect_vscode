@@ -19,7 +19,7 @@ import { removeFilesSync } from "../../core/file";
 
 export function activateInspectCommands(
   stateManager: WorkspaceStateManager,
-  context: ExtensionContext,
+  context: ExtensionContext
 ) {
   const inspectCommands = new InspectCommandDispatcher(stateManager);
   context.subscriptions.push(inspectCommands);
@@ -35,7 +35,7 @@ export class InspectCommandDispatcher implements Disposable {
       new RelativePattern(Uri.file(this.commandsDir_), "*"),
       false,
       true,
-      true,
+      true
     );
     this.commandsWatcher_.onDidCreate(async () => {
       const commandsRequest = this.collectCommandsRequest();
@@ -45,7 +45,7 @@ export class InspectCommandDispatcher implements Disposable {
           log.appendLine(`Executing VS Code command ${command.command}`);
           try {
             log.info(
-              `Executing command: ${command.command} with args: ${JSON.stringify(command.args)}`,
+              `Executing command: ${command.command} with args: ${JSON.stringify(command.args)}`
             );
             await commands.executeCommand(command.command, ...command.args);
           } catch (error) {
@@ -64,11 +64,9 @@ export class InspectCommandDispatcher implements Disposable {
       const commandFile = commandFiles[0];
       const commandContents = readFileSync(
         join(this.commandsDir_, commandFile),
-        { encoding: "utf-8" },
+        { encoding: "utf-8" }
       );
-      removeFilesSync(
-        commandFiles.map((file) => join(this.commandsDir_, file)),
-      );
+      removeFilesSync(commandFiles.map(file => join(this.commandsDir_, file)));
       return JSON.parse(commandContents) as Array<{
         command: string;
         args: unknown[];
@@ -99,13 +97,13 @@ function inspectCommandsDir(stateManager: WorkspaceStateManager): string {
           kPythonPackageName,
           "vscode",
           stateManager.getWorkspaceInstance(),
-          "commands",
+          "commands"
         )
       : join(
           kPythonPackageName,
           "vscode",
           stateManager.getWorkspaceInstance(),
-          "commands",
+          "commands"
         );
   const commandsDir = userDataDir(platformPath);
 

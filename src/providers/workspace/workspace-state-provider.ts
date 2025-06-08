@@ -3,7 +3,7 @@ import { Command } from "../../core/command";
 import { randomInt } from "../../core/random";
 
 export function activateWorkspaceState(
-  context: ExtensionContext,
+  context: ExtensionContext
 ): [Command[], WorkspaceStateManager] {
   const stateManager = new WorkspaceStateManager(context);
   return [[], stateManager];
@@ -28,7 +28,7 @@ export class WorkspaceStateManager {
 
   public async initializeWorkspaceId() {
     const existingKey = this.context_.workspaceState.get<string>(
-      "INSPECT_WORKSPACE_ID",
+      "INSPECT_WORKSPACE_ID"
     );
     if (!existingKey) {
       const key = `${Date.now()}-${randomInt(0, 100000)}`;
@@ -57,11 +57,11 @@ export class WorkspaceStateManager {
   public async setTaskState(
     taskFilePath: string,
     state: DocumentState,
-    taskName?: string,
+    taskName?: string
   ) {
     await this.context_.workspaceState.update(
       taskKey(taskFilePath, taskName),
-      state,
+      state
     );
   }
 

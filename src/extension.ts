@@ -83,7 +83,7 @@ export async function activate(context: ExtensionContext) {
   start("Setup Eval Command");
   const [inspectEvalCommands, inspectEvalMgr] = await activateEvalManager(
     stateManager,
-    context,
+    context
   );
 
   // Activate commands interface
@@ -95,13 +95,13 @@ export async function activate(context: ExtensionContext) {
   start("Monitor Tasks");
   const [taskCommands, activeTaskManager] = activateActiveTaskProvider(
     inspectEvalMgr,
-    context,
+    context
   );
 
   // Active the workspace manager to watch for tasks
   const workspaceTaskMgr = activateWorkspaceTaskProvider(
     inspectManager,
-    context,
+    context
   );
   end("Monitor Tasks");
 
@@ -127,7 +127,7 @@ export async function activate(context: ExtensionContext) {
     workspaceEnvManager,
     logsWatcher,
     context,
-    host,
+    host
   );
   const inspectLogviewManager = logviewWebviewManager;
 
@@ -147,7 +147,7 @@ export async function activate(context: ExtensionContext) {
     workspaceEnvManager,
     server,
     logsWatcher,
-    context,
+    context
   );
   end("Setup Activity Bar");
 
@@ -172,7 +172,7 @@ export async function activate(context: ExtensionContext) {
     ...stateCommands,
     ...envComands,
     ...taskCommands,
-  ].forEach((cmd) => commandManager.register(cmd));
+  ].forEach(cmd => commandManager.register(cmd));
   context.subscriptions.push(commandManager);
 
   end("Final Setup");
@@ -194,7 +194,7 @@ const checkInspectVersion = async () => {
       await window.showInformationMessage<MessageItem>(
         "The VS Code extension requires a newer version of Inspect. Please update " +
           "with pip install --upgrade inspect-ai",
-        close,
+        close
       );
     }
   }

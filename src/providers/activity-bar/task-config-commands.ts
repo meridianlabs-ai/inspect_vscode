@@ -7,7 +7,7 @@ import { scheduleReturnFocus } from "../../components/focus";
 export class RunConfigTaskCommand implements Command {
   constructor(
     private readonly manager_: ActiveTaskManager,
-    private readonly inspectMgr_: InspectEvalManager,
+    private readonly inspectMgr_: InspectEvalManager
   ) {}
   async execute(): Promise<void> {
     const taskInfo = this.manager_.getActiveTaskInfo();
@@ -16,7 +16,7 @@ export class RunConfigTaskCommand implements Command {
       const evalPromise = this.inspectMgr_.startEval(
         docPath,
         taskInfo.activeTask?.name,
-        false,
+        false
       );
       scheduleReturnFocus("inspect_ai.task-configuration.focus");
       await evalPromise;
@@ -30,7 +30,7 @@ export class RunConfigTaskCommand implements Command {
 export class DebugConfigTaskCommand implements Command {
   constructor(
     private readonly manager_: ActiveTaskManager,
-    private readonly inspectMgr_: InspectEvalManager,
+    private readonly inspectMgr_: InspectEvalManager
   ) {}
   async execute(): Promise<void> {
     const taskInfo = this.manager_.getActiveTaskInfo();
@@ -39,7 +39,7 @@ export class DebugConfigTaskCommand implements Command {
       const evalPromise = this.inspectMgr_.startEval(
         docPath,
         taskInfo.activeTask?.name,
-        true,
+        true
       );
       scheduleReturnFocus("inspect_ai.task-configuratio.focus");
       await evalPromise;

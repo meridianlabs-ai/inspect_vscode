@@ -18,7 +18,7 @@ export class InspectLogsWatcher implements Disposable {
     log.appendLine("Watching for evaluation logs");
     this.lastEval_ = Date.now();
 
-    const evalSignalFiles = inspectLastEvalPaths().map((path) => path.path);
+    const evalSignalFiles = inspectLastEvalPaths().map(path => path.path);
 
     this.watchInterval_ = setInterval(() => {
       for (const evalSignalFile of evalSignalFiles) {
@@ -48,7 +48,7 @@ export class InspectLogsWatcher implements Disposable {
               () => {
                 // 0.3.8 or earlier
                 evalLogPath = contents;
-              },
+              }
             );
 
             if (evalLogPath !== undefined) {

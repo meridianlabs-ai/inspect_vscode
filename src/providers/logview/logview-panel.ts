@@ -27,7 +27,7 @@ export class LogviewPanel extends Disposable {
     private context_: ExtensionContext,
     server: InspectViewServer,
     type: "file" | "dir",
-    uri: Uri,
+    uri: Uri
   ) {
     super();
 
@@ -43,14 +43,14 @@ export class LogviewPanel extends Disposable {
         server.evalLogBytes(
           params[0] as string,
           params[1] as number,
-          params[2] as number,
+          params[2] as number
         ),
       [kMethodEvalLogHeaders]: (params: unknown[]) =>
         server.evalLogHeaders(params[0] as string[]),
       [kMethodPendingSamples]: (params: unknown[]) =>
         server.evalLogPendingSamples(
           params[0] as string,
-          params[1] as string | undefined,
+          params[1] as string | undefined
         ),
       [kMethodSampleData]: (params: unknown[]) =>
         server.evalLogSampleData(
@@ -58,7 +58,7 @@ export class LogviewPanel extends Disposable {
           params[1] as string | number,
           params[2] as number,
           params[3] as number | undefined,
-          params[4] as number | undefined,
+          params[4] as number | undefined
         ),
     });
 
@@ -88,7 +88,7 @@ export class LogviewPanel extends Disposable {
                     const close: MessageItem = { title: "Close" };
                     await window.showInformationMessage<MessageItem>(
                       "This file is too large to be opened by the viewer.",
-                      close,
+                      close
                     );
                   } else {
                     throw err;
@@ -98,7 +98,7 @@ export class LogviewPanel extends Disposable {
             }
             break;
         }
-      },
+      }
     );
   }
 
@@ -143,11 +143,11 @@ export class LogviewPanel extends Disposable {
         type: "updateState",
         url: state.log_file?.toString(),
         sample_id: state.sample?.id,
-        sample_epoch: state.sample?.epoch
+        sample_epoch: state.sample?.epoch,
       };
       const stateScript = state.log_file
         ? `<script id="logview-state" type="application/json">${JSON.stringify(
-            stateMsg,
+            stateMsg
           )}</script>`
         : "";
 
@@ -171,7 +171,7 @@ export class LogviewPanel extends Disposable {
     ${stateScript}
     ${overrideCssHtml}
 
-    `,
+    `
       );
 
       // function to resolve resource uri
@@ -183,7 +183,7 @@ export class LogviewPanel extends Disposable {
       // nonces for scripts
       indexHtml = indexHtml.replace(
         /<script([ >])/g,
-        `<script nonce="${nonce}"$1`,
+        `<script nonce="${nonce}"$1`
       );
 
       // Determine whether this is the old index.html format (before bundling),
@@ -206,7 +206,7 @@ export class LogviewPanel extends Disposable {
           /": "\.([^?"]+)(["?])/g,
           (_, p1: string, p2: string) => {
             return `": "${resourceUri(p1)}${p2}`;
-          },
+          }
         );
 
         // fixup App.mjs
@@ -249,7 +249,7 @@ Inspect not available.
 
   private extensionResourceUrl(parts: string[]): Uri {
     return this.panel_.webview.asWebviewUri(
-      Uri.joinPath(this.context_.extensionUri, ...parts),
+      Uri.joinPath(this.context_.extensionUri, ...parts)
     );
   }
 
@@ -261,14 +261,14 @@ function webviewPanelJsonRpcServer(
   webviewPanel: HostWebviewPanel,
   methods:
     | Record<string, JsonRpcServerMethod>
-    | ((name: string) => JsonRpcServerMethod | undefined),
+    | ((name: string) => JsonRpcServerMethod | undefined)
 ): () => void {
   const target: JsonRpcPostMessageTarget = {
     postMessage: (data: unknown) => {
       void webviewPanel.webview.postMessage(data);
     },
     onMessage: (handler: (data: unknown) => void) => {
-      const disposable = webviewPanel.webview.onDidReceiveMessage((ev) => {
+      const disposable = webviewPanel.webview.onDidReceiveMessage(ev => {
         handler(ev);
       });
       return () => {

@@ -21,7 +21,7 @@ export const logviewTerminalLinkProvider = () => {
       }
 
       // Forward matches
-      const result = matches.map((match) => {
+      const result = matches.map(match => {
         // The path from the terminal.
         const path = match[1];
 
@@ -47,7 +47,7 @@ export const logviewTerminalLinkProvider = () => {
         const close: MessageItem = { title: "Close" };
         await window.showInformationMessage<MessageItem>(
           "Unable to find this log file within the current workspace.",
-          close,
+          close
         );
       }
     },

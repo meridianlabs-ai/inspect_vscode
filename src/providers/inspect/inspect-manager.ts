@@ -14,7 +14,7 @@ export function activateInspectManager(context: ExtensionContext) {
   context.subscriptions.push(
     inspectManager.onInspectChanged((e: InspectChangedEvent) => {
       terminalEnv.update(e.binPath);
-    }),
+    })
   );
   terminalEnv.update(inspectBinPath());
 
@@ -33,7 +33,7 @@ export class InspectManager implements Disposable {
     context.subscriptions.push(
       pythonInterpreter().onDidChange(() => {
         this.updateInspectAvailable();
-      }),
+      })
     );
     this.updateInspectAvailable();
   }

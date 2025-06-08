@@ -18,7 +18,7 @@ export async function activateLogListing(
   context: vscode.ExtensionContext,
   envManager: WorkspaceEnvManager,
   viewServer: InspectViewServer,
-  logsWatcher: InspectLogsWatcher,
+  logsWatcher: InspectLogsWatcher
 ): Promise<[Command[], vscode.Disposable[]]> {
   const kLogListingDir = "inspect_ai.logListingDir";
   const disposables: vscode.Disposable[] = [];
@@ -26,7 +26,7 @@ export async function activateLogListing(
   await vscode.commands.executeCommand(
     "setContext",
     "inspect_ai.haveEvalLogFormat",
-    hasMinimumInspectVersion(kInspectEvalLogFormatVersion),
+    hasMinimumInspectVersion(kInspectEvalLogFormatVersion)
   );
 
   // create tree data provider and tree
@@ -68,7 +68,7 @@ export async function activateLogListing(
       if (context.workspaceState.get<string>(kLogListingDir) === undefined) {
         updateTree();
       }
-    }),
+    })
   );
 
   // Register select log dir command
@@ -79,7 +79,7 @@ export async function activateLogListing(
         // store state ('null' means use workspace default so pass 'undefined' to clear for that)
         await context.workspaceState.update(
           kLogListingDir,
-          logLocation === null ? undefined : logLocation.toString(),
+          logLocation === null ? undefined : logLocation.toString()
         );
 
         // trigger update
@@ -88,7 +88,7 @@ export async function activateLogListing(
         // reveal
         await revealLogListing();
       }
-    }),
+    })
   );
 
   // Register reveal command
@@ -103,15 +103,15 @@ export async function activateLogListing(
             await tree.reveal(node);
           }
         }
-      },
-    ),
+      }
+    )
   );
 
   // Register refresh command
   disposables.push(
     vscode.commands.registerCommand("inspect.logListingRefresh", () => {
       treeDataProvider.refresh();
-    }),
+    })
   );
 
   // Register Reveal in Explorer command
@@ -123,8 +123,8 @@ export async function activateLogListing(
         if (logUri) {
           await vscode.commands.executeCommand("revealInExplorer", logUri);
         }
-      },
-    ),
+      }
+    )
   );
 
   // Register Open in JSON Editor... command
@@ -138,8 +138,8 @@ export async function activateLogListing(
             vscode.TextDocumentShowOptions
           >{ preview: true });
         }
-      },
-    ),
+      }
+    )
   );
 
   // Register delete log file command
@@ -156,7 +156,7 @@ export async function activateLogListing(
               detail: `Are you sure you want to delete the log file at ${prettyUriPath(logUri)}?`,
             },
             { title: "Delete", isCloseAffordance: false },
-            { title: "Cancel", isCloseAffordance: true },
+            { title: "Cancel", isCloseAffordance: true }
           );
 
           if (result?.title === "Delete") {
@@ -164,8 +164,8 @@ export async function activateLogListing(
             treeDataProvider.refresh();
           }
         }
-      },
-    ),
+      }
+    )
   );
 
   // Register copy path command
@@ -178,8 +178,8 @@ export async function activateLogListing(
           const path = prettyUriPath(logUri);
           await vscode.env.clipboard.writeText(path);
         }
-      },
-    ),
+      }
+    )
   );
 
   // Register copy editor command
@@ -192,27 +192,27 @@ export async function activateLogListing(
           const url = `vscode://ukaisi.inspect-ai/open?log=${encodeURIComponent(logUri.toString())}`;
           await vscode.env.clipboard.writeText(url);
         }
-      },
-    ),
+      }
+    )
   );
 
   // refresh when a log in our directory changes
   disposables.push(
-    logsWatcher.onInspectLogCreated((e) => {
+    logsWatcher.onInspectLogCreated(e => {
       const treeLogDir = treeDataProvider.getLogListing()?.logDir();
       if (treeLogDir && getRelativeUri(treeLogDir, e.log)) {
         treeDataProvider.refresh();
       }
-    }),
+    })
   );
 
   // refresh on change visiblity
   disposables.push(
-    tree.onDidChangeVisibility((e) => {
+    tree.onDidChangeVisibility(e => {
       if (e.visible) {
         treeDataProvider.refresh();
       }
-    }),
+    })
   );
 
   return [[], disposables];
@@ -221,6 +221,6 @@ export async function activateLogListing(
 export async function revealLogListing() {
   await vscode.commands.executeCommand("workbench.action.focusSideBar");
   await vscode.commands.executeCommand(
-    `workbench.view.extension.inspect_ai-activity-bar`,
+    `workbench.view.extension.inspect_ai-activity-bar`
   );
 }

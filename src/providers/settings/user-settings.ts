@@ -6,13 +6,13 @@ export const initializeGlobalSettings = async () => {
   const pythonAnalysis = workspace.getConfiguration("python.analysis") || [];
   const pkgIndexDepths =
     pythonAnalysis.get<Array<{ name: string; depth: number }>>(
-      kPackageIndexDepthsSetting,
+      kPackageIndexDepthsSetting
     ) || [];
 
   try {
-    kInspectPackageIndexDepth.forEach((pkgDep) => {
+    kInspectPackageIndexDepth.forEach(pkgDep => {
       if (
-        !pkgIndexDepths.find((p) => {
+        !pkgIndexDepths.find(p => {
           return pkgDep.name === p.name;
         })
       ) {
@@ -22,7 +22,7 @@ export const initializeGlobalSettings = async () => {
     await pythonAnalysis.update(
       kPackageIndexDepthsSetting,
       pkgIndexDepths,
-      ConfigurationTarget.Global,
+      ConfigurationTarget.Global
     );
   } catch {
     // This can happen if the user disables the Pylance extension

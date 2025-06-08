@@ -12,7 +12,7 @@ import { withEditorAssociation } from "../core/vscode/association";
 
 export function activateOpenLog(
   context: ExtensionContext,
-  viewManager: InspectViewManager,
+  viewManager: InspectViewManager
 ) {
   context.subscriptions.push(
     commands.registerCommand(
@@ -39,7 +39,7 @@ export function activateOpenLog(
                 filenamePattern:
                   "{[0-9][0-9][0-9][0-9]}-{[0-9][0-9]}-{[0-9][0-9]}T{[0-9][0-9]}[:-]{[0-9][0-9]}[:-]{[0-9][0-9]}*{[A-Za-z0-9]{21}}*.json",
               },
-              openLogViewer,
+              openLogViewer
             );
           }
 
@@ -48,7 +48,7 @@ export function activateOpenLog(
         } else {
           await viewManager.showLogFile(uri, "activate");
         }
-      },
-    ),
+      }
+    )
   );
 }
