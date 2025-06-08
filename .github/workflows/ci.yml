@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [18, 20]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'yarn'
+      
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+      
+      - name: Run linter
+        run: yarn lint
+      
+      - name: Check formatting
+        run: yarn prettier --check .
+      
+      - name: Run TypeScript compiler
+        run: yarn compile
+      
+      - name: Build extension
+        run: yarn package
+      
+      - name: Run tests
+        run: yarn test
+        env:
+          DISPLAY: ':99.0'
+        # Add headless display for VS Code tests
+      
+      - name: Package extension
+        run: yarn vsce package
+      
+      - name: Upload extension artifact
+        uses: actions/upload-artifact@v4
+        if: matrix.node-version == 18
+        with:
+          name: vscode-extension
+          path: '*.vsix'
