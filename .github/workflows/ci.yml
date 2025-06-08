@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 jobs:
-  test:
+  verify-package:
     runs-on: ubuntu-latest
 
     steps:
@@ -39,7 +39,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y xvfb
-      
+
       - name: Run tests
         run: xvfb-run -a yarn test
 
