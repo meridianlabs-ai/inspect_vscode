@@ -35,11 +35,13 @@ jobs:
       - name: Build extension
         run: yarn package
 
+      - name: Setup virtual display
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb
+      
       - name: Run tests
-        run: yarn test
-        env:
-          DISPLAY: ":99.0"
-        # Add headless display for VS Code tests
+        run: xvfb-run -a yarn test
 
       - name: Package extension
         run: yarn vsce package
