@@ -1,0 +1,28 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
+    "sourceMap": true,
+    "rootDir": "src",
+    "outDir": "out",
+    "strict": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitOverride": true
+  },
+  "exclude": [
+    "node_modules",
+    ".vscode-test",
+    "src/providers/activity-bar/webview",
+    "tools",
+    "out",
+    "dist",
+    "**/*.js",
+    "webpack.config.js",
+    "eslint.config.mjs"
+  ]
+}
