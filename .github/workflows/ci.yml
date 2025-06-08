@@ -10,18 +10,14 @@ jobs:
   test:
     runs-on: ubuntu-latest
     
-    strategy:
-      matrix:
-        node-version: [18, 20]
-    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
       
-      - name: Setup Node.js ${{ matrix.node-version }}
+      - name: Setup Node.js 18
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version: 18
           cache: 'yarn'
       
       - name: Install dependencies
@@ -50,7 +46,6 @@ jobs:
       
       - name: Upload extension artifact
         uses: actions/upload-artifact@v4
-        if: matrix.node-version == 18
         with:
           name: vscode-extension
           path: '*.vsix'
