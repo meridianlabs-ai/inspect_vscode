@@ -132,7 +132,7 @@ export class LogTreeDataProvider
       if (headers !== undefined) {
         const evalLog = (JSON.parse(headers) as EvalLog[])[0];
         if (evalLog.version === 2) {
-          item.tooltip = evalSummary(element, evalLog);
+          item.tooltip = evalSummary(evalLog);
         }
       }
     }
