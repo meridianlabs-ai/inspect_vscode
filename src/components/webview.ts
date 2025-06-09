@@ -36,6 +36,8 @@ export class InspectWebviewManager<T extends InspectWebview<S>, S> {
     ) => T,
     private host_: ExtensionHost
   ) {
+    this.extensionUri_ = context_.extensionUri;
+
     context_.subscriptions.push(
       window.registerWebviewPanelSerializer(this.viewType_, {
         deserializeWebviewPanel: (panel: WebviewPanel, state?: S) => {
@@ -228,6 +230,7 @@ export class InspectWebviewManager<T extends InspectWebview<S>, S> {
 
   private onShow_?: () => void;
   private onClose_?: () => void;
+  private readonly extensionUri_: Uri;
 }
 
 export abstract class InspectWebview<T> extends Disposable {
@@ -238,6 +241,8 @@ export abstract class InspectWebview<T> extends Disposable {
 
   public constructor(
     private readonly _context: ExtensionContext,
+    private readonly _server: InspectViewServer,
+    state: T,
     webviewPanel: HostWebviewPanel
   ) {
     super();

@@ -112,7 +112,7 @@ export class LogElementQueueProcessor {
                 element,
                 evalLog.status
               );
-              element.tooltip = evalSummary(evalLog);
+              element.tooltip = evalSummary(element, evalLog);
 
               // Cache completed elements
               const listing = this.logListing();
@@ -212,7 +212,10 @@ function iconForStatus(
   }
 }
 
-export function evalSummary(log: EvalLog): MarkdownString | undefined {
+export function evalSummary(
+  node: LogNode,
+  log: EvalLog
+): MarkdownString | undefined {
   // build summary
   const summary = evalHeader(log);
 

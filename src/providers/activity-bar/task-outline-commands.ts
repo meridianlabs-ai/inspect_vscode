@@ -141,16 +141,13 @@ export class EditSelectedTaskCommand implements Command {
         const selections = taskSelection?.cell
           ? [taskSelection?.cell]
           : undefined;
-        const targetColumnn = findTargetViewColumn(logViewColumn);
-        if (targetColumnn && selections) {
-          await window.showNotebookDocument(notebookDocument, {
-            selections,
-            preview: false,
-            viewColumn: targetColumnn,
-          });
-          if (selections) {
-            await commands.executeCommand("notebook.cell.edit");
-          }
+        await window.showNotebookDocument(notebookDocument, {
+          selections,
+          preview: false,
+          viewColumn: findTargetViewColumn(logViewColumn),
+        });
+        if (selections) {
+          await commands.executeCommand("notebook.cell.edit");
         }
       } else {
         // Find the task selection for the document (if any)

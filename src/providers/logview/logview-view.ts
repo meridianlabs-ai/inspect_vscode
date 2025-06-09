@@ -293,7 +293,7 @@ class InspectViewWebview extends InspectWebview<LogviewState> {
     state: LogviewState,
     webviewPanel: HostWebviewPanel
   ) {
-    super(context, webviewPanel);
+    super(context, server, state, webviewPanel);
 
     this.logviewPanel_ = new LogviewPanel(
       webviewPanel,

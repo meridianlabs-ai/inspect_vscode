@@ -102,7 +102,7 @@ export class LogviewPanel extends Disposable {
     );
   }
 
-  public override dispose() {
+  public dispose() {
     this._rpcDisconnect();
     this._pmUnsubcribe.dispose();
   }

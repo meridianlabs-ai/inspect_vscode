@@ -30,7 +30,7 @@ export async function logviewCommands(
     enableOpenInView
   );
 
-  return [new ShowLogviewCommand(manager), new ShowOpenLogCommand()];
+  return [new ShowLogviewCommand(manager), new ShowOpenLogCommand(manager)];
 }
 
 class ShowLogviewCommand implements Command {
@@ -52,6 +52,7 @@ class ShowLogviewCommand implements Command {
 }
 
 class ShowOpenLogCommand implements Command {
+  constructor(private readonly manager_: InspectViewManager) {}
   async execute(): Promise<void> {
     try {
       const uri = await selectFileUri();

@@ -36,7 +36,7 @@ export class LogListing {
   private readonly mru_: LogListingMRU;
 
   constructor(
-    context: ExtensionContext,
+    private readonly context: ExtensionContext,
     private readonly logDir_: Uri,
     private readonly viewServer_: InspectViewServer
   ) {

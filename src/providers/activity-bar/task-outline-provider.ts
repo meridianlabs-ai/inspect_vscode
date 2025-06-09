@@ -177,14 +177,13 @@ const findFirstTask = async (
       return await findFirstTask(treeDataProvider, child);
     }
   }
-  return undefined;
 };
 
 // A tree item for a task, file, or folder
 export class TaskTreeItem extends TreeItem {
   constructor(
     public readonly taskPath: TaskPath,
-    command: VsCodeCommand,
+    command?: VsCodeCommand,
     public readonly parent?: TaskTreeItem
   ) {
     super(
@@ -217,7 +216,7 @@ export class TaskListItem extends TaskTreeItem {
   constructor(
     taskPath: TaskPath,
     description: string,
-    command: VsCodeCommand,
+    command?: VsCodeCommand,
     parent?: TaskTreeItem
   ) {
     super(taskPath, command, parent);
@@ -238,7 +237,7 @@ export class TaskOutLineTreeDataProvider
   public static readonly viewType = "inspect_ai.task-outline-view";
   constructor(
     private readonly workspaceMgr: WorkspaceTaskManager,
-    private readonly command_: VsCodeCommand
+    private readonly command_?: VsCodeCommand
   ) {
     this.disposables_.push(
       this.workspaceMgr.onTasksChanged(
