@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.64](https://github.com/meridianlabs-ai/inspect-vscode/compare/0.3.63...v0.3.64) (2025-06-16)
+
+
+### Bug Fixes
+
+* Add support for displaying client log messages in the output channel ([#2](https://github.com/meridianlabs-ai/inspect-vscode/issues/2)) ([6fcb364](https://github.com/meridianlabs-ai/inspect-vscode/commit/6fcb36480def0efbfca43151219cfd41920a13ae))
+
 ## 0.3.63
 
 - Improve support for linking to wrapped evaluation paths in the terminal.
