@@ -14,12 +14,14 @@ import {
   kMethodEvalLogHeaders,
   kMethodEvalLogs,
   kMethodEvalLogSize,
+  kMethodLogMessage,
   kMethodPendingSamples,
   kMethodSampleData,
 } from "../../core/jsonrpc";
 import { InspectViewServer } from "../inspect/inspect-view-server";
 import { workspacePath } from "../../core/path";
 import { LogviewState } from "./logview-state";
+import { log } from "../../core/log";
 
 export class LogviewPanel extends Disposable {
   constructor(
@@ -60,6 +62,12 @@ export class LogviewPanel extends Disposable {
           params[3] as number | undefined,
           params[4] as number | undefined
         ),
+      [kMethodLogMessage]: async (params: unknown[]) => {
+        const log_file = params[0] as string;
+        const message = params[1] as string | undefined;
+        log.info(`[CLIENT LOG] (${log_file}): ${message}`);
+        await server.logMessage(log_file, message);
+      },
     });
 
     // serve post message api to webview
