@@ -18,6 +18,7 @@ import {
 } from "../../inspect/version";
 import {
   kInspectEvalLogFormatVersion,
+  kInspectLogMessageVersion,
   kInspectOpenInspectViewVersion,
 } from "./inspect-constants";
 import {
@@ -190,6 +191,21 @@ export class InspectViewServer implements Disposable {
       {},
       handleError
     );
+  }
+
+  public async logMessage(log_file: string, message?: string): Promise<void> {
+    if (hasMinimumInspectVersion(kInspectLogMessageVersion)) {
+      await this.api_json(
+        `/api/log-message/${encodeURIComponent(log_file)}?message=${encodeURIComponent(
+          message || ""
+        )}`
+      );
+      return undefined;
+    } else {
+      // Old clients don't support this
+      console.log(`[CLIENT MESSAGE] (${log_file}): ${message}`);
+      return Promise.resolve(undefined);
+    }
   }
 
   private async ensureRunning(): Promise<void> {
