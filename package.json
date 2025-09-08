@@ -5,17 +5,17 @@
   "publisher": "ukaisi",
   "icon": "assets/logo/inspect.png",
   "author": {
-    "name": "UK AI Security Institute"
+    "name": "Meridian Labs"
   },
   "version": "0.3.64",
   "license": "MIT",
   "homepage": "https://inspect.aisi.org.uk/",
   "repository": {
     "type": "git",
-    "url": "https://github.com/UKGovernmentBEIS/inspect_ai"
+    "url": "https://github.com/meridianlabs-ai/inspect-vscode/"
   },
   "bugs": {
-    "url": "https://github.com/UKGovernmentBEIS/inspect_ai/issues"
+    "url": "https://github.com/meridianlabs-ai/inspect-vscode/issues"
   },
   "engines": {
     "vscode": "^1.85.0",
