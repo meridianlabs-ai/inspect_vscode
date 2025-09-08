@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.65](https://github.com/meridianlabs-ai/inspect-vscode/compare/v0.3.64...v0.3.65) (2025-09-08)
+
+
+### Miscellaneous Chores
+
+* release 0.3.65 ([a0dc52b](https://github.com/meridianlabs-ai/inspect-vscode/commit/a0dc52b7d65de11be07136ff979e84d3be670d9d))
+
 ## [0.3.64](https://github.com/meridianlabs-ai/inspect-vscode/compare/0.3.63...v0.3.64) (2025-06-16)
 
 
