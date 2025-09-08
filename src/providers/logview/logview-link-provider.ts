@@ -93,7 +93,7 @@ export const logviewTerminalLinkProvider = (
             return undefined;
           }
         })
-        .filter(link => link !== undefined) as LogViewTerminalLink[];
+        .filter(link => link !== undefined);
 
       if (fileOnlyResult.length > 0) {
         // Return the file only results
