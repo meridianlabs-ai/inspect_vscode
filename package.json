@@ -19,7 +19,7 @@
   },
   "engines": {
     "vscode": "^1.85.0",
-    "node": ">=18.0.0"
+    "node": ">=20.0.0"
   },
   "categories": [
     "Machine Learning",
@@ -481,9 +481,9 @@
     "@types/yaml": "^1.9.7",
     "@typescript-eslint/eslint-plugin": "^7.4.0",
     "@typescript-eslint/parser": "^7.4.0",
-    "@vscode/test-cli": "^0.0.8",
+    "@vscode/test-cli": "^0.0.11",
     "@vscode/test-electron": "^2.3.9",
-    "@vscode/vsce": "^2.26.1",
+    "@vscode/vsce": "^3.6.0",
     "css-loader": "^7.1.1",
     "eslint": "^9.24.0",
     "glob": "^10.3.10",
@@ -502,6 +502,7 @@
     "@microsoft/fast-components": "^2.30.6",
     "@microsoft/fast-element": "^1.13.0",
     "@types/glob": "^8.1.0",
+    "@types/semver": "^7.7.1",
     "@vscode/webview-ui-toolkit": "^1.4.0",
     "async-lock": "^1.4.1",
     "date-fns": "^4.1.0",
