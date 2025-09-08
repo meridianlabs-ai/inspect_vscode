@@ -1,7 +1,7 @@
 {
   "name": "inspect-ai",
   "displayName": "Inspect AI",
-  "description": "Extension for the Inspect large language model evaluation framework.",
+  "description": "Extension for the Inspect AI evaluation framework.",
   "publisher": "ukaisi",
   "icon": "assets/logo/inspect.png",
   "author": {
