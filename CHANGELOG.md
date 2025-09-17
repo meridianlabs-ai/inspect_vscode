@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.66](https://github.com/meridianlabs-ai/inspect-vscode/compare/v0.3.65...v0.3.66) (2025-09-17)
+
+
+### Bug Fixes
+
+* Refresh log listing when the workspace log dir changes ([#8](https://github.com/meridianlabs-ai/inspect-vscode/issues/8)) ([91b723e](https://github.com/meridianlabs-ai/inspect-vscode/commit/91b723ec126d3b9d0e1f3784956475ddae22c3da))
+
 ## [0.3.65](https://github.com/meridianlabs-ai/inspect-vscode/compare/v0.3.64...v0.3.65) (2025-09-08)
 
 
