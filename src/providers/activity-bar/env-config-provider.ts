@@ -5,6 +5,7 @@ import {
   WebviewView,
   WebviewViewProvider,
   env,
+  commands,
 } from "vscode";
 import { getNonce } from "../../core/nonce";
 import { WorkspaceStateManager } from "../workspace/workspace-state-provider";
@@ -16,6 +17,7 @@ import {
   InspectManager,
 } from "../inspect/inspect-manager";
 import { inspectVersionDescriptor } from "../../inspect/props";
+import { debounce } from "lodash";
 
 export const kActiveTaskChanged = "activeTaskChanged";
 export const kInitialize = "initialize";
@@ -143,6 +145,17 @@ export class EnvConfigurationProvider implements WebviewViewProvider {
                   env: this.env,
                 },
               });
+            }
+
+            if (data.default === "logDir") {
+              // The log dir was changed, update the task tree if needed
+              await debounce(
+                async () => {
+                  await commands.executeCommand("inspect.logListingUpdate");
+                },
+                500,
+                { leading: false, trailing: true }
+              )();
             }
 
             break;

@@ -114,6 +114,13 @@ export async function activateLogListing(
     })
   );
 
+  // Register update command (for when the log directory changes )
+  disposables.push(
+    vscode.commands.registerCommand("inspect.logListingUpdate", () => {
+      updateTree();
+    })
+  );
+
   // Register Reveal in Explorer command
   disposables.push(
     vscode.commands.registerCommand(
