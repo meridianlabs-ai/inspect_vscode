@@ -242,12 +242,8 @@ function sortLogTree(nodes: LogNode[]): LogNode[] {
   // sort this level
   return nodes.sort((a, b) => {
     if (a.type === "dir" && b.type === "dir") {
-      return (
-        a.name
-          .split("/")
-          .pop()
-          ?.localeCompare(b.name.split("/").pop() || "") || 0
-      );
+      // Allow folders to follow their natural order
+      return 0;
     } else if (a.type === "file" && b.type === "file") {
       return b.mtime - a.mtime;
     } else if (a.type === "dir") {
