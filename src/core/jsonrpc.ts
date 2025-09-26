@@ -7,6 +7,7 @@ export const kMethodEvalLogHeaders = "eval_log_headers";
 export const kMethodPendingSamples = "eval_log_pending_samples";
 export const kMethodSampleData = "eval_log_sample_data";
 export const kMethodLogMessage = "log_message";
+export const kMethodEvalSet = "eval_set";
 
 // json rpc client (talk from the webview to the extension)
 export function webViewJsonRpcClient(vscode: {
