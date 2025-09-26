@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/meridianlabs-ai/inspect-vscode/compare/v0.3.66...v0.4.0) (2025-09-26)
+
+
+### Features
+
+* Sort folders (and logs) by most recently updated ([#10](https://github.com/meridianlabs-ai/inspect-vscode/issues/10)) ([3b398df](https://github.com/meridianlabs-ai/inspect-vscode/commit/3b398df1c1691676f0203fc094559547dd10f34c))
+
 ## [0.3.66](https://github.com/meridianlabs-ai/inspect-vscode/compare/v0.3.65...v0.3.66) (2025-09-17)
 
 
