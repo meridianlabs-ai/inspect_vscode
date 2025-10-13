@@ -43,4 +43,12 @@ const kInspectPackageIndexDepth = [
     name: "inspect_ai",
     depth: 2,
   },
+  {
+    name: "inspect_viz",
+    depth: 2,
+  },
+  {
+    name: "inspect_scout",
+    depth: 2,
+  },
 ];
