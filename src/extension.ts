@@ -26,6 +26,7 @@ import { activateOpenLog } from "./providers/openlog";
 import { activateProtocolHandler } from "./providers/protocol-handler";
 import { activateInspectCommands } from "./providers/inspect/inspect-commands";
 import { end, start } from "./core/log";
+import { initScoutProps } from "./scout/props";
 
 const kInspectMinimumVersion = "0.3.8";
 
@@ -47,8 +48,9 @@ export async function activate(context: ExtensionContext) {
   context.subscriptions.push(await initPythonInterpreter());
   end("Identifying Python");
 
-  // init inspect props
+  // init inspect and scout props
   context.subscriptions.push(initInspectProps());
+  context.subscriptions.push(initScoutProps());
 
   // Initialize global settings
   await initializeGlobalSettings();
