@@ -5,10 +5,6 @@ import {
   InspectWebviewManager,
 } from "../../components/webview";
 import { inspectViewPath } from "../../inspect/props";
-import {
-  InspectChangedEvent,
-  InspectManager,
-} from "../inspect/inspect-manager";
 import { LogviewState } from "./logview-state";
 import { ExtensionHost, HostWebviewPanel } from "../../hooks";
 import { showError } from "../../components/error";
@@ -18,6 +14,7 @@ import { LogviewPanel } from "./logview-panel";
 import { selectLogDirectory } from "../activity-bar/log-listing/log-directory-selector";
 import { dirname, getRelativeUri } from "../../core/uri";
 import { InspectLogsWatcher } from "../inspect/inspect-logs-watcher";
+import { PackageChangedEvent, PackageManager } from "../../core/package/manager";
 
 const kLogViewId = "inspect.logview";
 
@@ -72,14 +69,14 @@ export class InspectViewWebviewManager extends InspectWebviewManager<
   LogviewState
 > {
   constructor(
-    inspectManager: InspectManager,
+    inspectManager: PackageManager,
     server: InspectViewServer,
     context: ExtensionContext,
     host: ExtensionHost
   ) {
     // If the interpreter changes, refresh the tasks
     context.subscriptions.push(
-      inspectManager.onInspectChanged((e: InspectChangedEvent) => {
+      inspectManager.onPackageChanged((e: PackageChangedEvent) => {
         if (!e.available && this.activeView_) {
           this.activeView_?.dispose();
         }

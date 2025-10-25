@@ -11,15 +11,12 @@ import {
 } from "vscode";
 
 import { throttle } from "lodash";
-import {
-  InspectChangedEvent,
-  InspectManager,
-} from "../inspect/inspect-manager";
 import { startup } from "../../core/log";
+import { PackageChangedEvent, PackageManager } from "../../core/package/manager";
 
 // Activates the provider which tracks the currently active task (document and task name)
 export function activateWorkspaceTaskProvider(
-  inspectManager: InspectManager,
+  inspectManager: PackageManager,
   context: ExtensionContext
 ) {
   // The task manager
@@ -27,7 +24,7 @@ export function activateWorkspaceTaskProvider(
 
   // If the interpreter changes, refresh the tasks
   context.subscriptions.push(
-    inspectManager.onInspectChanged(async (e: InspectChangedEvent) => {
+    inspectManager.onPackageChanged(async (e: PackageChangedEvent) => {
       if (e.available) {
         await taskManager.refresh();
       }

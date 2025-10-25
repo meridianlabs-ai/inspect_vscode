@@ -17,8 +17,8 @@ import {
 } from "../active-task/active-task-provider";
 import { basename } from "path";
 import { inspectVersion } from "../../inspect";
-import { InspectManager } from "../inspect/inspect-manager";
 import { DocumentTaskInfo } from "../../components/task";
+import { PackageManager } from "../../core/package/manager";
 
 export type SetActiveTaskCommand = {
   type: "setActiveTask";
@@ -49,7 +49,7 @@ export class TaskConfigurationProvider implements WebviewViewProvider {
     private readonly extensionUri_: Uri,
     private readonly stateManager_: WorkspaceStateManager,
     private readonly taskManager_: ActiveTaskManager,
-    private readonly inspectManager_: InspectManager
+    private readonly inspectManager_: PackageManager
   ) {}
 
   public async resolveWebviewView(webviewView: WebviewView) {
@@ -118,7 +118,7 @@ export class TaskConfigurationProvider implements WebviewViewProvider {
 
     // If the interpreter changes, refresh the tasks
     this.disposables_.push(
-      this.inspectManager_.onInspectChanged(async () => {
+      this.inspectManager_.onPackageChanged(async () => {
         if (inspectVersion() !== null) {
           await initMsg();
           await this.taskManager_.refresh();

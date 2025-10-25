@@ -1,11 +1,11 @@
 import { ExtensionContext, StatusBarAlignment, window } from "vscode";
-import { InspectManager } from "./inspect/inspect-manager";
 import { inspectVersion } from "../inspect";
 import { inspectBinPath } from "../inspect/props";
+import { PackageManager } from "../core/package/manager";
 
 export function activateStatusBar(
   context: ExtensionContext,
-  inspectManager: InspectManager
+  inspectManager: PackageManager
 ) {
   const statusItem = window.createStatusBarItem(
     "inspect-ai.version",
@@ -24,7 +24,7 @@ export function activateStatusBar(
       `Inspect: ${version?.raw}` +
       (version ? `\n${inspectBinPath()?.path}` : "");
   };
-  context.subscriptions.push(inspectManager.onInspectChanged(updateStatus));
+  context.subscriptions.push(inspectManager.onPackageChanged(updateStatus));
 
   // reflect current state
   updateStatus();

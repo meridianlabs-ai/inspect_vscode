@@ -27,7 +27,9 @@ import { activateProtocolHandler } from "./providers/protocol-handler";
 import { activateInspectCommands } from "./providers/inspect/inspect-commands";
 import { end, start } from "./core/log";
 import { initScoutProps } from "./scout/props";
-import { scanviewTerminalLinkProvider } from "./providers/scanview/scanview-link-provider";
+import { scanviewTerminalLinkProvider } from "./providers/scout/scanview/scanview-link-provider";
+import { activateScoutManager } from "./providers/scout/scout-manager";
+import { ScoutViewServer } from "./providers/scout/scout-view-server";
 
 const kInspectMinimumVersion = "0.3.8";
 
@@ -175,6 +177,9 @@ export async function activate(context: ExtensionContext) {
   // Activate Log Notification
   activateLogNotify(context, logsWatcher, settingsMgr, inspectLogviewManager);
 
+  // Activate Scout
+  await activateScout(context, commandManager);
+
   // Activate commands
   [
     ...logViewCommands,
@@ -192,6 +197,23 @@ export async function activate(context: ExtensionContext) {
   start("Refresh Tasks");
   await activeTaskManager.refresh();
   end("Refresh Tasks");
+}
+
+export async function activateScout(context: ExtensionContext, _commandManager: CommandManager) {
+
+  // Scout Manager watches for changes to scout binary
+  start("Monitor Scout Binary");
+  const scoutManager = activateScoutManager(context);
+  context.subscriptions.push(scoutManager);
+  end("Monitor Scout Binary");
+
+  // initialiaze view server
+  start("Setup Scout View Server");
+  const server = new ScoutViewServer(context, scoutManager);
+  context.subscriptions.push(server);
+  end("Setup Scout View Server");
+
+
 }
 
 const checkInspectVersion = async () => {

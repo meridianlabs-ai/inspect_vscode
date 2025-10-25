@@ -12,12 +12,9 @@ import { WorkspaceStateManager } from "../workspace/workspace-state-provider";
 import { WorkspaceEnvManager } from "../workspace/workspace-env-provider";
 import { kInspectEnvValues } from "../inspect/inspect-constants";
 import { inspectVersion } from "../../inspect";
-import {
-  InspectChangedEvent,
-  InspectManager,
-} from "../inspect/inspect-manager";
 import { inspectVersionDescriptor } from "../../inspect/props";
 import { debounce } from "lodash";
+import { PackageChangedEvent, PackageManager } from "../../core/package/manager";
 
 export const kActiveTaskChanged = "activeTaskChanged";
 export const kInitialize = "initialize";
@@ -84,7 +81,7 @@ export class EnvConfigurationProvider implements WebviewViewProvider {
     private readonly extensionUri_: Uri,
     private readonly envManager_: WorkspaceEnvManager,
     private readonly stateManager_: WorkspaceStateManager,
-    private readonly inspectManager_: InspectManager
+    private readonly inspectManager_: PackageManager
   ) {}
   private env: EnvConfiguration = {};
 
@@ -201,7 +198,7 @@ export class EnvConfigurationProvider implements WebviewViewProvider {
 
     // If the interpreter changes, refresh the tasks
     this.disposables_.push(
-      this.inspectManager_.onInspectChanged(async (e: InspectChangedEvent) => {
+      this.inspectManager_.onPackageChanged(async (e: PackageChangedEvent) => {
         if (e.available) {
           await initMsg();
         } else {

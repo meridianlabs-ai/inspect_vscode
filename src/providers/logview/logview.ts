@@ -4,15 +4,15 @@ import { Command } from "../../core/command";
 import { logviewCommands } from "./commands";
 import { InspectViewWebviewManager } from "./logview-view";
 import { InspectViewManager } from "./logview-view";
-import { InspectManager } from "../inspect/inspect-manager";
 import { WorkspaceEnvManager } from "../workspace/workspace-env-provider";
 import { ExtensionHost } from "../../hooks";
 import { InspectViewServer } from "../inspect/inspect-view-server";
 import { activateLogviewEditor } from "./logview-editor";
 import { InspectLogsWatcher } from "../inspect/inspect-logs-watcher";
+import { PackageManager } from "../../core/package/manager";
 
 export async function activateLogview(
-  inspectManager: InspectManager,
+  inspectManager: PackageManager,
   server: InspectViewServer,
   envMgr: WorkspaceEnvManager,
   logsWatcher: InspectLogsWatcher,

@@ -7,7 +7,6 @@ import { WorkspaceTaskManager } from "../workspace/workspace-task-provider";
 import { WorkspaceEnvManager } from "../workspace/workspace-env-provider";
 import { WorkspaceStateManager } from "../workspace/workspace-state-provider";
 import { TaskConfigurationProvider } from "./task-config-provider";
-import { InspectManager } from "../inspect/inspect-manager";
 import {
   DebugConfigTaskCommand,
   RunConfigTaskCommand,
@@ -17,9 +16,10 @@ import { activateLogListing } from "./log-listing/log-listing-provider";
 import { InspectViewServer } from "../inspect/inspect-view-server";
 import { InspectLogsWatcher } from "../inspect/inspect-logs-watcher";
 import { end, start } from "../../core/log";
+import { PackageManager } from "../../core/package/manager";
 
 export async function activateActivityBar(
-  inspectManager: InspectManager,
+  inspectManager: PackageManager,
   inspectEvalMgr: InspectEvalManager,
   inspectLogviewManager: InspectViewManager,
   activeTaskManager: ActiveTaskManager,
