@@ -27,6 +27,7 @@ import { activateProtocolHandler } from "./providers/protocol-handler";
 import { activateInspectCommands } from "./providers/inspect/inspect-commands";
 import { end, start } from "./core/log";
 import { initScoutProps } from "./scout/props";
+import { scanviewTerminalLinkProvider } from "./providers/scanview/scanview-link-provider";
 
 const kInspectMinimumVersion = "0.3.8";
 
@@ -157,6 +158,12 @@ export async function activate(context: ExtensionContext) {
   // Register the log view link provider
   window.registerTerminalLinkProvider(
     logviewTerminalLinkProvider(context, logsWatcher)
+  );
+
+  // Register the scout terminal provider
+  // Register the log view link provider
+  window.registerTerminalLinkProvider(
+    scanviewTerminalLinkProvider(context)
   );
 
   // Activate Code Lens
