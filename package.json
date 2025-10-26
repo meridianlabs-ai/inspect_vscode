@@ -69,6 +69,16 @@
           }
         ],
         "priority": "default"
+      },
+      {
+        "viewType": "inspect-ai.scout-scan-editor",
+        "displayName": "Scout Scan Viewer",
+        "selector": [
+          {
+            "filenamePattern": "*.scan_id"
+          }
+        ],
+        "priority": "default"
       }
     ],
     "commands": [

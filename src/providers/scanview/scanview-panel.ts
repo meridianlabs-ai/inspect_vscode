@@ -35,16 +35,25 @@ export class ScanviewPanel extends Disposable {
     this._pmUnsubcribe.dispose();
   }
 
-  public getHtml(_state: ScanviewState): string {
-    // TODO: turn state into extraHead content
-    const extraHead = "";
+  public getHtml(state: ScanviewState): string {
+    const stateMsg = {
+      type: "updateState",
+      url: state.scan_dir?.toString(),
+      scanner: state.scan?.scanner,
+      transcript_id: state.scan?.transcript_id,
+    };
+    const stateScript = state.scan_dir
+      ? `<script id="scanview-state" type="application/json">${JSON.stringify(
+          stateMsg
+        )}</script>`
+      : "";
 
     return getWebviewPanelHtml(
       scoutViewPath(),
       this.panel_,
       this.getExtensionVersion(),
       null,
-      extraHead
+      stateScript
     );
   }
 
