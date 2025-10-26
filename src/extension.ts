@@ -27,7 +27,7 @@ import { activateProtocolHandler } from "./providers/protocol-handler";
 import { activateInspectCommands } from "./providers/inspect/inspect-commands";
 import { end, start } from "./core/log";
 import { initScoutProps } from "./scout/props";
-import { scanviewTerminalLinkProvider } from "./providers/scout/scanview/scanview-link-provider";
+import { scanviewTerminalLinkProvider } from "./providers/scanview/scanview-link-provider";
 import { activateScoutManager } from "./providers/scout/scout-manager";
 import { ScoutViewServer } from "./providers/scout/scout-view-server";
 
@@ -156,16 +156,15 @@ export async function activate(context: ExtensionContext) {
   );
   end("Setup Activity Bar");
 
+  // Activate Scout
+  start("Setup Scout");
+  await activateScout(context, commandManager);
+  start("Setup Scout");
+
   start("Final Setup");
   // Register the log view link provider
   window.registerTerminalLinkProvider(
     logviewTerminalLinkProvider(context, logsWatcher)
-  );
-
-  // Register the scout terminal provider
-  // Register the log view link provider
-  window.registerTerminalLinkProvider(
-    scanviewTerminalLinkProvider(context)
   );
 
   // Activate Code Lens
@@ -176,9 +175,6 @@ export async function activate(context: ExtensionContext) {
 
   // Activate Log Notification
   activateLogNotify(context, logsWatcher, settingsMgr, inspectLogviewManager);
-
-  // Activate Scout
-  await activateScout(context, commandManager);
 
   // Activate commands
   [
@@ -199,8 +195,10 @@ export async function activate(context: ExtensionContext) {
   end("Refresh Tasks");
 }
 
-export async function activateScout(context: ExtensionContext, _commandManager: CommandManager) {
-
+export async function activateScout(
+  context: ExtensionContext,
+  _commandManager: CommandManager
+) {
   // Scout Manager watches for changes to scout binary
   start("Monitor Scout Binary");
   const scoutManager = activateScoutManager(context);
@@ -213,7 +211,8 @@ export async function activateScout(context: ExtensionContext, _commandManager: 
   context.subscriptions.push(server);
   end("Setup Scout View Server");
 
-
+  // Register the scout terminal provider
+  window.registerTerminalLinkProvider(scanviewTerminalLinkProvider(context));
 }
 
 const checkInspectVersion = async () => {

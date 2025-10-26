@@ -1,3 +1,5 @@
+import { HostWebviewPanel } from "../hooks";
+
 // constants for json-rpc methods
 export const kMethodEvalLogs = "eval_logs";
 export const kMethodEvalLog = "eval_log";
@@ -254,4 +256,27 @@ function methodNotFoundResponse(request: JsonRpcRequest) {
     kJsonRpcMethodNotFound,
     `Method '${request.method}' not found.`
   );
+}
+
+
+export function webviewPanelJsonRpcServer(
+  webviewPanel: HostWebviewPanel,
+  methods:
+    | Record<string, JsonRpcServerMethod>
+    | ((name: string) => JsonRpcServerMethod | undefined)
+): () => void {
+  const target: JsonRpcPostMessageTarget = {
+    postMessage: (data: unknown) => {
+      void webviewPanel.webview.postMessage(data);
+    },
+    onMessage: (handler: (data: unknown) => void) => {
+      const disposable = webviewPanel.webview.onDidReceiveMessage(ev => {
+        handler(ev);
+      });
+      return () => {
+        disposable.dispose();
+      };
+    },
+  };
+  return jsonRpcPostMessageServer(target, methods);
 }
