@@ -31,6 +31,7 @@
   ],
   "activationEvents": [
     "onWebviewPanel:inspect.logview",
+    "onWebviewPanel:inspect.scanview",
     "onWebviewPanel:inspect_ai.task-configuration",
     "onWebviewPanel:inspect_ai.logs-view",
     "onWebviewPanel:inspect_ai.env-configuration-view",

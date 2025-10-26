@@ -14,23 +14,27 @@ import { ExtensionHost, HostWebviewPanel } from "../hooks";
 import { isNotebook } from "./notebook";
 import { FocusManager } from "./focus";
 import { log } from "../core/log";
-import { InspectViewServer } from "../providers/inspect/inspect-view-server";
+import { PackageViewServer } from "../core/package/view-server";
 
 export interface ShowOptions {
   readonly preserveFocus?: boolean;
   readonly viewColumn?: ViewColumn;
 }
 
-export class InspectWebviewManager<T extends InspectWebview<S>, S> {
+export class InspectWebviewManager<
+  T extends InspectWebview<S>,
+  PS extends PackageViewServer,
+  S,
+> {
   constructor(
     protected readonly context_: ExtensionContext,
-    private readonly server_: InspectViewServer,
+    private readonly server_: PS,
     private readonly viewType_: string,
     private readonly title_: string,
     private readonly localResourceRoots: Uri[],
     private webviewType_: new (
       context: ExtensionContext,
-      server: InspectViewServer,
+      server: PS,
       state: S,
       webviewPanel: HostWebviewPanel
     ) => T,

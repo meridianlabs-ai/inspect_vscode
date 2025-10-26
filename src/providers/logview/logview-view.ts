@@ -14,7 +14,10 @@ import { LogviewPanel } from "./logview-panel";
 import { selectLogDirectory } from "../activity-bar/log-listing/log-directory-selector";
 import { dirname, getRelativeUri } from "../../core/uri";
 import { InspectLogsWatcher } from "../inspect/inspect-logs-watcher";
-import { PackageChangedEvent, PackageManager } from "../../core/package/manager";
+import {
+  PackageChangedEvent,
+  PackageManager,
+} from "../../core/package/manager";
 
 const kLogViewId = "inspect.logview";
 
@@ -66,6 +69,7 @@ export class InspectViewManager {
 
 export class InspectViewWebviewManager extends InspectWebviewManager<
   InspectViewWebview,
+  InspectViewServer,
   LogviewState
 > {
   constructor(
