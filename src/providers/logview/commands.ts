@@ -6,14 +6,8 @@ import {
   kInspectEvalLogFormatVersion,
   kInspectOpenInspectViewVersion,
 } from "../inspect/inspect-constants";
-import { LogviewState } from "./logview-state";
 import { inspectVersionDescriptor } from "../../inspect/props";
 import { selectFileUri } from "./log-file-selector";
-
-export interface LogviewOptions {
-  state?: LogviewState;
-  activate?: boolean;
-}
 
 export async function logviewCommands(
   manager: InspectViewManager

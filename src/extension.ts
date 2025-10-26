@@ -1,6 +1,6 @@
 import { ExtensionContext, MessageItem, window } from "vscode";
 
-import { CommandManager } from "./core/command";
+import { Command, CommandManager } from "./core/command";
 import { activateCodeLens } from "./providers/codelens/codelens-provider";
 import { activateLogview } from "./providers/logview/logview";
 import { logviewTerminalLinkProvider } from "./providers/logview/logview-link-provider";
@@ -11,13 +11,16 @@ import { activateActivityBar } from "./providers/activity-bar/activity-bar-provi
 import { activateActiveTaskProvider } from "./providers/active-task/active-task-provider";
 import { activateWorkspaceTaskProvider } from "./providers/workspace/workspace-task-provider";
 import { activateWorkspaceState } from "./providers/workspace/workspace-state-provider";
-import { activateWorkspaceEnv } from "./providers/workspace/workspace-env-provider";
+import {
+  activateWorkspaceEnv,
+  WorkspaceEnvManager,
+} from "./providers/workspace/workspace-env-provider";
 import { initPythonInterpreter } from "./core/python";
 import { initInspectProps } from "./inspect";
 import { activateInspectManager } from "./providers/inspect/inspect-manager";
 import { checkActiveWorkspaceFolder } from "./core/workspace";
 import { inspectBinPath, inspectVersionDescriptor } from "./inspect/props";
-import { extensionHost } from "./hooks";
+import { ExtensionHost, extensionHost } from "./hooks";
 import { activateStatusBar } from "./providers/statusbar";
 import { InspectViewServer } from "./providers/inspect/inspect-view-server";
 import { InspectLogsWatcher } from "./providers/inspect/inspect-logs-watcher";
@@ -30,6 +33,8 @@ import { initScoutProps } from "./scout/props";
 import { scanviewTerminalLinkProvider } from "./providers/scanview/scanview-link-provider";
 import { activateScoutManager } from "./providers/scout/scout-manager";
 import { ScoutViewServer } from "./providers/scout/scout-view-server";
+import { activateOpenScan } from "./providers/openscan";
+import { activateScanview } from "./providers/scanview/scanview";
 
 const kInspectMinimumVersion = "0.3.8";
 
@@ -158,8 +163,8 @@ export async function activate(context: ExtensionContext) {
 
   // Activate Scout
   start("Setup Scout");
-  await activateScout(context, commandManager);
-  start("Setup Scout");
+  const scoutCommands = await activateScout(context, workspaceEnvManager, host);
+  end("Setup Scout");
 
   start("Final Setup");
   // Register the log view link provider
@@ -184,6 +189,7 @@ export async function activate(context: ExtensionContext) {
     ...stateCommands,
     ...envComands,
     ...taskCommands,
+    ...scoutCommands,
   ].forEach(cmd => commandManager.register(cmd));
   context.subscriptions.push(commandManager);
 
@@ -197,8 +203,9 @@ export async function activate(context: ExtensionContext) {
 
 export async function activateScout(
   context: ExtensionContext,
-  _commandManager: CommandManager
-) {
+  workspaceEnvManager: WorkspaceEnvManager,
+  host: ExtensionHost
+): Promise<Command[]> {
   // Scout Manager watches for changes to scout binary
   start("Monitor Scout Binary");
   const scoutManager = activateScoutManager(context);
@@ -213,6 +220,20 @@ export async function activateScout(
 
   // Register the scout terminal provider
   window.registerTerminalLinkProvider(scanviewTerminalLinkProvider(context));
+
+  // Activate the log view
+  start("Setup Scout Viewer");
+  const [scoutViewCommands, _] = await activateScanview(
+    scoutManager,
+    server,
+    workspaceEnvManager,
+    context,
+    host
+  );
+  activateOpenScan(context);
+  end("Setup Scout Viewer");
+
+  return scoutViewCommands;
 }
 
 const checkInspectVersion = async () => {

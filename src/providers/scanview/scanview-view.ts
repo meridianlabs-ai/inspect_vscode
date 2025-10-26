@@ -341,7 +341,7 @@ async function selectScanResultsDirectory(
   return await selectDirectory(
     "Scan Results Directory",
     "scans",
-    envManager.getDefaultLogDir(),
+    envManager.getDefaultScanResultsDir(),
     new ScanResultsListingMRU(context)
   );
 }

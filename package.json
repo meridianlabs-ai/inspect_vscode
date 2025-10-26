@@ -97,6 +97,20 @@
         "enablement": "workspaceFolderCount != 0"
       },
       {
+        "command": "inspect.scoutView",
+        "title": "Scout View...",
+        "icon": "$(code-oss)",
+        "category": "Inspect",
+        "enablement": "workspaceFolderCount != 0"
+      },
+      {
+        "command": "inspect.scoutViewScan",
+        "title": "Open Scout Scan...",
+        "icon": "$(code-oss)",
+        "category": "Inspect",
+        "enablement": "workspaceFolderCount != 0"
+      },
+      {
         "command": "inspect.createTask",
         "title": "Create Task",
         "category": "Inspect",
@@ -230,6 +244,11 @@
       {
         "command": "inspect.openLogViewer",
         "title": "Open in Inspect Log Viewer",
+        "enablement": "workspaceFolderCount != 0"
+      },
+      {
+        "command": "inspect.openScanViewer",
+        "title": "Open in Scout Scan Viewer",
         "enablement": "workspaceFolderCount != 0"
       }
     ],
@@ -461,6 +480,10 @@
         },
         {
           "command": "inspect.openLogViewer",
+          "when": "false"
+        },
+        {
+          "command": "inspect.openScanViewer",
           "when": "false"
         }
       ]

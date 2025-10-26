@@ -23,7 +23,8 @@ export async function selectDirectory(
   entity: string,
   dirname: string,
   defaultDir: Uri,
-  mru: ListingMRU
+  mru: ListingMRU,
+  workspaceDefaultDir = true
 ): Promise<Uri | null | undefined> {
   return new Promise<Uri | null | undefined>(resolve => {
     // get the mru (screen out the current workspaceLogDir)
@@ -33,12 +34,14 @@ export async function selectDirectory(
 
     // build list of items
     const items: SelectLocationQuickPickItem[] = [];
-    items.push({
-      iconPath: new ThemeIcon("code-oss"),
-      label: `Workspace ${entity}`,
-      description: prettyUriPath(defaultDir),
-      location: kWorkspaceLogDirectory,
-    });
+    if (workspaceDefaultDir) {
+      items.push({
+        iconPath: new ThemeIcon("code-oss"),
+        label: `Workspace ${entity}`,
+        description: prettyUriPath(defaultDir),
+        location: kWorkspaceLogDirectory,
+      });
+    }
     items.push({
       label: "Select a location",
       kind: QuickPickItemKind.Separator,
