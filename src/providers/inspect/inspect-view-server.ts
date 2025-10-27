@@ -50,6 +50,36 @@ export class InspectViewServer implements Disposable {
     );
   }
 
+  public async evalLogDir(): Promise<string | undefined> {
+    if (this.haveInspectEvalLogFormat()) {
+      return this.api_json(`/api/log-dir`);
+    } else {
+      throw new Error("evalLogDir not implemented");
+    }
+  }
+
+  public async evalLogFiles(
+    mtime: number,
+    clientFileCount: number
+  ): Promise<string | undefined> {
+    const log_file_token = (mtime: number, fileCount: number): string => {
+      // Use a weak etag as the mtime and file count may not
+      // uniquely identify the state of the log directory
+      return `W/"${mtime}-${fileCount}"`;
+    };
+
+    if (this.haveInspectEvalLogFormat()) {
+      const headers: Record<string, string> = {};
+      const token = log_file_token(mtime, clientFileCount);
+      if (token) {
+        headers["If-None-Match"] = token;
+      }
+      return this.api_json("/api/log-files", headers);
+    } else {
+      throw new Error("evalLogFile not implemented");
+    }
+  }
+
   public async evalLogs(log_dir: Uri): Promise<string | undefined> {
     if (this.haveInspectEvalLogFormat()) {
       return this.api_json(

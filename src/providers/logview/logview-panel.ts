@@ -11,6 +11,8 @@ import {
   JsonRpcServerMethod,
   kMethodEvalLog,
   kMethodEvalLogBytes,
+  kMethodEvalLogDir,
+  kMethodEvalLogFiles,
   kMethodEvalLogHeaders,
   kMethodEvalLogs,
   kMethodEvalLogSize,
@@ -35,6 +37,9 @@ export class LogviewPanel extends Disposable {
 
     // serve eval log api to webview
     this._rpcDisconnect = webviewPanelJsonRpcServer(panel_, {
+      [kMethodEvalLogDir]: async () => server.evalLogDir(),
+      [kMethodEvalLogFiles]: async (params: unknown[]) =>
+        server.evalLogFiles(params[0] as number, params[1] as number),
       [kMethodEvalLogs]: async () =>
         type === "dir" ? server.evalLogs(uri) : server.evalLogsSolo(uri),
       [kMethodEvalLog]: (params: unknown[]) =>
