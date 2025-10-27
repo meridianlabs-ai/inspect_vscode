@@ -2,6 +2,8 @@ import { HostWebviewPanel } from "../hooks";
 
 // constants for json-rpc methods
 export const kMethodEvalLogs = "eval_logs";
+export const kMethodEvalLogDir = "eval_log_dir";
+export const kMethodEvalLogFiles = "eval_log_files";
 export const kMethodEvalLog = "eval_log";
 export const kMethodEvalLogSize = "eval_log_size";
 export const kMethodEvalLogBytes = "eval_log_bytes";
