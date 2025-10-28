@@ -1,7 +1,11 @@
 import vscode from "vscode";
 import { ExtensionContext, Uri } from "vscode";
 import { HostWebviewPanel } from "../../hooks";
-import { webviewPanelJsonRpcServer } from "../../core/jsonrpc";
+import {
+  kMethodGetScan,
+  kMethodGetScans,
+  webviewPanelJsonRpcServer,
+} from "../../core/jsonrpc";
 import { ScanviewState } from "./scanview-state";
 import {
   getWebviewPanelHtml,
@@ -15,7 +19,7 @@ export class ScanviewPanel extends Disposable {
   constructor(
     private panel_: HostWebviewPanel,
     private context_: ExtensionContext,
-    _server: ScoutViewServer,
+    server: ScoutViewServer,
     _type: "scan" | "results",
     _uri: Uri
   ) {
@@ -23,7 +27,9 @@ export class ScanviewPanel extends Disposable {
 
     // serve eval log api to webview
     this._rpcDisconnect = webviewPanelJsonRpcServer(panel_, {
-      // TODO: methods
+      [kMethodGetScans]: async () => server.getScans(),
+      [kMethodGetScan]: async (params: unknown[]) =>
+        server.getScan(params[0] as string),
     });
 
     // serve post message api to webview

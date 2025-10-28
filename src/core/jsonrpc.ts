@@ -13,6 +13,10 @@ export const kMethodSampleData = "eval_log_sample_data";
 export const kMethodLogMessage = "log_message";
 export const kMethodEvalSet = "eval_set";
 
+// constants for Scout json-rpc methods
+export const kMethodGetScans = "get_scans";
+export const kMethodGetScan = "get_scan";
+
 // json rpc client (talk from the webview to the extension)
 export function webViewJsonRpcClient(vscode: {
   postMessage(message: unknown): void;
