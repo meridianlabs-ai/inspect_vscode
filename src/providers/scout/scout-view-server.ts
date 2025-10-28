@@ -13,8 +13,8 @@ export class ScoutViewServer extends PackageViewServer {
       7576,
       "scout",
       scoutBinPath,
-      [],
-      undefined
+      ["--display", "rich"],
+      "http"
     );
   }
 
