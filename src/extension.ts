@@ -10,7 +10,10 @@ import { activateEvalManager } from "./providers/inspect/inspect-eval";
 import { activateActivityBar } from "./providers/activity-bar/activity-bar-provider";
 import { activateActiveTaskProvider } from "./providers/active-task/active-task-provider";
 import { activateWorkspaceTaskProvider } from "./providers/workspace/workspace-task-provider";
-import { activateWorkspaceState } from "./providers/workspace/workspace-state-provider";
+import {
+  activateWorkspaceState,
+  WorkspaceStateManager,
+} from "./providers/workspace/workspace-state-provider";
 import {
   activateWorkspaceEnv,
   WorkspaceEnvManager,
@@ -35,6 +38,7 @@ import { activateScoutManager } from "./providers/scout/scout-manager";
 import { ScoutViewServer } from "./providers/scout/scout-view-server";
 import { activateOpenScan } from "./providers/openscan";
 import { activateScanview } from "./providers/scanview/scanview";
+import { activateScoutActivityBar } from "./providers/activity-bar/scout-activity-bar-provider";
 
 const kInspectMinimumVersion = "0.3.8";
 
@@ -163,7 +167,14 @@ export async function activate(context: ExtensionContext) {
 
   // Activate Scout
   start("Setup Scout");
-  const scoutCommands = await activateScout(context, workspaceEnvManager, host);
+  const scoutCommands = await activateScout(
+    context,
+    workspaceEnvManager,
+    stateManager,
+    host,
+    server,
+    logsWatcher
+  );
   end("Setup Scout");
 
   start("Final Setup");
@@ -204,7 +215,10 @@ export async function activate(context: ExtensionContext) {
 export async function activateScout(
   context: ExtensionContext,
   workspaceEnvManager: WorkspaceEnvManager,
-  host: ExtensionHost
+  workspaceStateManager: WorkspaceStateManager,
+  host: ExtensionHost,
+  viewServer: InspectViewServer,
+  logsWatcher: InspectLogsWatcher
 ): Promise<Command[]> {
   // Scout Manager watches for changes to scout binary
   start("Monitor Scout Binary");
@@ -233,7 +247,19 @@ export async function activateScout(
   activateOpenScan(context);
   end("Setup Scout Viewer");
 
-  return scoutViewCommands;
+  // Activate the Activity Bar
+  start("Scout Activity Bar");
+  const activityBarCommands = await activateScoutActivityBar(
+    scoutManager,
+    workspaceEnvManager,
+    workspaceStateManager,
+    viewServer,
+    logsWatcher,
+    context
+  );
+  end("Scout Activity Bar");
+
+  return [...scoutViewCommands, ...activityBarCommands];
 }
 
 const checkInspectVersion = async () => {

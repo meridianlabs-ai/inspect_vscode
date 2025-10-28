@@ -37,11 +37,8 @@ window.addEventListener("message", e => {
       showEmptyPanel("No task selected", "configuration-controls");
       break;
 
-    case "noInspect":
-      showEmptyPanel(
-        "Inspect Package not installed.",
-        "configuration-controls"
-      );
+    case "noPackage":
+      showEmptyPanel("Package not installed.", "configuration-controls");
       break;
 
     case "setActiveTask":

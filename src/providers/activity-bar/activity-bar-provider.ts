@@ -1,5 +1,5 @@
 import { ExtensionContext, window } from "vscode";
-import { EnvConfigurationProvider } from "./env-config-provider";
+import { InspectConfigurationProvider } from "./env-config-inspect-provider";
 import { activateTaskOutline } from "./task-outline-provider";
 import { InspectEvalManager } from "../inspect/inspect-eval";
 import { ActiveTaskManager } from "../active-task/active-task-provider";
@@ -13,12 +13,10 @@ import {
 } from "./task-config-commands";
 import { InspectViewManager } from "../logview/logview-view";
 import { activateLogListing } from "./log-listing/log-listing-provider";
-import { activateScanListing } from "./log-listing/scan-listing-provider";
 import { InspectViewServer } from "../inspect/inspect-view-server";
 import { InspectLogsWatcher } from "../inspect/inspect-logs-watcher";
 import { end, start } from "../../core/log";
 import { PackageManager } from "../../core/package/manager";
-import { ScoutEnvConfigurationProvider } from "./scout-env-config-provider";
 
 export async function activateActivityBar(
   inspectManager: PackageManager,
@@ -42,16 +40,6 @@ export async function activateActivityBar(
   context.subscriptions.push(...logsDispose);
   end("Log Listing");
 
-  start("Scan Listing");
-  const [scansCommands, scansDispose] = await activateScanListing(
-    context,
-    workspaceEnvMgr,
-    inspectViewServer,
-    logsWatcher
-  );
-  context.subscriptions.push(...scansDispose);
-  end("Scan Listing");
-
   start("Task Outline");
   const [outlineCommands, treeDataProvider] = await activateTaskOutline(
     context,
@@ -64,7 +52,7 @@ export async function activateActivityBar(
   context.subscriptions.push(treeDataProvider);
   end("Task Outline");
 
-  const envProvider = new EnvConfigurationProvider(
+  const envProvider = new InspectConfigurationProvider(
     context.extensionUri,
     workspaceEnvMgr,
     workspaceStateMgr,
@@ -72,21 +60,8 @@ export async function activateActivityBar(
   );
   context.subscriptions.push(
     window.registerWebviewViewProvider(
-      EnvConfigurationProvider.viewType,
+      InspectConfigurationProvider.viewType,
       envProvider
-    )
-  );
-
-  const scoutEnvProvider = new ScoutEnvConfigurationProvider(
-    context.extensionUri,
-    workspaceEnvMgr,
-    workspaceStateMgr,
-    inspectManager
-  );
-  context.subscriptions.push(
-    window.registerWebviewViewProvider(
-      ScoutEnvConfigurationProvider.viewType,
-      scoutEnvProvider
     )
   );
 
@@ -107,10 +82,5 @@ export async function activateActivityBar(
     new DebugConfigTaskCommand(activeTaskManager, inspectEvalMgr),
   ];
 
-  return [
-    ...outlineCommands,
-    ...taskConfigCommands,
-    ...logsCommands,
-    ...scansCommands,
-  ];
+  return [...outlineCommands, ...taskConfigCommands, ...logsCommands];
 }
