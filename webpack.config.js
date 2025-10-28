@@ -78,6 +78,26 @@ const envWebviewConfig = {
   },
 };
 
+// Config for webview source code (to be run in a web-based context)
+/** @type WebpackConfig */
+const scoutEnvWebviewConfig = {
+  ...baseConfig,
+  target: ["web", "es2020"],
+  entry: "./src/providers/activity-bar/webview/scout-env-config-webview.ts",
+  experiments: { outputModule: true },
+  output: {
+    path: path.resolve(__dirname, "out"),
+    filename: "scout-env-config-webview.js",
+    libraryTarget: "module",
+    chunkFormat: "module",
+  },
+  performance: {
+    // Increase the size limit to 1 MB (or any value you prefer)
+    maxAssetSize: 1000000, // in bytes
+    maxEntrypointSize: 1000000, // in bytes
+  },
+};
+
 const taskHyperparamWebviewConfig = {
   ...baseConfig,
   target: ["web", "es2020"],
@@ -99,5 +119,6 @@ const taskHyperparamWebviewConfig = {
 module.exports = [
   extensionConfig,
   envWebviewConfig,
+  scoutEnvWebviewConfig,
   taskHyperparamWebviewConfig,
 ];

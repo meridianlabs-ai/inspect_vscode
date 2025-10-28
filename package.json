@@ -34,6 +34,7 @@
     "onWebviewPanel:inspect.scanview",
     "onWebviewPanel:inspect_ai.task-configuration",
     "onWebviewPanel:inspect_ai.logs-view",
+    "onWebviewPanel:inspect_ai.scans-view",
     "onWebviewPanel:inspect_ai.env-configuration-view",
     "onWebviewPanel:inspect_ai.task-outline-view",
     "onLanguage:eval",
@@ -308,6 +309,12 @@
           "id": "inspect_ai-activity-bar",
           "title": "Inspect",
           "icon": "assets/logo/inspect.svg"
+        },
+        {
+          "id": "inspect_ai-activity-bar-scout",
+          "title": "Scout",
+          "icon": "assets/logo/scout.svg",
+          "when": "inspect_ai.inspect_scout.installed"
         }
       ]
     },
@@ -335,6 +342,14 @@
           "name": "Task",
           "when": "workspaceFolderCount != 0 && inspect_ai.task-outline-view.noInspect == false",
           "collapsed": true
+        }
+      ],
+      "inspect_ai-activity-bar-scout": [
+        {
+          "type": "webview",
+          "id": "inspect_ai.scout-env-configuration-view",
+          "name": "Configuration (.env)",
+          "when": "workspaceFolderCount != 0 && inspect_ai.task-outline-view.noInspect == false && inspect_ai.inspect_scout.installed == true"
         }
       ]
     },

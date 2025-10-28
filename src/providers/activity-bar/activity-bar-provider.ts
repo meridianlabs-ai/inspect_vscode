@@ -17,6 +17,7 @@ import { InspectViewServer } from "../inspect/inspect-view-server";
 import { InspectLogsWatcher } from "../inspect/inspect-logs-watcher";
 import { end, start } from "../../core/log";
 import { PackageManager } from "../../core/package/manager";
+import { ScoutEnvConfigurationProvider } from "./scout-env-config-provider";
 
 export async function activateActivityBar(
   inspectManager: PackageManager,
@@ -62,6 +63,19 @@ export async function activateActivityBar(
     window.registerWebviewViewProvider(
       EnvConfigurationProvider.viewType,
       envProvider
+    )
+  );
+
+  const scoutEnvProvider = new ScoutEnvConfigurationProvider(
+    context.extensionUri,
+    workspaceEnvMgr,
+    workspaceStateMgr,
+    inspectManager
+  );
+  context.subscriptions.push(
+    window.registerWebviewViewProvider(
+      ScoutEnvConfigurationProvider.viewType,
+      scoutEnvProvider
     )
   );
 

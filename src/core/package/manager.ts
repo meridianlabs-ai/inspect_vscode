@@ -1,7 +1,12 @@
-import { Disposable, Event, EventEmitter, ExtensionContext } from "vscode";
+import {
+  commands,
+  Disposable,
+  Event,
+  EventEmitter,
+  ExtensionContext,
+} from "vscode";
 import { pythonInterpreter } from "../python";
 import { AbsolutePath } from "../path";
-
 
 // Fired when the active task changes
 export interface PackageChangedEvent {
@@ -10,7 +15,11 @@ export interface PackageChangedEvent {
 }
 
 export class PackageManager implements Disposable {
-  constructor(context: ExtensionContext, private checkForPackage_: () => AbsolutePath | null) {
+  constructor(
+    context: ExtensionContext,
+    private packageName_: string,
+    private checkForPackage_: () => AbsolutePath | null
+  ) {
     // If the interpreter changes, refresh the tasks
     context.subscriptions.push(
       pythonInterpreter().onDidChange(() => {
@@ -35,6 +44,11 @@ export class PackageManager implements Disposable {
         available: !!this.packageBinPath_,
         binPath,
       });
+      commands.executeCommand(
+        "setContext",
+        `inspect_ai.${this.packageName_}.installed`,
+        this.available
+      );
     }
     if (!available) {
       this.watchForPackage();

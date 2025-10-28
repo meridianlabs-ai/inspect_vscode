@@ -2,11 +2,18 @@ import { ExtensionContext } from "vscode";
 import { inspectBinPath } from "../../inspect/props";
 import { AbsolutePath } from "../../core/path";
 import { delimiter } from "path";
-import { PackageChangedEvent, PackageManager } from "../../core/package/manager";
+import {
+  PackageChangedEvent,
+  PackageManager,
+} from "../../core/package/manager";
 
 // Activates the provider which tracks the availability of Inspect
 export function activateInspectManager(context: ExtensionContext) {
-  const inspectManager = new PackageManager(context, inspectBinPath);
+  const inspectManager = new PackageManager(
+    context,
+    "inspect_ai",
+    inspectBinPath
+  );
 
   // Initialize the terminal with the inspect bin path
   // on the path (if needed)
