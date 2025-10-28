@@ -1,7 +1,4 @@
-import {
-  ExtensionContext,
-  Uri,
-} from "vscode";
+import { ExtensionContext, Uri } from "vscode";
 
 import {
   hasMinimumInspectVersion,
@@ -28,7 +25,16 @@ const kNotModifiedSignal = "NotModified";
 
 export class InspectViewServer extends PackageViewServer {
   constructor(context: ExtensionContext, inspectManager: PackageManager) {
-    super(context, inspectManager, 7676, "inspect", inspectBinPath, ["--no-ansi"])
+    super(
+      context,
+      inspectManager,
+      ["view", "start"],
+      7676,
+      "inspect",
+      inspectBinPath,
+      ["--no-ansi"],
+      "http"
+    );
   }
 
   public async evalLogDir(): Promise<string | undefined> {
@@ -219,22 +225,18 @@ export class InspectViewServer extends PackageViewServer {
     }
   }
 
-
   override async ensureRunning(): Promise<void> {
     // only do this if we have a new enough version of inspect
     if (!this.haveInspectEvalLogFormat()) {
       return;
     }
-    return await super.ensureRunning()
+    return await super.ensureRunning();
   }
 
   private haveInspectEvalLogFormat() {
     return hasMinimumInspectVersion(kInspectEvalLogFormatVersion);
   }
 }
-
-
-
 
 // The eval commands below need to be coordinated in terms of their working directory
 // The evalLogs() call will return log files with relative paths to the working dir (if possible)

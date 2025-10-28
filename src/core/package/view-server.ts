@@ -3,12 +3,7 @@ import { randomUUID } from "crypto";
 import * as os from "os";
 import AsyncLock from "async-lock";
 
-import {
-  Disposable,
-  ExtensionContext,
-  OutputChannel,
-  window,
-} from "vscode";
+import { Disposable, ExtensionContext, OutputChannel, window } from "vscode";
 
 import { findOpenPort } from "../../core/port";
 import { AbsolutePath, activeWorkspacePath } from "../../core/path";
@@ -16,18 +11,21 @@ import { shQuote } from "../../core/string";
 import { spawnProcess } from "../../core/process";
 import { PackageManager } from "./manager";
 
-
 export class PackageViewServer implements Disposable {
   constructor(
-    context: ExtensionContext, 
-    packageManager: PackageManager, 
+    context: ExtensionContext,
+    packageManager: PackageManager,
+    private startCommand_: string[],
     private defaultPort_: number,
-    private packageBin_: string, 
+    private packageBin_: string,
     private packageBinPath_: () => AbsolutePath | null,
     private viewArgs_: string[],
-) {
+    private logLevel_: string | undefined
+  ) {
     // create output channel for debugging
-    this.outputChannel_ = window.createOutputChannel(`${this.packageBin_} view`);
+    this.outputChannel_ = window.createOutputChannel(
+      `${this.packageBin_} view`
+    );
 
     // shutdown server when inspect version changes (then we'll launch
     // a new instance w/ the correct version)
@@ -37,7 +35,6 @@ export class PackageViewServer implements Disposable {
       })
     );
   }
-
 
   protected async api_json(
     path: string,
@@ -98,86 +95,88 @@ export class PackageViewServer implements Disposable {
   }
 
   protected async ensureRunning(): Promise<void> {
+    await this.serverStartupLock_.acquire(
+      `${this.packageBin_}-server-startup`,
+      async () => {
+        if (
+          this.serverProcess_ === undefined ||
+          this.serverProcess_.exitCode !== null
+        ) {
+          // find port and establish auth token
+          this.serverProcess_ = undefined;
+          this.serverPort_ = await findOpenPort(this.defaultPort_);
+          this.serverAuthToken_ = randomUUID();
 
-    await this.serverStartupLock_.acquire(`${this.packageBin_}-server-startup`, async () => {
-      if (
-        this.serverProcess_ === undefined ||
-        this.serverProcess_.exitCode !== null
-      ) {
-        // find port and establish auth token
-        this.serverProcess_ = undefined;
-        this.serverPort_ = await findOpenPort(this.defaultPort_);
-        this.serverAuthToken_ = randomUUID();
+          // launch server and wait to resolve/return until it produces output
+          return new Promise((resolve, reject) => {
+            // find inspect
+            const inspect = this.packageBinPath_();
+            if (!inspect) {
+              throw new Error(
+                `${this.packageBin_} view: package installation not found`
+              );
+            }
 
-        // launch server and wait to resolve/return until it produces output
-        return new Promise((resolve, reject) => {
-          // find inspect
-          const inspect = this.packageBinPath_();
-          if (!inspect) {
-            throw new Error(`${this.packageBin_} view: package installation not found`);
-          }
+            // launch process
+            const options: SpawnOptions = {
+              cwd: activeWorkspacePath().path,
+              env: {
+                COLUMNS: "150",
+                INSPECT_VIEW_AUTHORIZATION_TOKEN: this.serverAuthToken_,
+              },
+              windowsHide: true,
+            };
 
-          // launch process
-          const options: SpawnOptions = {
-            cwd: activeWorkspacePath().path,
-            env: {
-              COLUMNS: "150",
-              INSPECT_VIEW_AUTHORIZATION_TOKEN: this.serverAuthToken_,
-            },
-            windowsHide: true,
-          };
-
-          // forward output to channel and resolve promise
-          let resolved = false;
-          const onOutput = (output: string) => {
-            this.outputChannel_.append(output);
-            if (!resolved) {
-              if (output.includes("Running on ")) {
-                resolved = true;
-                resolve(undefined);
+            // forward output to channel and resolve promise
+            let resolved = false;
+            const onOutput = (output: string) => {
+              this.outputChannel_.append(output);
+              if (!resolved) {
+                if (output.includes("Running on ")) {
+                  resolved = true;
+                  resolve(undefined);
+                }
               }
-            }
-          };
+            };
 
-          // run server
-          const quote =
-            os.platform() === "win32" ? shQuote : (arg: string) => arg;
-          const args = [
-            "view",
-            "start",
-            "--port",
-            String(this.serverPort_),
-            "--log-level",
-            "http",
-          ].concat(this.viewArgs_);
-          this.serverProcess_ = spawnProcess(
-            quote(inspect.path),
-            args.map(quote),
-            options,
-            {
-              stdout: onOutput,
-              stderr: onOutput,
-            },
-            {
-              onClose: (code: number) => {
-                this.outputChannel_.appendLine(
-                  `${this.packageBin_} view exited with code ${code} (pid=${this.serverProcess_?.pid})`
-                );
+            // run server
+            const quote =
+              os.platform() === "win32" ? shQuote : (arg: string) => arg;
+            const args = [
+              ...this.startCommand_,
+              "--port",
+              String(this.serverPort_),
+              ...(this.logLevel_ ? ["--log-level", this.logLevel_] : []),
+            ].concat(this.viewArgs_);
+            this.serverProcess_ = spawnProcess(
+              quote(inspect.path),
+              args.map(quote),
+              options,
+              {
+                stdout: onOutput,
+                stderr: onOutput,
               },
-              onError: (error: Error) => {
-                this.outputChannel_.appendLine(
-                  `Error starting ${this.packageBin_} view ${error.message}`
-                );
-                reject(error);
-              },
-            }
-          );
-          this.outputChannel_.appendLine(
-            `Starting ${this.packageBin_} view on port ${this.serverPort_} (pid=${this.serverProcess_?.pid})`
-          );
-        });
+              {
+                onClose: (code: number) => {
+                  this.outputChannel_.appendLine(
+                    `${this.packageBin_} view exited with code ${code} (pid=${this.serverProcess_?.pid})`
+                  );
+                },
+                onError: (error: Error) => {
+                  this.outputChannel_.appendLine(
+                    `Error starting ${this.packageBin_} view ${error.message}`
+                  );
+                  reject(error);
+                },
+              }
+            );
+            this.outputChannel_.appendLine(
+              `Starting ${this.packageBin_} view on port ${this.serverPort_} (pid=${this.serverProcess_?.pid})`
+            );
+          });
+        }
       }
-    });
+    );
   }
 
   private shutdown() {
@@ -198,5 +197,3 @@ export class PackageViewServer implements Disposable {
   private serverPort_?: number = undefined;
   private serverAuthToken_: string = "";
 }
-
-

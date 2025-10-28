@@ -6,9 +6,23 @@ import { scoutBinPath } from "../../scout/props";
 
 export class ScoutViewServer extends PackageViewServer {
   constructor(context: ExtensionContext, scoutManager: PackageManager) {
-    super(context, scoutManager, 7576, "scout", scoutBinPath, [
-      "--display",
-      "rich",
-    ]);
+    super(
+      context,
+      scoutManager,
+      ["view"],
+      7576,
+      "scout",
+      scoutBinPath,
+      [],
+      undefined
+    );
+  }
+
+  getScans(): Promise<string> {
+    return this.api_json("/api/scans");
+  }
+
+  getScan(scanLocation: string): Promise<string> {
+    return this.api_json(`/api/scan/${encodeURIComponent(scanLocation)}`);
   }
 }
