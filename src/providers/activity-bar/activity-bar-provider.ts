@@ -13,6 +13,7 @@ import {
 } from "./task-config-commands";
 import { InspectViewManager } from "../logview/logview-view";
 import { activateLogListing } from "./log-listing/log-listing-provider";
+import { activateScanListing } from "./log-listing/scan-listing-provider";
 import { InspectViewServer } from "../inspect/inspect-view-server";
 import { InspectLogsWatcher } from "../inspect/inspect-logs-watcher";
 import { end, start } from "../../core/log";
@@ -40,6 +41,16 @@ export async function activateActivityBar(
   );
   context.subscriptions.push(...logsDispose);
   end("Log Listing");
+
+  start("Scan Listing");
+  const [scansCommands, scansDispose] = await activateScanListing(
+    context,
+    workspaceEnvMgr,
+    inspectViewServer,
+    logsWatcher
+  );
+  context.subscriptions.push(...scansDispose);
+  end("Scan Listing");
 
   start("Task Outline");
   const [outlineCommands, treeDataProvider] = await activateTaskOutline(
@@ -96,5 +107,10 @@ export async function activateActivityBar(
     new DebugConfigTaskCommand(activeTaskManager, inspectEvalMgr),
   ];
 
-  return [...outlineCommands, ...taskConfigCommands, ...logsCommands];
+  return [
+    ...outlineCommands,
+    ...taskConfigCommands,
+    ...logsCommands,
+    ...scansCommands,
+  ];
 }
