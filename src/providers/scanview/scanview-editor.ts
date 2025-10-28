@@ -1,12 +1,12 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import * as vscode from "vscode";
 import { Uri } from "vscode";
-import { inspectViewPath } from "../../inspect/props";
 import { HostWebviewPanel } from "../../hooks";
 import { dirname } from "../../core/uri";
 import { ScoutViewServer } from "../scout/scout-view-server";
 import { ScanviewPanel } from "./scanview-panel";
 import { ScanviewState } from "./scanview-state";
+import { scoutViewPath } from "../../scout/props";
 
 export const kScoutScanViewType = "inspect-ai.scout-scan-editor";
 
@@ -70,7 +70,7 @@ class ScoutScanReadonlyEditor implements vscode.CustomReadonlyEditorProvider {
 
     // local resource roots
     const localResourceRoots: Uri[] = [];
-    const viewDir = inspectViewPath();
+    const viewDir = scoutViewPath();
     if (viewDir) {
       localResourceRoots.push(Uri.file(viewDir.path));
     }
