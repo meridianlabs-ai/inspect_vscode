@@ -3,33 +3,24 @@ import * as vscode from "vscode";
 import { Command } from "../../../core/command";
 
 import { WorkspaceEnvManager } from "../../workspace/workspace-env-provider";
-import { LogListing } from "./log-listing";
-import { InspectViewServer } from "../../inspect/inspect-view-server";
+import { LogListing, Logs } from "./log-listing";
 import { activeWorkspaceFolder } from "../../../core/workspace";
 import { getRelativeUri, prettyUriPath } from "../../../core/uri";
-import { InspectLogsWatcher } from "../../inspect/inspect-logs-watcher";
 import { Uri } from "vscode";
-import { hasMinimumInspectVersion } from "../../../inspect/version";
-import { kInspectEvalLogFormatVersion } from "../../inspect/inspect-constants";
 import { ScansTreeDataProvider } from "./scan-listing-data";
+import { ScoutViewServer } from "../../scout/scout-view-server";
+import { ScanResultsListingMRU } from "../../scanview/scanview-view";
 
 export async function activateScanListing(
   context: vscode.ExtensionContext,
   envManager: WorkspaceEnvManager,
-  viewServer: InspectViewServer,
-  logsWatcher: InspectLogsWatcher
+  viewServer: ScoutViewServer
 ): Promise<[Command[], vscode.Disposable[]]> {
-  const kLogListingDir = "inspect_ai.logListingDir";
+  const kScanResultsDir = "inspect_ai.scanResultsDir";
   const disposables: vscode.Disposable[] = [];
 
-  await vscode.commands.executeCommand(
-    "setContext",
-    "inspect_ai.haveEvalLogFormat",
-    hasMinimumInspectVersion(kInspectEvalLogFormatVersion)
-  );
-
   // create tree data provider and tree
-  const treeDataProvider = new ScansTreeDataProvider(context, viewServer);
+  const treeDataProvider = new ScansTreeDataProvider();
   disposables.push(treeDataProvider);
   const tree = vscode.window.createTreeView(ScansTreeDataProvider.viewType, {
     treeDataProvider,
@@ -39,15 +30,45 @@ export async function activateScanListing(
 
   // update the tree based on the current preferred log dir
   const updateTree = () => {
-    // see what the active log dir is
-    const preferredLogDir = context.workspaceState.get<string>(kLogListingDir);
+    // see what the active scan dir is
+    const preferredLogDir = context.workspaceState.get<string>(kScanResultsDir);
     const logDir = preferredLogDir
       ? Uri.parse(preferredLogDir)
-      : envManager.getDefaultLogDir();
+      : envManager.getDefaultScanResultsDir();
+
+    // create a logs fetcher
+    const logsFetcher = async (_uri: Uri): Promise<Logs | undefined> => {
+      const scansJSON = await viewServer.getScans();
+      if (scansJSON) {
+        const scans = JSON.parse(scansJSON) as {
+          results_dir: string;
+          scans: Array<{
+            location: string;
+            spec: {
+              scan_id: string;
+              scan_file?: string;
+              timestamp: string;
+            };
+          }>;
+        };
+        return {
+          log_dir: scans.results_dir,
+          items: scans.scans.map(scan => ({
+            name: scan.location,
+            mtime: new Date(scan.spec.timestamp).getTime(),
+            display_name: `scan_id=${scan.spec.scan_id}`,
+            item_id: scan.spec.scan_id,
+          })),
+        };
+      } else {
+        return undefined;
+      }
+    };
 
     // set it
-    treeDataProvider.setLogListing(new LogListing(context, logDir, viewServer));
-
+    treeDataProvider.setLogListing(
+      new LogListing(logDir, new ScanResultsListingMRU(context), logsFetcher)
+    );
     // show a workspace relative path if this is in the workspace,
     // otherwise show the protocol then the last two bits of the path
     const relativePath = getRelativeUri(activeWorkspaceFolder().uri, logDir);
@@ -64,7 +85,7 @@ export async function activateScanListing(
   // update tree if the environment changes and we are tracking the workspace log dir
   disposables.push(
     envManager.onEnvironmentChanged(() => {
-      if (context.workspaceState.get<string>(kLogListingDir) === undefined) {
+      if (context.workspaceState.get<string>(kScanResultsDir) === undefined) {
         updateTree();
       }
     })
@@ -121,98 +142,18 @@ export async function activateScanListing(
     })
   );
 
-  // Register Reveal in Explorer command
-  disposables.push(
-    vscode.commands.registerCommand(
-      "inspect.logListingRevealInExplorer",
-      async (node: LogNode) => {
-        const logUri = treeDataProvider.getLogListing()?.uriForNode(node);
-        if (logUri) {
-          await vscode.commands.executeCommand("revealInExplorer", logUri);
-        }
-      }
-    )
-  );
 
-  // Register Open in JSON Editor... command
-  disposables.push(
-    vscode.commands.registerCommand(
-      "inspect.logListingOpenInJSONEditor",
-      async (node: LogNode) => {
-        const logUri = treeDataProvider.getLogListing()?.uriForNode(node);
-        if (logUri) {
-          await vscode.commands.executeCommand("vscode.open", logUri, <
-            vscode.TextDocumentShowOptions
-          >{ preview: true });
-        }
-      }
-    )
-  );
-
-  // Register delete log file command
-  disposables.push(
-    vscode.commands.registerCommand(
-      "inspect.logListingDeleteLogFile",
-      async (node: LogNode) => {
-        const logUri = treeDataProvider.getLogListing()?.uriForNode(node);
-        if (logUri) {
-          const result = await vscode.window.showInformationMessage(
-            "Delete Log File",
-            {
-              modal: true,
-              detail: `Are you sure you want to delete the log file at ${prettyUriPath(logUri)}?`,
-            },
-            { title: "Delete", isCloseAffordance: false },
-            { title: "Cancel", isCloseAffordance: true }
-          );
-
-          if (result?.title === "Delete") {
-            await viewServer.evalLogDelete(logUri.toString());
-            treeDataProvider.refresh();
-          }
-        }
-      }
-    )
-  );
-
-  // Register copy path command
-  disposables.push(
-    vscode.commands.registerCommand(
-      "inspect.logListingCopyLogPath",
-      async (node: LogNode) => {
-        const logUri = treeDataProvider.getLogListing()?.uriForNode(node);
-        if (logUri) {
-          const path = prettyUriPath(logUri);
-          await vscode.env.clipboard.writeText(path);
-        }
-      }
-    )
-  );
-
-  // Register copy editor command
-  disposables.push(
-    vscode.commands.registerCommand(
-      "inspect.logListingCopyEditorPath",
-      async (node: LogNode) => {
-        const logUri = treeDataProvider.getLogListing()?.uriForNode(node);
-        if (logUri) {
-          const url = `vscode://ukaisi.inspect-ai/open?log=${encodeURIComponent(logUri.toString())}`;
-          await vscode.env.clipboard.writeText(url);
-        }
-      }
-    )
-  );
   */
 
   // refresh when a log in our directory changes
-  disposables.push(
-    logsWatcher.onInspectLogCreated(e => {
-      const treeLogDir = treeDataProvider.getLogListing()?.logDir();
-      if (treeLogDir && getRelativeUri(treeLogDir, e.log)) {
-        treeDataProvider.refresh();
-      }
-    })
-  );
+  // disposables.push(
+  //   logsWatcher.onInspectLogCreated(e => {
+  //     const treeLogDir = treeDataProvider.getLogListing()?.logDir();
+  //     if (treeLogDir && getRelativeUri(treeLogDir, e.log)) {
+  //       treeDataProvider.refresh();
+  //     }
+  //   })
+  // );
 
   // refresh on change visiblity
   disposables.push(
@@ -226,9 +167,9 @@ export async function activateScanListing(
   return [[], disposables];
 }
 
-export async function revealLogListing() {
+export async function revealScanListing() {
   await vscode.commands.executeCommand("workbench.action.focusSideBar");
   await vscode.commands.executeCommand(
-    `workbench.view.extension.inspect_ai-activity-bar`
+    `workbench.view.extension.inspect_ai-activity-bar-scout`
   );
 }

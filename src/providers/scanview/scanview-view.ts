@@ -328,7 +328,7 @@ class ScoutViewWebview extends InspectWebview<ScanviewState> {
 
 const kScanResultsMruKey = "inspect_ai.scan-results-listing-mru";
 
-class ScanResultsListingMRU extends ListingMRU {
+export class ScanResultsListingMRU extends ListingMRU {
   constructor(context_: ExtensionContext) {
     super(kScanResultsMruKey, context_);
   }

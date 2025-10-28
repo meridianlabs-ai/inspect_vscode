@@ -171,9 +171,7 @@ export async function activate(context: ExtensionContext) {
     context,
     workspaceEnvManager,
     stateManager,
-    host,
-    server,
-    logsWatcher
+    host
   );
   end("Setup Scout");
 
@@ -216,9 +214,7 @@ export async function activateScout(
   context: ExtensionContext,
   workspaceEnvManager: WorkspaceEnvManager,
   workspaceStateManager: WorkspaceStateManager,
-  host: ExtensionHost,
-  viewServer: InspectViewServer,
-  logsWatcher: InspectLogsWatcher
+  host: ExtensionHost
 ): Promise<Command[]> {
   // Scout Manager watches for changes to scout binary
   start("Monitor Scout Binary");
@@ -253,8 +249,7 @@ export async function activateScout(
     scoutManager,
     workspaceEnvManager,
     workspaceStateManager,
-    viewServer,
-    logsWatcher,
+    server,
     context
   );
   end("Scout Activity Bar");
