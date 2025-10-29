@@ -51,7 +51,7 @@ export class EnvConfigurationProvider<T extends EnvConfig>
 {
   constructor(
     protected readonly extensionUri_: Uri,
-    private readonly envManager_: WorkspaceEnvManager,
+    protected readonly envManager_: WorkspaceEnvManager,
     private readonly envConfigManager_: EnvConfigManager<T>,
     private readonly stateManager_: WorkspaceStateManager,
     private readonly packageManager_: PackageManager,
@@ -255,7 +255,7 @@ export function headHTML(
   `;
 }
 
-export function modelPickerHTML(): string {
+export function modelPickerHTML(modelCaption: string = "Model"): string {
   const kInspectProviders = [
     "openai",
     "anthropic",
@@ -286,10 +286,10 @@ export function modelPickerHTML(): string {
   });
   return `
                       <div class="dropdown-container full-width">
-                        <div id="provider-label-container"><label id="provider-label" for="provider">Model</label></div>
+                        <div id="provider-label-container"><label id="provider-label" for="provider">${modelCaption}</label></div>
                         <div class="cols full-width no-wrap">
                           <fast-combobox autocomplete="both" id="provider" placeholder="Provider">
-                            <fast-option value="">None</fast-option>
+                            <fast-option value="">(none)</fast-option>
                             ${modelOptions.join("\n")}
                           </fast>
                         </div>

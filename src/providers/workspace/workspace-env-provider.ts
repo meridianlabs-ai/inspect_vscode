@@ -103,7 +103,7 @@ export class WorkspaceEnvManager implements Disposable {
   public getDefaultScanResultsDir() {
     // See if there is a log dir
     const envVals = this.getValues();
-    const envResults = envVals[kScoutEnvValues.scanResultsDir];
+    const envResults = envVals[kScoutEnvValues.scanResults];
 
     // If there is a results dir, try to parse and use it
     try {
