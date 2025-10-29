@@ -45,11 +45,8 @@ export function initEnv(restoreEnv: (vscode: any, env: any) => void) {
         restoreEnv(vscode, e.data.message.env);
         break;
 
-      case "noInspect":
-        showEmptyPanel(
-          "Inspect package not installed",
-          "configuration-controls"
-        );
+      case "noPackage":
+        showEmptyPanel("Package not installed", "configuration-controls");
     }
   });
 

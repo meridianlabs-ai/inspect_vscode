@@ -1,7 +1,7 @@
 import "./vscode-controls.css";
 import "./env-config-webview.css";
 
-import { EnvConfiguration } from "../env-config-provider";
+import { EnvConfiguration } from "../env-config-inspect-provider";
 
 import { restoreInputState, restoreSelectState } from "./webview-utils";
 import { showProviderHelp } from "./env-utils-model";

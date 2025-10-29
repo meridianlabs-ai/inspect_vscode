@@ -4,7 +4,7 @@ import { Command } from "../../../core/command";
 import { LogTreeDataProvider } from "./log-listing-data";
 
 import { WorkspaceEnvManager } from "../../workspace/workspace-env-provider";
-import { LogListing, LogNode } from "./log-listing";
+import { LogListing, LogNode, Logs } from "./log-listing";
 import { InspectViewServer } from "../../inspect/inspect-view-server";
 import { activeWorkspaceFolder } from "../../../core/workspace";
 import { getRelativeUri, prettyUriPath } from "../../../core/uri";
@@ -13,6 +13,7 @@ import { selectLogDirectory } from "./log-directory-selector";
 import { Uri } from "vscode";
 import { hasMinimumInspectVersion } from "../../../inspect/version";
 import { kInspectEvalLogFormatVersion } from "../../inspect/inspect-constants";
+import { LogListingMRU } from "./log-listing-mru";
 
 export async function activateLogListing(
   context: vscode.ExtensionContext,
@@ -46,8 +47,37 @@ export async function activateLogListing(
       ? Uri.parse(preferredLogDir)
       : envManager.getDefaultLogDir();
 
+    // create a logs fetcher
+    const logsFetcher = async (uri: Uri): Promise<Logs | undefined> => {
+      const logsJSON = await viewServer.evalLogs(uri);
+      if (logsJSON) {
+        const logs = JSON.parse(logsJSON) as {
+          log_dir: string;
+          files: Array<{
+            name: string;
+            mtime: number;
+            task: string;
+            task_id: string;
+          }>;
+        };
+        return {
+          log_dir: logs.log_dir,
+          items: logs.files.map(file => ({
+            name: file.name,
+            mtime: file.mtime,
+            display_name: file.task,
+            item_id: file.task_id,
+          })),
+        };
+      } else {
+        return undefined;
+      }
+    };
+
     // set it
-    treeDataProvider.setLogListing(new LogListing(context, logDir, viewServer));
+    treeDataProvider.setLogListing(
+      new LogListing(logDir, new LogListingMRU(context), logsFetcher)
+    );
 
     // show a workspace relative path if this is in the workspace,
     // otherwise show the protocol then the last two bits of the path

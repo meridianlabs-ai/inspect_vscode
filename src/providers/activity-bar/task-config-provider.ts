@@ -39,7 +39,7 @@ export type SetStateParamCmd = {
 };
 
 export type NoInspectCmd = {
-  command: "noInspect";
+  command: "noPackage";
 };
 
 export class TaskConfigurationProvider implements WebviewViewProvider {
@@ -62,7 +62,7 @@ export class TaskConfigurationProvider implements WebviewViewProvider {
     const noInspectMsg = async () => {
       webviewView.description = "";
       await webviewView.webview.postMessage({
-        type: "noInspect",
+        type: "noPackage",
       });
     };
 
