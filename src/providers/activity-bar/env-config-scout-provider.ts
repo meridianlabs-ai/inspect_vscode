@@ -16,6 +16,7 @@ export interface ScoutConfiguration {
   provider?: string;
   model?: string;
   modelBaseUrl?: string;
+  scanResultsDir?: string;
 }
 
 class ScoutConfig implements EnvConfigManager<ScoutConfiguration> {
@@ -30,6 +31,7 @@ class ScoutConfig implements EnvConfigManager<ScoutConfiguration> {
       env[kScoutEnvValues.providerModel] = "";
     }
     env[kScoutEnvValues.modelBaseUrl] = config.modelBaseUrl || "";
+    env[kScoutEnvValues.scanResultsDir] = config.scanResultsDir || "";
 
     return env;
   }
@@ -55,6 +57,11 @@ class ScoutConfig implements EnvConfigManager<ScoutConfiguration> {
       config.modelBaseUrl = modelBaseUrl;
     }
 
+    const scanResultsDir = env[kScoutEnvValues.scanResultsDir];
+    if (scanResultsDir) {
+      config.scanResultsDir = scanResultsDir;
+    }
+
     return config;
   }
   public setConfiguration(
@@ -72,6 +79,8 @@ class ScoutConfig implements EnvConfigManager<ScoutConfiguration> {
       case "modelBaseUrl":
         state.modelBaseUrl = value;
         break;
+      case "scanResultsDir":
+        state.scanResultsDir = value;
     }
   }
 }
@@ -91,8 +100,8 @@ export class ScoutConfigurationProvider extends EnvConfigurationProvider<ScoutCo
       new ScoutConfig(),
       stateManager,
       scoutManager,
-      "logDir",
-      "inspect.logListingUpdate"
+      "scanResultsDir",
+      "inspect.scanListingUpdate"
     );
   }
 
