@@ -255,7 +255,7 @@
       },
       {
         "command": "inspect.scanListing",
-        "title": "Scout Scans Listing...",
+        "title": "Scout Scan Listing...",
         "icon": "$(root-folder-opened)",
         "category": "Inspect",
         "enablement": "workspaceFolderCount != 0"
@@ -263,6 +263,13 @@
       {
         "command": "inspect.scanListingReveal",
         "title": "Reveal Scan Listing",
+        "category": "Inspect",
+        "enablement": "workspaceFolderCount != 0"
+      },
+      {
+        "command": "inspect.scanListingRefresh",
+        "title": "Refresh Scan Listing",
+        "icon": "$(refresh)",
         "category": "Inspect",
         "enablement": "workspaceFolderCount != 0"
       }
@@ -418,6 +425,11 @@
           "command": "inspect.scanListing",
           "when": "view == inspect_ai.scans-view",
           "group": "navigation"
+        },
+        {
+          "command": "inspect.logListingRefresh",
+          "when": "view == inspect_ai.scans-view",
+          "group": "navigation"
         }
       ],
       "explorer/context": [
@@ -527,6 +539,10 @@
         },
         {
           "command": "inspect.scanListingReveal",
+          "when": "false"
+        },
+        {
+          "command": "inspect.scanListingRefresh",
           "when": "false"
         }
       ]

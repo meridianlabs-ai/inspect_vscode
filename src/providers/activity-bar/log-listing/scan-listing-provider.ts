@@ -117,14 +117,14 @@ export async function activateScanListing(
     )
   );
 
-  /*
-
   // Register refresh command
   disposables.push(
-    vscode.commands.registerCommand("inspect.logListingRefresh", () => {
+    vscode.commands.registerCommand("inspect.scanListingRefresh", () => {
       treeDataProvider.refresh();
     })
   );
+
+  /*
 
   // Register update command (for when the log directory changes )
   disposables.push(
