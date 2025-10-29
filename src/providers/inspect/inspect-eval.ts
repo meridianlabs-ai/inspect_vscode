@@ -9,10 +9,10 @@ import { inspectBinPath, inspectVersionDescriptor } from "../../inspect/props";
 
 import { ExecManager, ExecProfile } from "../../core/package/exec-manager";
 
-export async function activateEvalManager(
+export function activateEvalManager(
   stateManager: WorkspaceStateManager,
   context: ExtensionContext
-): Promise<[Command[], ExecManager]> {
+): [Command[], ExecManager] {
   const profile: ExecProfile = {
     packageName: "inspect-ai",
     packageDisplayName: "Inspect",

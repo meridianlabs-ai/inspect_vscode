@@ -8,10 +8,10 @@ import {
 import { scoutBinPath, scoutVersionDescriptor } from "../../scout/props";
 import { ExecManager, ExecProfile } from "../../core/package/exec-manager";
 
-export async function activateScoutScanManager(
+export function activateScoutScanManager(
   stateManager: WorkspaceStateManager,
   context: ExtensionContext
-): Promise<Command[]> {
+): Command[] {
   const profile: ExecProfile = {
     packageName: "inspect-scout",
     packageDisplayName: "Inspect Scout",

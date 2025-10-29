@@ -102,7 +102,7 @@ export async function activate(context: ExtensionContext) {
 
   // Eval Manager
   start("Setup Eval Command");
-  const [inspectEvalCommands, inspectEvalMgr] = await activateEvalManager(
+  const [inspectEvalCommands, inspectEvalMgr] = activateEvalManager(
     stateManager,
     context
   );
@@ -270,7 +270,7 @@ export async function activateScout(
   activateScanNotify(context, outputWatcher, settingsMgr);
 
   // Activate scan commands
-  const scanManagerCommands = await activateScoutScanManager(
+  const scanManagerCommands = activateScoutScanManager(
     workspaceStateManager,
     context
   );
