@@ -102,14 +102,14 @@
         "command": "inspect.scoutView",
         "title": "Scout View...",
         "icon": "$(code-oss)",
-        "category": "Inspect",
+        "category": "Scout",
         "enablement": "workspaceFolderCount != 0"
       },
       {
         "command": "inspect.scoutViewScan",
-        "title": "Open Scout Scan...",
+        "title": "Open Scan...",
         "icon": "$(code-oss)",
-        "category": "Inspect",
+        "category": "Scout",
         "enablement": "workspaceFolderCount != 0"
       },
       {
@@ -255,22 +255,22 @@
       },
       {
         "command": "inspect.scanListing",
-        "title": "Scout Scan Listing...",
+        "title": "Scan Listing...",
         "icon": "$(root-folder-opened)",
-        "category": "Inspect",
+        "category": "Scout",
         "enablement": "workspaceFolderCount != 0"
       },
       {
         "command": "inspect.scanListingReveal",
         "title": "Reveal Scan Listing",
-        "category": "Inspect",
+        "category": "Scout",
         "enablement": "workspaceFolderCount != 0"
       },
       {
         "command": "inspect.scanListingRefresh",
         "title": "Refresh Scan Listing",
         "icon": "$(refresh)",
-        "category": "Inspect",
+        "category": "Scout",
         "enablement": "workspaceFolderCount != 0"
       }
     ],
