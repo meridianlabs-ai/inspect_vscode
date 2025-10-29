@@ -277,6 +277,20 @@
         "command": "inspect.scanListingRevealInExplorer",
         "title": "Reveal in Explorer",
         "enablement": "workspaceFolderCount != 0"
+      },
+      {
+        "command": "inspect.runScoutScan",
+        "title": "Run Scan",
+        "icon": "$(play)",
+        "category": "Scout",
+        "enablement": "workspaceFolderCount != 0"
+      },
+      {
+        "command": "inspect.debugScoutScan",
+        "title": "Debug Scan",
+        "icon": "$(debug-alt)",
+        "category": "Scout",
+        "enablement": "workspaceFolderCount != 0"
       }
     ],
     "keybindings": [
@@ -324,10 +338,16 @@
           "description": "Limit evaluation to one sample when debugging.",
           "order": 5
         },
+        "inspect_ai.debugSingleTranscript": {
+          "type": "boolean",
+          "default": true,
+          "description": "Limit scanning to one transcript when debugging.",
+          "order": 5
+        },
         "inspect_ai.useSubdirectoryEnvironments": {
           "type": "boolean",
           "default": true,
-          "description": "Run and debug inspect commands using subdirectory environments when present.",
+          "description": "Run and debug commands using subdirectory environments when present.",
           "order": 2
         }
       }
@@ -559,6 +579,14 @@
         },
         {
           "command": "inspect.scanListingRefresh",
+          "when": "false"
+        },
+        {
+          "command": "inspect.runScoutScan",
+          "when": "false"
+        },
+        {
+          "command": "inspect.debugScoutScan",
           "when": "false"
         }
       ]

@@ -1,7 +1,6 @@
 import { ExtensionContext, window } from "vscode";
 import { InspectConfigurationProvider } from "./env-config-inspect-provider";
 import { activateTaskOutline } from "./task-outline-provider";
-import { InspectEvalManager } from "../inspect/inspect-eval";
 import { ActiveTaskManager } from "../active-task/active-task-provider";
 import { WorkspaceTaskManager } from "../workspace/workspace-task-provider";
 import { WorkspaceEnvManager } from "../workspace/workspace-env-provider";
@@ -17,10 +16,11 @@ import { InspectViewServer } from "../inspect/inspect-view-server";
 import { OutputWatcher } from "../../core/package/output-watcher";
 import { end, start } from "../../core/log";
 import { PackageManager } from "../../core/package/manager";
+import { ExecManager } from "../../core/package/exec-manager";
 
 export async function activateActivityBar(
   inspectManager: PackageManager,
-  inspectEvalMgr: InspectEvalManager,
+  inspectEvalMgr: ExecManager,
   inspectLogviewManager: InspectViewManager,
   activeTaskManager: ActiveTaskManager,
   workspaceTaskMgr: WorkspaceTaskManager,

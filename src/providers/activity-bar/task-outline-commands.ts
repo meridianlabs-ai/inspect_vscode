@@ -14,7 +14,6 @@ import {
   TaskOutLineTreeDataProvider,
   TaskTreeItem,
 } from "./task-outline-provider";
-import { InspectEvalManager } from "../inspect/inspect-eval";
 import { pathExists, toAbsolutePath, workspacePath } from "../../core/path";
 import { writeFileSync } from "fs";
 
@@ -33,6 +32,7 @@ import {
 import { scheduleReturnFocus } from "../../components/focus";
 import { InspectViewManager } from "../logview/logview-view";
 import { ActiveTaskManager } from "../active-task/active-task-provider";
+import { ExecManager } from "../../core/package/exec-manager";
 
 export class ShowTaskTree implements Command {
   constructor(private readonly provider_: TaskOutLineTreeDataProvider) {}
@@ -59,13 +59,13 @@ export class ShowTaskList implements Command {
 }
 
 export class RunSelectedEvalCommand implements Command {
-  constructor(private readonly inspectEvalMgr_: InspectEvalManager) {}
+  constructor(private readonly inspectEvalMgr_: ExecManager) {}
   async execute(treeItem: TaskTreeItem): Promise<void> {
     const path = treeItem.taskPath.path;
     const task =
       treeItem.taskPath.type === "task" ? treeItem.taskPath.name : undefined;
 
-    const evalPromise = this.inspectEvalMgr_.startEval(
+    const evalPromise = this.inspectEvalMgr_.start(
       toAbsolutePath(path),
       task,
       false
@@ -79,12 +79,12 @@ export class RunSelectedEvalCommand implements Command {
 }
 
 export class DebugSelectedEvalCommand implements Command {
-  constructor(private readonly inspectEvalMgr_: InspectEvalManager) {}
+  constructor(private readonly inspectEvalMgr_: ExecManager) {}
   async execute(treeItem: TaskTreeItem): Promise<void> {
     const path = treeItem.taskPath.path;
     const task =
       treeItem.taskPath.type === "task" ? treeItem.taskPath.name : undefined;
-    await this.inspectEvalMgr_.startEval(toAbsolutePath(path), task, true);
+    await this.inspectEvalMgr_.start(toAbsolutePath(path), task, true);
   }
   private static readonly id = "inspect.debugSelectedTask";
   public readonly id = DebugSelectedEvalCommand.id;

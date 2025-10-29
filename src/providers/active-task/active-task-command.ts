@@ -1,22 +1,18 @@
 import { Command } from "../../core/command";
+import { ExecManager } from "../../core/package/exec-manager";
 import { toAbsolutePath } from "../../core/path";
-import { InspectEvalManager } from "../inspect/inspect-eval";
 import { ActiveTaskManager } from "./active-task-provider";
 
 export class RunActiveTaskCommand implements Command {
   constructor(
     private readonly manager_: ActiveTaskManager,
-    private readonly inspectMgr_: InspectEvalManager
+    private readonly inspectMgr_: ExecManager
   ) {}
   async execute(): Promise<void> {
     const taskInfo = this.manager_.getActiveTaskInfo();
     if (taskInfo) {
       const docPath = toAbsolutePath(taskInfo.document.fsPath);
-      await this.inspectMgr_.startEval(
-        docPath,
-        taskInfo.activeTask?.name,
-        false
-      );
+      await this.inspectMgr_.start(docPath, taskInfo.activeTask?.name, false);
     }
   }
 
@@ -27,17 +23,13 @@ export class RunActiveTaskCommand implements Command {
 export class DebugActiveTaskCommand implements Command {
   constructor(
     private readonly manager_: ActiveTaskManager,
-    private readonly inspectMgr_: InspectEvalManager
+    private readonly inspectMgr_: ExecManager
   ) {}
   async execute(): Promise<void> {
     const taskInfo = this.manager_.getActiveTaskInfo();
     if (taskInfo) {
       const docPath = toAbsolutePath(taskInfo.document.fsPath);
-      await this.inspectMgr_.startEval(
-        docPath,
-        taskInfo.activeTask?.name,
-        true
-      );
+      await this.inspectMgr_.start(docPath, taskInfo.activeTask?.name, true);
     }
   }
 

@@ -40,6 +40,9 @@ import { activateOpenScan } from "./providers/openscan";
 import { activateScanview } from "./providers/scanview/scanview";
 import { activateScoutActivityBar } from "./providers/activity-bar/scout-activity-bar-provider";
 import { activateScanNotify } from "./providers/scannotify";
+import { activateScoutCodeLens } from "./providers/codelens/scout-codelens-provider";
+import { activateScoutScanManager } from "./providers/scout/scout-scan";
+import { activateWorkspaceEnvironment } from "./providers/environment";
 
 const kInspectMinimumVersion = "0.3.8";
 
@@ -93,6 +96,9 @@ export async function activate(context: ExtensionContext) {
   const inspectManager = activateInspectManager(context);
   context.subscriptions.push(inspectManager);
   end("Monitor Inspect Binary");
+
+  // Workspace environment
+  await activateWorkspaceEnvironment(context, stateManager);
 
   // Eval Manager
   start("Setup Eval Command");
@@ -263,7 +269,20 @@ export async function activateScout(
   // Activate scan notify
   activateScanNotify(context, outputWatcher, settingsMgr);
 
-  return Promise.resolve([...scoutViewCommands, ...activityBarCommands]);
+  // Activate scan commands
+  const scanManagerCommands = await activateScoutScanManager(
+    workspaceStateManager,
+    context
+  );
+
+  // Activate code lends
+  activateScoutCodeLens(context);
+
+  return Promise.resolve([
+    ...scoutViewCommands,
+    ...activityBarCommands,
+    ...scanManagerCommands,
+  ]);
 }
 
 const checkInspectVersion = async () => {

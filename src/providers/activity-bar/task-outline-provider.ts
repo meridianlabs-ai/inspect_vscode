@@ -24,7 +24,6 @@ import {
   CreateTaskCommand,
 } from "./task-outline-commands";
 import { AbsolutePath, activeWorkspacePath } from "../../core/path";
-import { InspectEvalManager } from "../inspect/inspect-eval";
 import { Command } from "../../core/command";
 import {
   TaskPath,
@@ -38,11 +37,12 @@ import { inspectVersion } from "../../inspect";
 import { InspectViewManager } from "../logview/logview-view";
 import { DocumentTaskInfo } from "../../components/task";
 import { PackageManager } from "../../core/package/manager";
+import { ExecManager } from "../../core/package/exec-manager";
 
 // Activation function for the task outline
 export async function activateTaskOutline(
   context: ExtensionContext,
-  inspectEvalMgr: InspectEvalManager,
+  inspectEvalMgr: ExecManager,
   workspaceTaskMgr: WorkspaceTaskManager,
   activeTaskManager: ActiveTaskManager,
   inspectManager: PackageManager,
