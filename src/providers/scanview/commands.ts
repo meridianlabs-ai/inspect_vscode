@@ -76,6 +76,7 @@ export async function selectScanDirectory(
       envManager.getDefaultScanResultsDir(),
       "scan_id=<scan_id>"
     ),
-    new ScanDirListingMRU(context)
+    new ScanDirListingMRU(context),
+    false
   );
 }
