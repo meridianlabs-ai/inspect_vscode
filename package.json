@@ -302,6 +302,12 @@
           "markdownDescription": "Show a notification with a **View Log** button when evals complete.",
           "order": 1
         },
+        "inspect_ai.notifyScanComplete": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Show a notification with a **View Scan** button when scans complete.",
+          "order": 1
+        },
         "inspect_ai.taskListView": {
           "type": "string",
           "default": "tree",

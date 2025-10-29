@@ -170,6 +170,12 @@ export class ScoutConfigurationProvider extends EnvConfigurationProvider<ScoutCo
     // Use a nonce to only allow a specific script to be run.
     const nonce = getNonce();
 
+    // See if we need a placeholder for transcripts
+    const envValues = this.envManager_.getValues();
+    const transcriptsPlaceholder = envValues["SCOUT_SCAN_TRANSCRIPTS"]
+      ? ""
+      : envValues["INSPECT_LOG_DIR"] || "./logs";
+
     return `<!DOCTYPE html>
               <html lang="en">
               ${headHTML(nonce, webview, this.extensionUri_)}
@@ -177,7 +183,7 @@ export class ScoutConfigurationProvider extends EnvConfigurationProvider<ScoutCo
               <section class="component-container">
                 <form id="configuration-controls" class="hidden">
                 <div class="group rows full-width">
-                  <vscode-text-field placeholder="" id="scan-transcripts" class="full-width">Transcripts</vscode-text-field>
+                  <vscode-text-field placeholder="${transcriptsPlaceholder}" id="scan-transcripts" class="full-width">Transcripts</vscode-text-field>
                   <div class="cols control-column full-width">
                     <vscode-text-field id="scan-limit" size="5" placeholder="" min="1">Limit</vscode-text-field>
                     <vscode-text-field id="scan-shuffle" size="5" placeholder="" min="1">Shuffle</vscode-text-field>
