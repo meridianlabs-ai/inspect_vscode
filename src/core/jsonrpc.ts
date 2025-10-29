@@ -264,7 +264,6 @@ function methodNotFoundResponse(request: JsonRpcRequest) {
   );
 }
 
-
 export function webviewPanelJsonRpcServer(
   webviewPanel: HostWebviewPanel,
   methods:

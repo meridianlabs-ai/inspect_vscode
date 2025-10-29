@@ -12,7 +12,10 @@ import {
 
 import { throttle } from "lodash";
 import { startup } from "../../core/log";
-import { PackageChangedEvent, PackageManager } from "../../core/package/manager";
+import {
+  PackageChangedEvent,
+  PackageManager,
+} from "../../core/package/manager";
 
 // Activates the provider which tracks the currently active task (document and task name)
 export function activateWorkspaceTaskProvider(

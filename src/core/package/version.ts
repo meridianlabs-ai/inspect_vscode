@@ -1,7 +1,6 @@
 import { coerce } from "semver";
 import { VersionDescriptor } from "./props";
 
-
 export function withMinimumPackageVersion<T>(
   version: string,
   packageVersion: VersionDescriptor | null,
@@ -35,7 +34,8 @@ export function hasMinimumPackageVersion(
   } else {
     if (
       packageVersion &&
-      (packageVersion.version.compare(version) >= 0 || packageVersion.isDeveloperBuild)
+      (packageVersion.version.compare(version) >= 0 ||
+        packageVersion.isDeveloperBuild)
     ) {
       return true;
     } else {

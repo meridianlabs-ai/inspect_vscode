@@ -7,7 +7,6 @@ import { Disposable } from "vscode";
 import { runProcess } from "../process";
 import { existsSync } from "fs";
 
-
 export interface VersionDescriptor {
   raw: string;
   version: SemVer;
@@ -39,7 +38,7 @@ export class PackagePropsCache implements Disposable {
     return this.package_;
   }
 
-  get pkg_bin() : string {
+  get pkg_bin(): string {
     return this.pacakge_bin_;
   }
 
@@ -75,12 +74,16 @@ export class PackagePropsCache implements Disposable {
   }
 }
 
-export function initPackageProps(pkg: string, pkg_binary: string): PackagePropsCache {
+export function initPackageProps(
+  pkg: string,
+  pkg_binary: string
+): PackagePropsCache {
   return new PackagePropsCache(pkg, pkg_binary, null, null, null);
 }
 
-
-export function packageVersionDescriptor(packagePropsCache: PackagePropsCache): VersionDescriptor | null {
+export function packageVersionDescriptor(
+  packagePropsCache: PackagePropsCache
+): VersionDescriptor | null {
   if (packagePropsCache.version) {
     return packagePropsCache.version;
   } else {
@@ -122,7 +125,9 @@ export function packageVersionDescriptor(packagePropsCache: PackagePropsCache): 
 }
 
 // path to package view www assets
-export function packageViewPath(packagePropsCache: PackagePropsCache): AbsolutePath | null {
+export function packageViewPath(
+  packagePropsCache: PackagePropsCache
+): AbsolutePath | null {
   if (packagePropsCache.viewPath) {
     return packagePropsCache.viewPath;
   } else {
@@ -151,7 +156,9 @@ export function packageViewPath(packagePropsCache: PackagePropsCache): AbsoluteP
         packagePropsCache.setViewPath(viewPath);
         return viewPath;
       } catch (error) {
-        log.error(`Error attempting to read ${packagePropsCache.pkg} view path.`);
+        log.error(
+          `Error attempting to read ${packagePropsCache.pkg} view path.`
+        );
         log.error(error instanceof Error ? error : String(error));
         return null;
       }
@@ -161,14 +168,19 @@ export function packageViewPath(packagePropsCache: PackagePropsCache): AbsoluteP
   }
 }
 
-export function packageBinPath(packagePropsCache: PackagePropsCache): AbsolutePath | null {
+export function packageBinPath(
+  packagePropsCache: PackagePropsCache
+): AbsolutePath | null {
   if (packagePropsCache.binPath) {
     return packagePropsCache.binPath;
   } else {
     const interpreter = pythonInterpreter();
     if (interpreter.available) {
       try {
-        const binPath = pythonBinaryPath(interpreter, packageFileName(packagePropsCache.pkg_bin));
+        const binPath = pythonBinaryPath(
+          interpreter,
+          packageFileName(packagePropsCache.pkg_bin)
+        );
         if (binPath) {
           packagePropsCache.setBinPath(binPath);
         }
