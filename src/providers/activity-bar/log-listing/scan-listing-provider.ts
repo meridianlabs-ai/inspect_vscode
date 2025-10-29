@@ -11,6 +11,7 @@ import { ScansTreeDataProvider } from "./scan-listing-data";
 import { ScoutViewServer } from "../../scout/scout-view-server";
 import { ScanResultsListingMRU } from "../../scanview/scanview-view";
 import { stringify } from "yaml";
+import { selectScanDirectory } from "../../scanview/commands";
 
 export async function activateScanListing(
   context: vscode.ExtensionContext,
@@ -80,26 +81,27 @@ export async function activateScanListing(
     })
   );
 
-  /*
-  // Register select log dir command
+  // Register select scan dir command
   disposables.push(
-    vscode.commands.registerCommand("inspect.logListing", async () => {
-      const logLocation = await selectLogDirectory(context, envManager);
-      if (logLocation !== undefined) {
+    vscode.commands.registerCommand("inspect.scanListing", async () => {
+      const scanResultsDir = await selectScanDirectory(context, envManager);
+      if (scanResultsDir !== undefined) {
         // store state ('null' means use workspace default so pass 'undefined' to clear for that)
         await context.workspaceState.update(
-          kLogListingDir,
-          logLocation === null ? undefined : logLocation.toString()
+          kScanResultsDir,
+          scanResultsDir === null ? undefined : scanResultsDir.toString()
         );
 
         // trigger update
         updateTree();
 
         // reveal
-        await revealLogListing();
+        await revealScanListing();
       }
     })
   );
+
+  /*
 
   // Register reveal command
   disposables.push(

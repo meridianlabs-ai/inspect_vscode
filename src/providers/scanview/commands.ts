@@ -65,7 +65,7 @@ class ScanDirListingMRU extends ListingMRU {
   }
 }
 
-async function selectScanDirectory(
+export async function selectScanDirectory(
   context: ExtensionContext,
   envManager: WorkspaceEnvManager
 ) {
@@ -77,6 +77,6 @@ async function selectScanDirectory(
       "scan_id=<scan_id>"
     ),
     new ScanDirListingMRU(context),
-    false
+    true
   );
 }
