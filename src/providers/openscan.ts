@@ -17,6 +17,8 @@ export function activateOpenScan(context: ExtensionContext) {
             preview: true,
           }
         );
+
+        await commands.executeCommand("inspect.scanListingReveal", uri);
       }
     )
   );

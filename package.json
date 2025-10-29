@@ -259,6 +259,12 @@
         "icon": "$(root-folder-opened)",
         "category": "Inspect",
         "enablement": "workspaceFolderCount != 0"
+      },
+      {
+        "command": "inspect.scanListingReveal",
+        "title": "Reveal Scan Listing",
+        "category": "Inspect",
+        "enablement": "workspaceFolderCount != 0"
       }
     ],
     "keybindings": [
@@ -517,6 +523,10 @@
         },
         {
           "command": "inspect.openScanViewer",
+          "when": "false"
+        },
+        {
+          "command": "inspect.scanListingReveal",
           "when": "false"
         }
       ]

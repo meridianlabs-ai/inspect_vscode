@@ -101,12 +101,10 @@ export async function activateScanListing(
     })
   );
 
-  /*
-
   // Register reveal command
   disposables.push(
     vscode.commands.registerCommand(
-      "inspect.logListingReveal",
+      "inspect.scanListingReveal",
       async (uri?: Uri) => {
         const treeLogUri = treeDataProvider.getLogListing()?.logDir();
         if (treeLogUri && uri && getRelativeUri(treeLogUri, uri) !== null) {
@@ -118,6 +116,8 @@ export async function activateScanListing(
       }
     )
   );
+
+  /*
 
   // Register refresh command
   disposables.push(
