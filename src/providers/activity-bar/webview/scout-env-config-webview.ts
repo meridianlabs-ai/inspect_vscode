@@ -8,6 +8,10 @@ import { restoreInputState, restoreSelectState } from "./webview-utils";
 import { showProviderHelp } from "./env-utils-model";
 import { initEnv } from "./env-utils";
 
+const attachListeners = (vscode: any) => {
+  //
+};
+
 const restoreEnv = (vscode: any, config: ScoutConfiguration) => {
   restoreSelectState("provider", config.provider);
   restoreInputState("model", config.model);
@@ -16,4 +20,4 @@ const restoreEnv = (vscode: any, config: ScoutConfiguration) => {
   showProviderHelp(vscode);
 };
 
-initEnv(restoreEnv);
+initEnv(attachListeners, restoreEnv);

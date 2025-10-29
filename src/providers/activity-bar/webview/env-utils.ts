@@ -16,7 +16,10 @@ import { attachModelListeners } from "./env-utils-model";
 // Declare the acquireVsCodeApi function to tell TypeScript about it
 declare function acquireVsCodeApi(): any;
 
-export function initEnv(restoreEnv: (vscode: any, env: any) => void) {
+export function initEnv(
+  attachListeners: (vscode: any) => void,
+  restoreEnv: (vscode: any, env: any) => void
+) {
   // Load the vscode design system
   provideVSCodeDesignSystem().register(allComponents);
 
@@ -38,6 +41,7 @@ export function initEnv(restoreEnv: (vscode: any, env: any) => void) {
         controls?.classList.remove("hidden");
 
         attachModelListeners(vscode);
+        attachListeners(vscode);
 
         break;
       case "envChanged":

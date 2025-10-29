@@ -110,16 +110,6 @@ export const attachModelListeners = (vscode: any) => {
   showBaseUrlEl.addEventListener("click", () => {
     toggleBaseUrl();
   });
-
-  setEnvWhenKeyup(vscode, "max-connections", "maxConnections");
-  setEnvWhenValueChanged(vscode, "max-connections", "maxConnections");
-  setEnvWhenKeyup(vscode, "max-retries", "maxRetries");
-  setEnvWhenValueChanged(vscode, "max-retries", "maxRetries");
-  setEnvWhenKeyup(vscode, "timeout", "timeout");
-  setEnvWhenValueChanged(vscode, "timeout", "timeout");
-
-  setEnvWhenKeyup(vscode, "log-dir", "logDir");
-  setEnvWhenValueChanged(vscode, "log-level", "logLevel");
 };
 export function toggleBaseUrl() {
   const baseUrlContainerEl = document.getElementById(
