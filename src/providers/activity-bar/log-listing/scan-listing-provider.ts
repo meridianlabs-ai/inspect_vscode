@@ -3,7 +3,7 @@ import * as vscode from "vscode";
 import { Command } from "../../../core/command";
 
 import { WorkspaceEnvManager } from "../../workspace/workspace-env-provider";
-import { LogItem, LogListing, Logs } from "./log-listing";
+import { LogItem, LogListing, LogNode, Logs } from "./log-listing";
 import { activeWorkspaceFolder } from "../../../core/workspace";
 import { getRelativeUri, prettyUriPath } from "../../../core/uri";
 import { Uri } from "vscode";
@@ -114,6 +114,19 @@ export async function activateScanListing(
           if (node) {
             await tree.reveal(node);
           }
+        }
+      }
+    )
+  );
+
+  // Register Reveal in Explorer command
+  disposables.push(
+    vscode.commands.registerCommand(
+      "inspect.scanListingRevealInExplorer",
+      async (node: LogNode) => {
+        const logUri = treeDataProvider.getLogListing()?.uriForNode(node);
+        if (logUri) {
+          await vscode.commands.executeCommand("revealInExplorer", logUri);
         }
       }
     )
