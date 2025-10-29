@@ -32,7 +32,7 @@ export class ScansTreeDataProvider extends LogListingTreeDataProvider {
         element.iconPath ||
         (element.type === "file"
           ? new vscode.ThemeIcon(
-              "bracket",
+              "search-view-icon",
               new vscode.ThemeColor("symbolIcon.classForeground")
             )
           : undefined),
@@ -58,7 +58,7 @@ export class ScansTreeDataProvider extends LogListingTreeDataProvider {
       }
     }
 
-    // open files in the editor
+    // open scans in the editor
     if (element.type === "file") {
       treeItem.command = {
         command: "inspect.openScanViewer",
@@ -67,9 +67,5 @@ export class ScansTreeDataProvider extends LogListingTreeDataProvider {
       };
     }
     return treeItem;
-  }
-
-  async resolveTreeItem?(item: TreeItem, _element: LogNode): Promise<TreeItem> {
-    return Promise.resolve(item);
   }
 }

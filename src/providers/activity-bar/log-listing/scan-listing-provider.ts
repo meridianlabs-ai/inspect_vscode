@@ -3,13 +3,14 @@ import * as vscode from "vscode";
 import { Command } from "../../../core/command";
 
 import { WorkspaceEnvManager } from "../../workspace/workspace-env-provider";
-import { LogListing, Logs } from "./log-listing";
+import { LogItem, LogListing, Logs } from "./log-listing";
 import { activeWorkspaceFolder } from "../../../core/workspace";
 import { getRelativeUri, prettyUriPath } from "../../../core/uri";
 import { Uri } from "vscode";
 import { ScansTreeDataProvider } from "./scan-listing-data";
 import { ScoutViewServer } from "../../scout/scout-view-server";
 import { ScanResultsListingMRU } from "../../scanview/scanview-view";
+import { stringify } from "yaml";
 
 export async function activateScanListing(
   context: vscode.ExtensionContext,
@@ -42,23 +43,11 @@ export async function activateScanListing(
       if (scansJSON) {
         const scans = JSON.parse(scansJSON) as {
           results_dir: string;
-          scans: Array<{
-            location: string;
-            spec: {
-              scan_id: string;
-              scan_file?: string;
-              timestamp: string;
-            };
-          }>;
+          scans: Array<Status>;
         };
         return {
           log_dir: scans.results_dir,
-          items: scans.scans.map(scan => ({
-            name: scan.location,
-            mtime: new Date(scan.spec.timestamp).getTime(),
-            display_name: `scan_id=${scan.spec.scan_id}`,
-            item_id: scan.spec.scan_id,
-          })),
+          items: scans.scans.map(scanToLogItem),
         };
       } else {
         return undefined;
@@ -172,4 +161,125 @@ export async function revealScanListing() {
   await vscode.commands.executeCommand(
     `workbench.view.extension.inspect_ai-activity-bar-scout`
   );
+}
+
+interface ModelConfig {
+  model: string;
+  config: Record<string, unknown>;
+  base_url?: string;
+  args: Record<string, unknown>;
+}
+
+interface ScanOptions {
+  max_transcripts: number;
+  max_processes: number;
+  limit?: number;
+  shuffle?: boolean | number;
+}
+
+interface ScanSpec {
+  scan_id: string;
+  scan_name: string;
+  scan_file?: string;
+  scan_args?: Record<string, unknown>;
+  timestamp: string;
+  tags?: string[];
+  metadata?: Record<string, unknown>;
+  model?: ModelConfig;
+  options: ScanOptions;
+}
+
+interface ScannerSummary {
+  scans: number;
+  results: number;
+  errors: number;
+  tokens: number;
+  model_usage: Record<string, unknown>;
+}
+
+interface Summary {
+  scanners: Record<string, ScannerSummary>;
+}
+
+interface Error {
+  transcript_id: string;
+  scanner: string;
+  error: string;
+  traceback: string;
+}
+
+interface Status {
+  complete: boolean;
+  spec: ScanSpec;
+  location: string;
+  summary: Summary;
+  errors: Array<Error>;
+}
+
+function scanToLogItem(scan: Status): LogItem {
+  // display name
+  let display_name = scan.spec.scan_name;
+
+  // if the name is generic and there is a scan file then use that
+  if (["scan", "job"].includes(display_name) && scan.spec.scan_file) {
+    display_name = scan.spec.scan_file.split(/[\\\/]/).pop() || display_name;
+  }
+
+  // compute stats
+  const firstScanner = Object.values(scan.summary.scanners)[0];
+  const transcripts = firstScanner?.scans || 0;
+
+  // build tooltip
+  const tooltip = [
+    `### ${display_name}`,
+    "",
+    "",
+    `${transcripts} transcripts  `,
+    `scan_id=${scan.spec.scan_id}  `,
+    "",
+    "",
+  ];
+
+  const scannerTable = [
+    "| scanner | results | errors | tokens |",
+    "|:--------|:-------:|:------:|-------:|",
+  ];
+  const formatValue = (val: number) => (val ? val.toLocaleString() : "-");
+  for (const [key, value] of Object.entries(scan.summary.scanners)) {
+    scannerTable.push(
+      `| ${key}      | ${formatValue(value.results)}       | ${formatValue(value.errors)}     | ${formatValue(value.tokens)}      |`
+    );
+  }
+  tooltip.push(scannerTable.join("\n"));
+
+  const config = scanConfig(scan);
+  if (config) {
+    tooltip.push(`${config.join("\n")}`);
+  }
+
+  return {
+    name: scan.location,
+    mtime: new Date(scan.spec.timestamp).getTime(),
+    display_name,
+    item_id: scan.spec.scan_id,
+    tooltip: new vscode.MarkdownString(tooltip.join("\n"), true),
+  };
+}
+
+function scanConfig(scan: Status): string[] | undefined {
+  let config: Record<string, unknown> = {};
+
+  // model
+  if (scan.spec.model) {
+    config["model"] = scan.spec.model.model;
+    config = { ...config, ...scan.spec.model.config };
+  }
+
+  config = { ...config, ...scan.spec.options };
+
+  if (Object.keys(config).length > 0) {
+    return ["```", `\n${stringify(config)}`, "```"];
+  } else {
+    return undefined;
+  }
 }

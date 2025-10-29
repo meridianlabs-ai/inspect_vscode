@@ -17,7 +17,6 @@ export type LogNode =
   | ({
       type: "file";
       iconPath?: string | ThemeIcon;
-      tooltip?: MarkdownString;
       parent?: LogNode;
     } & LogItem);
 
@@ -31,6 +30,7 @@ export interface LogItem {
   mtime: number;
   display_name: string;
   item_id: string;
+  tooltip?: MarkdownString;
 }
 
 export interface Logs {
