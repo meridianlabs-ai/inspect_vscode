@@ -239,7 +239,7 @@ function scanToLogItem(scan: Status): LogItem {
 
   // if the name is generic and there is a scan file then use that
   if (["scan", "job"].includes(display_name) && scan.spec.scan_file) {
-    display_name = scan.spec.scan_file.split(/[\\\/]/).pop() || display_name;
+    display_name = scan.spec.scan_file.split(/[\\/]/).pop() || display_name;
   }
 
   // compute stats

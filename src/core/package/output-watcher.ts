@@ -45,10 +45,10 @@ export class OutputWatcher implements Disposable {
           const updated = statSync(evalSignalFile.path).mtime.getTime();
 
           const lastTime =
-            evalSignalFile.type == "log" ? this.lastLog_ : this.lastScan_;
+            evalSignalFile.type === "log" ? this.lastLog_ : this.lastScan_;
 
           if (updated > lastTime) {
-            if (evalSignalFile.type == "log") {
+            if (evalSignalFile.type === "log") {
               this.lastLog_ = updated;
             } else {
               this.lastScan_ = updated;
@@ -91,7 +91,7 @@ export class OutputWatcher implements Disposable {
               // fire event
               try {
                 const logUri = resolveToUri(evalLogPath);
-                if (evalSignalFile.type == "log") {
+                if (evalSignalFile.type === "log") {
                   this.onInspectLogCreated_.fire({
                     log: logUri,
                     externalWorkspace,
