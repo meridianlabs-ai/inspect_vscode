@@ -334,7 +334,7 @@ export class ScanResultsListingMRU extends ListingMRU {
   }
 }
 
-async function selectScanResultsDirectory(
+export async function selectScanResultsDirectory(
   context: ExtensionContext,
   envManager: WorkspaceEnvManager
 ) {
