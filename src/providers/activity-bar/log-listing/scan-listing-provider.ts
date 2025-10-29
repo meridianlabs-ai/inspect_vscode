@@ -38,8 +38,8 @@ export async function activateScanListing(
       : envManager.getDefaultScanResultsDir();
 
     // create a logs fetcher
-    const logsFetcher = async (_uri: Uri): Promise<Logs | undefined> => {
-      const scansJSON = await viewServer.getScans();
+    const logsFetcher = async (uri: Uri): Promise<Logs | undefined> => {
+      const scansJSON = await viewServer.getScans(uri);
       if (scansJSON) {
         const scans = JSON.parse(scansJSON) as {
           results_dir: string;

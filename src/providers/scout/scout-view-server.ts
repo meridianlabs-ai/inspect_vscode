@@ -1,4 +1,4 @@
-import { ExtensionContext } from "vscode";
+import { ExtensionContext, Uri } from "vscode";
 
 import { PackageManager } from "../../core/package/manager";
 import { PackageViewServer } from "../../core/package/view-server";
@@ -18,8 +18,12 @@ export class ScoutViewServer extends PackageViewServer {
     );
   }
 
-  getScans(): Promise<string> {
-    return this.api_json("/api/scans");
+  getScans(results_dir?: Uri): Promise<string> {
+    let uri = "/api/scans";
+    if (results_dir) {
+      uri = `${uri}?results_dir=${results_dir.toString()}`;
+    }
+    return this.api_json(uri);
   }
 
   getScan(scanLocation: string): Promise<string> {
