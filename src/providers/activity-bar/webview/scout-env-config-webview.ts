@@ -8,7 +8,7 @@ import { restoreInputState, restoreSelectState } from "./webview-utils";
 import { showProviderHelp } from "./env-utils-model";
 import { initEnv } from "./env-utils";
 
-const attachListeners = (vscode: any) => {
+const attachListeners = (_vscode: any) => {
   //
 };
 

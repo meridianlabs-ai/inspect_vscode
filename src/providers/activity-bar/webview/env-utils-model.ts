@@ -1,9 +1,4 @@
-import {
-  openUrl,
-  setEnvValue,
-  setEnvWhenKeyup,
-  setEnvWhenValueChanged,
-} from "./webview-utils";
+import { openUrl, setEnvValue, setEnvWhenKeyup } from "./webview-utils";
 
 export const kModelInfo: Record<string, string> = {
   openai: "https://platform.openai.com/docs/models/overview",
