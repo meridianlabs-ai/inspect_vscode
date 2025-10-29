@@ -37,7 +37,7 @@ export class ScansTreeDataProvider extends LogListingTreeDataProvider {
             )
           : undefined),
       label:
-        element.type == "file"
+        element.type === "file"
           ? element.display_name
           : element.name.split("/").pop(),
       collapsibleState:
@@ -53,7 +53,9 @@ export class ScansTreeDataProvider extends LogListingTreeDataProvider {
       treeItem.label = element.display_name;
       try {
         treeItem.description = `${formatPrettyDateTime(new Date(element.mtime))}`;
-      } catch {}
+      } catch {
+        // pass
+      }
     }
 
     // open files in the editor

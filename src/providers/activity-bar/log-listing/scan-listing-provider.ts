@@ -164,7 +164,7 @@ export async function activateScanListing(
     })
   );
 
-  return [[], disposables];
+  return Promise.resolve([[], disposables]);
 }
 
 export async function revealScanListing() {
