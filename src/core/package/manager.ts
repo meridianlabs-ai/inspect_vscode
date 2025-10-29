@@ -44,7 +44,7 @@ export class PackageManager implements Disposable {
         available: !!this.packageBinPath_,
         binPath,
       });
-      commands.executeCommand(
+      void commands.executeCommand(
         "setContext",
         `inspect_ai.${this.packageName_}.installed`,
         this.available

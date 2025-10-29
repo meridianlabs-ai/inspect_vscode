@@ -1,8 +1,8 @@
-
 import { scoutVersionDescriptor } from "./props";
-import { hasMinimumPackageVersion, withMinimumPackageVersion } from "../core/package/version";
-
-
+import {
+  hasMinimumPackageVersion,
+  withMinimumPackageVersion,
+} from "../core/package/version";
 
 export function withMinimumScoutVersion(
   version: string,
@@ -20,12 +20,21 @@ export function withMinimumScoutVersion<T>(
   hasVersion: () => T,
   doesntHaveVersion: () => T
 ): T | void {
-  return withMinimumPackageVersion(version, scoutVersionDescriptor(), hasVersion, doesntHaveVersion)
+  return withMinimumPackageVersion(
+    version,
+    scoutVersionDescriptor(),
+    hasVersion,
+    doesntHaveVersion
+  );
 }
 
 export function hasMinimumScoutVersion(
   version: string,
   strictDevCheck = false
 ): boolean {
-  return hasMinimumPackageVersion(version, scoutVersionDescriptor(), strictDevCheck)
+  return hasMinimumPackageVersion(
+    version,
+    scoutVersionDescriptor(),
+    strictDevCheck
+  );
 }

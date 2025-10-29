@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import * as vscode from "vscode";
 import { Uri } from "vscode";
 import { HostWebviewPanel } from "../../hooks";
@@ -105,6 +104,7 @@ class ScoutScanReadonlyEditor implements vscode.CustomReadonlyEditorProvider {
           : undefined,
     };
     webviewPanel.webview.html = this.scanviewPanel_.getHtml(logViewState);
+    return Promise.resolve();
   }
 
   dispose() {

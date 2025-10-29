@@ -10,13 +10,13 @@ import { activateScanviewEditor } from "./scanview-editor";
 import { PackageManager } from "../../core/package/manager";
 import { ScoutViewServer } from "../scout/scout-view-server";
 
-export async function activateScanview(
+export function activateScanview(
   scoutManager: PackageManager,
   server: ScoutViewServer,
   envMgr: WorkspaceEnvManager,
   context: ExtensionContext,
   host: ExtensionHost
-): Promise<[Command[], ScoutViewManager]> {
+): [Command[], ScoutViewManager] {
   // activate the log viewer editor
   activateScanviewEditor(context, server);
 
@@ -34,8 +34,5 @@ export async function activateScanview(
   );
 
   // scanview commands
-  return [
-    await scanviewCommands(context, scanviewManager, envMgr),
-    scanviewManager,
-  ];
+  return [scanviewCommands(context, scanviewManager, envMgr), scanviewManager];
 }

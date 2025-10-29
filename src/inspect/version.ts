@@ -1,8 +1,8 @@
-
 import { inspectVersionDescriptor } from "./props";
-import { hasMinimumPackageVersion, withMinimumPackageVersion } from "../core/package/version";
-
-
+import {
+  hasMinimumPackageVersion,
+  withMinimumPackageVersion,
+} from "../core/package/version";
 
 export function withMinimumInspectVersion(
   version: string,
@@ -20,12 +20,21 @@ export function withMinimumInspectVersion<T>(
   hasVersion: () => T,
   doesntHaveVersion: () => T
 ): T | void {
-  return withMinimumPackageVersion(version, inspectVersionDescriptor(), hasVersion, doesntHaveVersion)
+  return withMinimumPackageVersion(
+    version,
+    inspectVersionDescriptor(),
+    hasVersion,
+    doesntHaveVersion
+  );
 }
 
 export function hasMinimumInspectVersion(
   version: string,
   strictDevCheck = false
 ): boolean {
-  return hasMinimumPackageVersion(version, inspectVersionDescriptor(), strictDevCheck)
+  return hasMinimumPackageVersion(
+    version,
+    inspectVersionDescriptor(),
+    strictDevCheck
+  );
 }

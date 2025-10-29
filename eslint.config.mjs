@@ -20,6 +20,9 @@ export default defineConfig([
     "**/dist",
     "**/*.d.ts",
     "src/providers/activity-bar/webview/env-config-webview.ts",
+    "src/providers/activity-bar/webview/scout-env-config-webview.ts",
+    "src/providers/activity-bar/webview/env-utils.ts",
+    "src/providers/activity-bar/webview/env-utils-model.ts",
     "src/providers/activity-bar/webview/task-config-webview.ts",
     "src/providers/activity-bar/webview/webview-utils.ts",
     "tools/**/*",
@@ -60,6 +63,14 @@ export default defineConfig([
       eqeqeq: "warn",
       "no-throw-literal": "warn",
       semi: "off",
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          caughtErrorsIgnorePattern: "^_",
+        },
+      ],
     },
   },
 ]);

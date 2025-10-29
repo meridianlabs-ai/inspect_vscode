@@ -223,7 +223,7 @@ export async function activateScout(
 
   // Activate the log view
   start("Setup Scout Viewer");
-  const [scoutViewCommands, _] = await activateScanview(
+  const [scoutViewCommands, _] = activateScanview(
     scoutManager,
     server,
     workspaceEnvManager,
@@ -233,7 +233,7 @@ export async function activateScout(
   activateOpenScan(context);
   end("Setup Scout Viewer");
 
-  return scoutViewCommands;
+  return Promise.resolve(scoutViewCommands);
 }
 
 const checkInspectVersion = async () => {

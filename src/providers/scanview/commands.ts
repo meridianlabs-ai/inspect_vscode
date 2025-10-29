@@ -9,11 +9,11 @@ import { ListingMRU } from "../../core/listing-mru";
 import { selectDirectory } from "../../core/select";
 import { WorkspaceEnvManager } from "../workspace/workspace-env-provider";
 
-export async function scanviewCommands(
+export function scanviewCommands(
   context: ExtensionContext,
   manager: ScoutViewManager,
   envManager: WorkspaceEnvManager
-): Promise<Command[]> {
+): Command[] {
   return [
     new ShowScanviewCommand(manager),
     new ShowOpenScanCommand(context, envManager),
