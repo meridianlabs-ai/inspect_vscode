@@ -44,7 +44,7 @@ class ShowOpenScanCommand implements Command {
   ) {}
   async execute(): Promise<void> {
     try {
-      const uri = await selectScanDirectory(this.context_, this.envManager_);
+      const uri = await selectScansDirectory(this.context_, this.envManager_);
       if (uri) {
         await commands.executeCommand("inspect.openScanViewer", uri);
       }
@@ -65,12 +65,12 @@ class ScanDirListingMRU extends ListingMRU {
   }
 }
 
-export async function selectScanDirectory(
+export async function selectScansDirectory(
   context: ExtensionContext,
   envManager: WorkspaceEnvManager
 ) {
   return await selectDirectory(
-    "Scan Directory",
+    "Scans Directory",
     "scan_id=<scan_id>",
     vscode.Uri.joinPath(
       envManager.getDefaultScanResultsDir(),

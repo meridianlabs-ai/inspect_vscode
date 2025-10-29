@@ -11,7 +11,7 @@ import { ScansTreeDataProvider } from "./scan-listing-data";
 import { ScoutViewServer } from "../../scout/scout-view-server";
 import { ScanResultsListingMRU } from "../../scanview/scanview-view";
 import { stringify } from "yaml";
-import { selectScanDirectory } from "../../scanview/commands";
+import { selectScansDirectory } from "../../scanview/commands";
 import { OutputWatcher } from "../../../core/package/output-watcher";
 
 export async function activateScanListing(
@@ -86,7 +86,7 @@ export async function activateScanListing(
   // Register select scan dir command
   disposables.push(
     vscode.commands.registerCommand("inspect.scanListing", async () => {
-      const scanResultsDir = await selectScanDirectory(context, envManager);
+      const scanResultsDir = await selectScansDirectory(context, envManager);
       if (scanResultsDir !== undefined) {
         // store state ('null' means use workspace default so pass 'undefined' to clear for that)
         await context.workspaceState.update(
