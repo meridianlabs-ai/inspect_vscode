@@ -11,7 +11,7 @@ import { workspacePath } from "../../core/path";
 import { TerminalLink, TerminalLinkContext } from "vscode";
 import { existsSync } from "fs";
 import { basename } from "path";
-import { InspectLogsWatcher } from "../inspect/inspect-logs-watcher";
+import { OutputWatcher } from "../../core/package/output-watcher";
 
 const kLogFilePattern = /^.*Log: (\S*?\.json|\S*?\.eval)\s*/g;
 const kEvalJsonPattern = /^(S*?\.json|\S*?\.eval)\s*/g;
@@ -22,13 +22,13 @@ interface LogViewTerminalLink extends TerminalLink {
 
 export const logviewTerminalLinkProvider = (
   context: ExtensionContext,
-  logsWatcher: InspectLogsWatcher
+  outputWatcher: OutputWatcher
 ) => {
   // Most recently created logs in order of creation
   const recentlyCreatedLogs = new Set<Uri>();
 
   context.subscriptions.push(
-    logsWatcher.onInspectLogCreated(e => {
+    outputWatcher.onInspectLogCreated(e => {
       if (e.externalWorkspace) {
         return;
       }

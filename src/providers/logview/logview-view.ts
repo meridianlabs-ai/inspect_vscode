@@ -13,7 +13,7 @@ import { WorkspaceEnvManager } from "../workspace/workspace-env-provider";
 import { LogviewPanel } from "./logview-panel";
 import { selectLogDirectory } from "../activity-bar/log-listing/log-directory-selector";
 import { dirname, getRelativeUri } from "../../core/uri";
-import { InspectLogsWatcher } from "../inspect/inspect-logs-watcher";
+import { OutputWatcher } from "../../core/package/output-watcher";
 import {
   PackageChangedEvent,
   PackageManager,
@@ -26,10 +26,10 @@ export class InspectViewManager {
     private readonly context_: ExtensionContext,
     private readonly webViewManager_: InspectViewWebviewManager,
     private readonly envMgr_: WorkspaceEnvManager,
-    logsWatcher: InspectLogsWatcher
+    outputWatcher: OutputWatcher
   ) {
     this.context_.subscriptions.push(
-      logsWatcher.onInspectLogCreated(async e => {
+      outputWatcher.onInspectLogCreated(async e => {
         // if this log is contained in the directory currently being viewed
         // then do a background refresh on it
         if (this.webViewManager_.hasWebview()) {

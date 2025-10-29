@@ -14,7 +14,7 @@ import {
 import { InspectViewManager } from "../logview/logview-view";
 import { activateLogListing } from "./log-listing/log-listing-provider";
 import { InspectViewServer } from "../inspect/inspect-view-server";
-import { InspectLogsWatcher } from "../inspect/inspect-logs-watcher";
+import { OutputWatcher } from "../../core/package/output-watcher";
 import { end, start } from "../../core/log";
 import { PackageManager } from "../../core/package/manager";
 
@@ -27,7 +27,7 @@ export async function activateActivityBar(
   workspaceStateMgr: WorkspaceStateManager,
   workspaceEnvMgr: WorkspaceEnvManager,
   inspectViewServer: InspectViewServer,
-  logsWatcher: InspectLogsWatcher,
+  outputWatcher: OutputWatcher,
   context: ExtensionContext
 ) {
   start("Log Listing");
@@ -35,7 +35,7 @@ export async function activateActivityBar(
     context,
     workspaceEnvMgr,
     inspectViewServer,
-    logsWatcher
+    outputWatcher
   );
   context.subscriptions.push(...logsDispose);
   end("Log Listing");

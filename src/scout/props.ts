@@ -1,4 +1,4 @@
-import { AbsolutePath } from "../core/path";
+import { AbsolutePath, toAbsolutePath } from "../core/path";
 import { Disposable } from "vscode";
 import {
   initPackageProps,
@@ -8,8 +8,10 @@ import {
   packageViewPath,
   VersionDescriptor,
 } from "../core/package/props";
+import { userDataDir, userRuntimeDir } from "../core/appdirs";
+import { join } from "path";
 
-export const kPythonPackageName = "inspect_ai";
+const kPythonPackageName = "inspect_scout";
 
 let scoutPropsCache_: PackagePropsCache;
 
@@ -28,4 +30,10 @@ export function scoutViewPath(): AbsolutePath | null {
 
 export function scoutBinPath(): AbsolutePath | null {
   return packageBinPath(scoutPropsCache_);
+}
+
+export function scoutLastScanPaths(): AbsolutePath[] {
+  return [userRuntimeDir(kPythonPackageName), userDataDir(kPythonPackageName)]
+    .map(dir => join(dir, "view", "last-scan"))
+    .map(toAbsolutePath);
 }

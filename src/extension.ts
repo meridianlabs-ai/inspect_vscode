@@ -26,7 +26,7 @@ import { inspectBinPath, inspectVersionDescriptor } from "./inspect/props";
 import { ExtensionHost, extensionHost } from "./hooks";
 import { activateStatusBar } from "./providers/statusbar";
 import { InspectViewServer } from "./providers/inspect/inspect-view-server";
-import { InspectLogsWatcher } from "./providers/inspect/inspect-logs-watcher";
+import { OutputWatcher } from "./core/package/output-watcher";
 import { activateLogNotify } from "./providers/lognotify";
 import { activateOpenLog } from "./providers/openlog";
 import { activateProtocolHandler } from "./providers/protocol-handler";
@@ -129,9 +129,9 @@ export async function activate(context: ExtensionContext) {
   end("Setup View Server");
 
   // initialise logs watcher
-  start("Setup Log Watcher");
-  const logsWatcher = new InspectLogsWatcher(stateManager);
-  end("Setup Log Watcher");
+  start("Setup Output Watcher");
+  const outputWatcher = new OutputWatcher(stateManager);
+  end("Setup Output Watcher");
 
   // Activate the log view
   start("Setup Log Viewer");
@@ -139,7 +139,7 @@ export async function activate(context: ExtensionContext) {
     inspectManager,
     server,
     workspaceEnvManager,
-    logsWatcher,
+    outputWatcher,
     context,
     host
   );
@@ -160,7 +160,7 @@ export async function activate(context: ExtensionContext) {
     stateManager,
     workspaceEnvManager,
     server,
-    logsWatcher,
+    outputWatcher,
     context
   );
   end("Setup Activity Bar");
@@ -171,6 +171,7 @@ export async function activate(context: ExtensionContext) {
     context,
     workspaceEnvManager,
     stateManager,
+    outputWatcher,
     host
   );
   end("Setup Scout");
@@ -178,7 +179,7 @@ export async function activate(context: ExtensionContext) {
   start("Final Setup");
   // Register the log view link provider
   window.registerTerminalLinkProvider(
-    logviewTerminalLinkProvider(context, logsWatcher)
+    logviewTerminalLinkProvider(context, outputWatcher)
   );
 
   // Activate Code Lens
@@ -188,7 +189,7 @@ export async function activate(context: ExtensionContext) {
   activateStatusBar(context, inspectManager);
 
   // Activate Log Notification
-  activateLogNotify(context, logsWatcher, settingsMgr, inspectLogviewManager);
+  activateLogNotify(context, outputWatcher, settingsMgr, inspectLogviewManager);
 
   // Activate commands
   [
@@ -214,6 +215,7 @@ export async function activateScout(
   context: ExtensionContext,
   workspaceEnvManager: WorkspaceEnvManager,
   workspaceStateManager: WorkspaceStateManager,
+  outputWatcher: OutputWatcher,
   host: ExtensionHost
 ): Promise<Command[]> {
   // Scout Manager watches for changes to scout binary
@@ -250,6 +252,7 @@ export async function activateScout(
     workspaceEnvManager,
     workspaceStateManager,
     server,
+    outputWatcher,
     context
   );
   end("Scout Activity Bar");

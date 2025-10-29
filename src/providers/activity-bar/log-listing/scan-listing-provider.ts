@@ -12,11 +12,13 @@ import { ScoutViewServer } from "../../scout/scout-view-server";
 import { ScanResultsListingMRU } from "../../scanview/scanview-view";
 import { stringify } from "yaml";
 import { selectScanDirectory } from "../../scanview/commands";
+import { OutputWatcher } from "../../../core/package/output-watcher";
 
 export async function activateScanListing(
   context: vscode.ExtensionContext,
   envManager: WorkspaceEnvManager,
-  viewServer: ScoutViewServer
+  viewServer: ScoutViewServer,
+  outputWatcher: OutputWatcher
 ): Promise<[Command[], vscode.Disposable[]]> {
   const kScanResultsDir = "inspect_ai.scanResultsDir";
   const disposables: vscode.Disposable[] = [];
@@ -131,15 +133,15 @@ export async function activateScanListing(
     })
   );
 
-  // refresh when a log in our directory changes
-  // disposables.push(
-  //   logsWatcher.onInspectLogCreated(e => {
-  //     const treeLogDir = treeDataProvider.getLogListing()?.logDir();
-  //     if (treeLogDir && getRelativeUri(treeLogDir, e.log)) {
-  //       treeDataProvider.refresh();
-  //     }
-  //   })
-  // );
+  // refresh when a scan occurs
+  disposables.push(
+    outputWatcher.onScoutScanCreated(e => {
+      const treeLogDir = treeDataProvider.getLogListing()?.logDir();
+      if (treeLogDir && getRelativeUri(treeLogDir, e.scan)) {
+        treeDataProvider.refresh();
+      }
+    })
+  );
 
   // refresh on change visiblity
   disposables.push(

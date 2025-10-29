@@ -8,7 +8,7 @@ import { LogListing, LogNode, Logs } from "./log-listing";
 import { InspectViewServer } from "../../inspect/inspect-view-server";
 import { activeWorkspaceFolder } from "../../../core/workspace";
 import { getRelativeUri, prettyUriPath } from "../../../core/uri";
-import { InspectLogsWatcher } from "../../inspect/inspect-logs-watcher";
+import { OutputWatcher } from "../../../core/package/output-watcher";
 import { selectLogDirectory } from "./log-directory-selector";
 import { Uri } from "vscode";
 import { hasMinimumInspectVersion } from "../../../inspect/version";
@@ -19,7 +19,7 @@ export async function activateLogListing(
   context: vscode.ExtensionContext,
   envManager: WorkspaceEnvManager,
   viewServer: InspectViewServer,
-  logsWatcher: InspectLogsWatcher
+  outputWatcher: OutputWatcher
 ): Promise<[Command[], vscode.Disposable[]]> {
   const kLogListingDir = "inspect_ai.logListingDir";
   const disposables: vscode.Disposable[] = [];
@@ -235,7 +235,7 @@ export async function activateLogListing(
 
   // refresh when a log in our directory changes
   disposables.push(
-    logsWatcher.onInspectLogCreated(e => {
+    outputWatcher.onInspectLogCreated(e => {
       const treeLogDir = treeDataProvider.getLogListing()?.logDir();
       if (treeLogDir && getRelativeUri(treeLogDir, e.log)) {
         treeDataProvider.refresh();
