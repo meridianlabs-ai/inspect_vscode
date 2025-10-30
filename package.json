@@ -103,14 +103,14 @@
         "title": "Scout View...",
         "icon": "$(code-oss)",
         "category": "Scout",
-        "enablement": "workspaceFolderCount != 0"
+        "enablement": "workspaceFolderCount != 0 && inspect_ai.inspect_scout.installed == true"
       },
       {
         "command": "inspect.scoutViewScan",
         "title": "Open Scan...",
         "icon": "$(code-oss)",
         "category": "Scout",
-        "enablement": "workspaceFolderCount != 0"
+        "enablement": "workspaceFolderCount != 0 && inspect_ai.inspect_scout.installed == true"
       },
       {
         "command": "inspect.createTask",
@@ -258,7 +258,7 @@
         "title": "Scan Listing...",
         "icon": "$(root-folder-opened)",
         "category": "Scout",
-        "enablement": "workspaceFolderCount != 0"
+        "enablement": "workspaceFolderCount != 0 && inspect_ai.inspect_scout.installed == true"
       },
       {
         "command": "inspect.scanListingReveal",
