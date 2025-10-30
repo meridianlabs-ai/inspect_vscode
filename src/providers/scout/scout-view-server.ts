@@ -18,7 +18,7 @@ export class ScoutViewServer extends PackageViewServer {
     );
   }
 
-  getScans(results_dir?: Uri): Promise<string> {
+  async getScans(results_dir?: Uri): Promise<string> {
     let uri = "/api/scans";
     if (results_dir) {
       uri = `${uri}?results_dir=${results_dir.toString()}`;
@@ -26,7 +26,13 @@ export class ScoutViewServer extends PackageViewServer {
     return this.api_json(uri);
   }
 
-  getScan(scanLocation: string): Promise<string> {
+  async getScan(scanLocation: string): Promise<string> {
     return this.api_json(`/api/scan/${encodeURIComponent(scanLocation)}`);
+  }
+
+  async deleteScan(scanLocation: Uri): Promise<string> {
+    return this.api_json(
+      `/api/scan-delete/${encodeURIComponent(scanLocation.toString(true))}`
+    );
   }
 }

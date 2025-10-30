@@ -137,6 +137,32 @@ export async function activateScanListing(
     )
   );
 
+  // Register delete log file command
+  disposables.push(
+    vscode.commands.registerCommand(
+      "inspect.scanListingDeleteScan",
+      async (node: LogNode) => {
+        const logUri = treeDataProvider.getLogListing()?.uriForNode(node);
+        if (logUri) {
+          const result = await vscode.window.showInformationMessage(
+            "Delete Scan",
+            {
+              modal: true,
+              detail: `Are you sure you want to delete the scan at ${prettyUriPath(logUri)}?`,
+            },
+            { title: "Delete", isCloseAffordance: false },
+            { title: "Cancel", isCloseAffordance: true }
+          );
+
+          if (result?.title === "Delete") {
+            await viewServer.deleteScan(logUri);
+            treeDataProvider.refresh();
+          }
+        }
+      }
+    )
+  );
+
   // Register refresh command
   disposables.push(
     vscode.commands.registerCommand("inspect.scanListingRefresh", () => {

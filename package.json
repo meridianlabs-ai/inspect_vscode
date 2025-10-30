@@ -279,6 +279,11 @@
         "enablement": "workspaceFolderCount != 0"
       },
       {
+        "command": "inspect.scanListingDeleteScan",
+        "title": "Delete Scan...",
+        "enablement": "workspaceFolderCount != 0"
+      },
+      {
         "command": "inspect.runScoutScan",
         "title": "Run Scan",
         "icon": "$(play)",
@@ -510,6 +515,11 @@
           "command": "inspect.scanListingRevealInExplorer",
           "group": "navigation",
           "when": "view == inspect_ai.scans-view && viewItem =~ /file\\+local/"
+        },
+        {
+          "command": "inspect.scanListingDeleteScan",
+          "group": "2_modification",
+          "when": "view == inspect_ai.scans-view &&  viewItem =~ /file/"
         }
       ],
       "commandPalette": [
