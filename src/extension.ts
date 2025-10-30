@@ -38,10 +38,10 @@ import { activateScoutManager } from "./providers/scout/scout-manager";
 import { ScoutViewServer } from "./providers/scout/scout-view-server";
 import { activateScanview } from "./providers/scanview/scanview";
 import { activateScoutActivityBar } from "./providers/activity-bar/scout-activity-bar-provider";
-import { activateScanNotify } from "./providers/scannotify";
 import { activateScoutCodeLens } from "./providers/codelens/scout-codelens-provider";
 import { activateScoutScanManager } from "./providers/scout/scout-scan";
 import { activateWorkspaceEnvironment } from "./providers/environment";
+import { activateOpenScan } from "./providers/openscan";
 
 const kInspectMinimumVersion = "0.3.8";
 
@@ -223,7 +223,7 @@ export async function activateScout(
   workspaceEnvManager: WorkspaceEnvManager,
   workspaceStateManager: WorkspaceStateManager,
   outputWatcher: OutputWatcher,
-  settingsMgr: InspectSettingsManager,
+  _settingsMgr: InspectSettingsManager,
   host: ExtensionHost
 ): Promise<Command[]> {
   // Scout Manager watches for changes to scout binary
@@ -250,7 +250,7 @@ export async function activateScout(
     context,
     host
   );
-  // activateOpenScan(context);
+  activateOpenScan(context);
   end("Setup Scout Viewer");
 
   // Activate the Activity Bar
@@ -266,7 +266,7 @@ export async function activateScout(
   end("Scout Activity Bar");
 
   // Activate scan notify
-  activateScanNotify(context, outputWatcher, settingsMgr);
+  // activateScanNotify(context, outputWatcher, settingsMgr);
 
   // Activate scan commands
   const scanManagerCommands = activateScoutScanManager(
