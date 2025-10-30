@@ -62,10 +62,21 @@ class ScoutScanReadonlyEditor implements vscode.CustomReadonlyEditorProvider {
       scanner?: string;
       transcript_id?: string;
     };
-    const scanner = doc.scanner;
+    let scanner = doc.scanner;
     const transcript_id = doc.transcript_id;
 
-    const docUriNoParams = document.uri.with({ query: "", fragment: "" });
+    let docUriNoParams = document.uri.with({ query: "", fragment: "" });
+
+    // If the uri ends with a parquet file, clip it off and use the
+    // name of the parquet file as scanner
+    if (docUriNoParams.path.endsWith(".parquet")) {
+      const pathParts = docUriNoParams.path.split("/");
+      const parquetFile = pathParts.pop();
+      if (parquetFile && !scanner) {
+        scanner = parquetFile.replace(/\.parquet$/, "");
+      }
+      docUriNoParams = docUriNoParams.with({ path: pathParts.join("/") });
+    }
 
     // local resource roots
     const localResourceRoots: Uri[] = [];
