@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.1](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.5.0...v0.5.1) (2025-10-30)
+
+
+### Bug Fixes
+
+* Disable scan notify command ([48b4a9e](https://github.com/meridianlabs-ai/inspect_vscode/commit/48b4a9e2abda85368aed5bdc3125273365ff8c2d))
+
 ## [0.5.0](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.4.1...v0.5.0) (2025-10-30)
 
 
