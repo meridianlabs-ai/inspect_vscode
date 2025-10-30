@@ -24,7 +24,6 @@ import {
   CreateTaskCommand,
 } from "./task-outline-commands";
 import { AbsolutePath, activeWorkspacePath } from "../../core/path";
-import { InspectEvalManager } from "../inspect/inspect-eval";
 import { Command } from "../../core/command";
 import {
   TaskPath,
@@ -35,17 +34,18 @@ import { basename, relative, sep } from "path";
 import { ActiveTaskManager } from "../active-task/active-task-provider";
 import { throttle } from "lodash";
 import { inspectVersion } from "../../inspect";
-import { InspectManager } from "../inspect/inspect-manager";
 import { InspectViewManager } from "../logview/logview-view";
 import { DocumentTaskInfo } from "../../components/task";
+import { PackageManager } from "../../core/package/manager";
+import { ExecManager } from "../../core/package/exec-manager";
 
 // Activation function for the task outline
 export async function activateTaskOutline(
   context: ExtensionContext,
-  inspectEvalMgr: InspectEvalManager,
+  inspectEvalMgr: ExecManager,
   workspaceTaskMgr: WorkspaceTaskManager,
   activeTaskManager: ActiveTaskManager,
-  inspectManager: InspectManager,
+  inspectManager: PackageManager,
   inspectLogviewManager: InspectViewManager
 ): Promise<[Command[], Disposable]> {
   // Command when item is clicked
@@ -70,7 +70,7 @@ export async function activateTaskOutline(
 
   // If the interpreter changes, refresh the tasks
   context.subscriptions.push(
-    inspectManager.onInspectChanged(async () => {
+    inspectManager.onPackageChanged(async () => {
       await checkInspect();
     })
   );

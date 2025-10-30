@@ -1,17 +1,5 @@
-import { ChildProcess, SpawnOptions } from "child_process";
-import { randomUUID } from "crypto";
-import * as os from "os";
-import AsyncLock from "async-lock";
+import { ExtensionContext, Uri } from "vscode";
 
-import {
-  Disposable,
-  ExtensionContext,
-  OutputChannel,
-  Uri,
-  window,
-} from "vscode";
-
-import { findOpenPort } from "../../core/port";
 import {
   hasMinimumInspectVersion,
   withMinimumInspectVersion,
@@ -27,26 +15,26 @@ import {
   inspectEvalLogs,
 } from "../../inspect/logs";
 import { activeWorkspacePath } from "../../core/path";
-import { inspectBinPath } from "../../inspect/props";
-import { shQuote } from "../../core/string";
-import { spawnProcess } from "../../core/process";
-import { InspectManager } from "./inspect-manager";
 import { activeWorkspaceFolder } from "../../core/workspace";
+import { PackageManager } from "../../core/package/manager";
+import { PackageViewServer } from "../../core/package/view-server";
+import { inspectBinPath } from "../../inspect/props";
 
 const kNotFoundSignal = "NotFound";
 const kNotModifiedSignal = "NotModified";
 
-export class InspectViewServer implements Disposable {
-  constructor(context: ExtensionContext, inspectManager: InspectManager) {
-    // create output channel for debugging
-    this.outputChannel_ = window.createOutputChannel("Inspect View");
-
-    // shutdown server when inspect version changes (then we'll launch
-    // a new instance w/ the correct version)
-    context.subscriptions.push(
-      inspectManager.onInspectChanged(() => {
-        this.shutdown();
-      })
+export class InspectViewServer extends PackageViewServer {
+  constructor(context: ExtensionContext, inspectManager: PackageManager) {
+    super(
+      context,
+      inspectManager,
+      ["view", "start"],
+      7676,
+      "Inspect",
+      "inspect",
+      inspectBinPath,
+      ["--no-ansi"],
+      "http"
     );
   }
 
@@ -238,173 +226,17 @@ export class InspectViewServer implements Disposable {
     }
   }
 
-  private async ensureRunning(): Promise<void> {
+  override async ensureRunning(): Promise<void> {
     // only do this if we have a new enough version of inspect
     if (!this.haveInspectEvalLogFormat()) {
       return;
     }
-
-    await this.serverStartupLock_.acquire("server-startup", async () => {
-      if (
-        this.serverProcess_ === undefined ||
-        this.serverProcess_.exitCode !== null
-      ) {
-        // find port and establish auth token
-        this.serverProcess_ = undefined;
-        this.serverPort_ = await findOpenPort(7676);
-        this.serverAuthToken_ = randomUUID();
-
-        // launch server and wait to resolve/return until it produces output
-        return new Promise((resolve, reject) => {
-          // find inspect
-          const inspect = inspectBinPath();
-          if (!inspect) {
-            throw new Error("inspect view: inspect installation not found");
-          }
-
-          // launch process
-          const options: SpawnOptions = {
-            cwd: activeWorkspacePath().path,
-            env: {
-              COLUMNS: "150",
-              INSPECT_VIEW_AUTHORIZATION_TOKEN: this.serverAuthToken_,
-            },
-            windowsHide: true,
-          };
-
-          // forward output to channel and resolve promise
-          let resolved = false;
-          const onOutput = (output: string) => {
-            this.outputChannel_.append(output);
-            if (!resolved) {
-              if (output.includes("Running on ")) {
-                resolved = true;
-                resolve(undefined);
-              }
-            }
-          };
-
-          // run server
-          const quote =
-            os.platform() === "win32" ? shQuote : (arg: string) => arg;
-          const args = [
-            "view",
-            "start",
-            "--port",
-            String(this.serverPort_),
-            "--log-level",
-            "http",
-            "--no-ansi",
-          ];
-          this.serverProcess_ = spawnProcess(
-            quote(inspect.path),
-            args.map(quote),
-            options,
-            {
-              stdout: onOutput,
-              stderr: onOutput,
-            },
-            {
-              onClose: (code: number) => {
-                this.outputChannel_.appendLine(
-                  `Inspect View exited with code ${code} (pid=${this.serverProcess_?.pid})`
-                );
-              },
-              onError: (error: Error) => {
-                this.outputChannel_.appendLine(
-                  `Error starting Inspect View ${error.message}`
-                );
-                reject(error);
-              },
-            }
-          );
-          this.outputChannel_.appendLine(
-            `Starting Inspect View on port ${this.serverPort_} (pid=${this.serverProcess_?.pid})`
-          );
-        });
-      }
-    });
+    return await super.ensureRunning();
   }
 
   private haveInspectEvalLogFormat() {
     return hasMinimumInspectVersion(kInspectEvalLogFormatVersion);
   }
-
-  private async api_json(
-    path: string,
-    headers?: Record<string, string>,
-    handleError?: (status: number) => string | undefined
-  ): Promise<string> {
-    return (await this.api(path, false, headers, handleError)) as string;
-  }
-
-  private async api_bytes(path: string): Promise<Uint8Array> {
-    return (await this.api(path, true)) as Uint8Array;
-  }
-
-  private async api(
-    path: string,
-    binary: boolean = false,
-    headers: Record<string, string> = {},
-    handleError?: (status: number) => string | undefined
-  ): Promise<string | Uint8Array> {
-    // ensure the server is started and ready
-    await this.ensureRunning();
-
-    // build headers
-    headers = {
-      ...headers,
-      Authorization: this.serverAuthToken_,
-      Accept: binary ? "application/octet-stream" : "application/json",
-      Pragma: "no-cache",
-      Expires: "0",
-      ["Cache-Control"]: "no-cache",
-    };
-
-    // make request
-    const response = await fetch(
-      `http://localhost:${this.serverPort_}${path}`,
-      { method: "GET", headers }
-    );
-    if (response.ok) {
-      if (binary) {
-        const buffer = await response.arrayBuffer();
-        return new Uint8Array(buffer);
-      } else {
-        return await response.text();
-      }
-    } else if (response.status !== 200) {
-      if (handleError) {
-        const error_response = handleError(response.status);
-        if (error_response) {
-          return error_response;
-        }
-      }
-      const message = (await response.text()) || response.statusText;
-      const error = new Error(`Error: ${response.status}: ${message})`);
-      throw error;
-    } else {
-      throw new Error(`${response.status} - ${response.statusText} `);
-    }
-  }
-
-  private shutdown() {
-    this.serverProcess_?.kill();
-    this.serverProcess_ = undefined;
-    this.serverPort_ = undefined;
-    this.serverAuthToken_ = "";
-  }
-
-  dispose() {
-    this.shutdown();
-    this.outputChannel_.dispose();
-  }
-
-  private outputChannel_: OutputChannel;
-  private serverStartupLock_ = new AsyncLock();
-  private serverProcess_?: ChildProcess = undefined;
-  private serverPort_?: number = undefined;
-  private serverAuthToken_: string = "";
 }
 
 // The eval commands below need to be coordinated in terms of their working directory

@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import * as vscode from "vscode";
 import { Uri } from "vscode";
 import { inspectViewPath } from "../../inspect/props";

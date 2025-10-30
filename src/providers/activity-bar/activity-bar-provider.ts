@@ -1,13 +1,11 @@
 import { ExtensionContext, window } from "vscode";
-import { EnvConfigurationProvider } from "./env-config-provider";
+import { InspectConfigurationProvider } from "./env-config-inspect-provider";
 import { activateTaskOutline } from "./task-outline-provider";
-import { InspectEvalManager } from "../inspect/inspect-eval";
 import { ActiveTaskManager } from "../active-task/active-task-provider";
 import { WorkspaceTaskManager } from "../workspace/workspace-task-provider";
 import { WorkspaceEnvManager } from "../workspace/workspace-env-provider";
 import { WorkspaceStateManager } from "../workspace/workspace-state-provider";
 import { TaskConfigurationProvider } from "./task-config-provider";
-import { InspectManager } from "../inspect/inspect-manager";
 import {
   DebugConfigTaskCommand,
   RunConfigTaskCommand,
@@ -15,19 +13,21 @@ import {
 import { InspectViewManager } from "../logview/logview-view";
 import { activateLogListing } from "./log-listing/log-listing-provider";
 import { InspectViewServer } from "../inspect/inspect-view-server";
-import { InspectLogsWatcher } from "../inspect/inspect-logs-watcher";
+import { OutputWatcher } from "../../core/package/output-watcher";
 import { end, start } from "../../core/log";
+import { PackageManager } from "../../core/package/manager";
+import { ExecManager } from "../../core/package/exec-manager";
 
 export async function activateActivityBar(
-  inspectManager: InspectManager,
-  inspectEvalMgr: InspectEvalManager,
+  inspectManager: PackageManager,
+  inspectEvalMgr: ExecManager,
   inspectLogviewManager: InspectViewManager,
   activeTaskManager: ActiveTaskManager,
   workspaceTaskMgr: WorkspaceTaskManager,
   workspaceStateMgr: WorkspaceStateManager,
   workspaceEnvMgr: WorkspaceEnvManager,
   inspectViewServer: InspectViewServer,
-  logsWatcher: InspectLogsWatcher,
+  outputWatcher: OutputWatcher,
   context: ExtensionContext
 ) {
   start("Log Listing");
@@ -35,7 +35,7 @@ export async function activateActivityBar(
     context,
     workspaceEnvMgr,
     inspectViewServer,
-    logsWatcher
+    outputWatcher
   );
   context.subscriptions.push(...logsDispose);
   end("Log Listing");
@@ -52,7 +52,7 @@ export async function activateActivityBar(
   context.subscriptions.push(treeDataProvider);
   end("Task Outline");
 
-  const envProvider = new EnvConfigurationProvider(
+  const envProvider = new InspectConfigurationProvider(
     context.extensionUri,
     workspaceEnvMgr,
     workspaceStateMgr,
@@ -60,7 +60,7 @@ export async function activateActivityBar(
   );
   context.subscriptions.push(
     window.registerWebviewViewProvider(
-      EnvConfigurationProvider.viewType,
+      InspectConfigurationProvider.viewType,
       envProvider
     )
   );

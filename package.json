@@ -31,9 +31,12 @@
   ],
   "activationEvents": [
     "onWebviewPanel:inspect.logview",
+    "onWebviewPanel:inspect.scanview",
     "onWebviewPanel:inspect_ai.task-configuration",
     "onWebviewPanel:inspect_ai.logs-view",
+    "onWebviewPanel:inspect_ai.scans-view",
     "onWebviewPanel:inspect_ai.env-configuration-view",
+    "onWebviewPanel:inspect_ai.scout-env-configuration-view",
     "onWebviewPanel:inspect_ai.task-outline-view",
     "onLanguage:eval",
     "workspaceContains:**/*.eval",
@@ -68,6 +71,16 @@
           }
         ],
         "priority": "default"
+      },
+      {
+        "viewType": "inspect-ai.scout-scan-editor",
+        "displayName": "Scout Scan Viewer",
+        "selector": [
+          {
+            "filenamePattern": "**/scan_id=*/*.parquet"
+          }
+        ],
+        "priority": "default"
       }
     ],
     "commands": [
@@ -84,6 +97,20 @@
         "icon": "$(code-oss)",
         "category": "Inspect",
         "enablement": "workspaceFolderCount != 0"
+      },
+      {
+        "command": "inspect.scoutView",
+        "title": "Scout View...",
+        "icon": "$(code-oss)",
+        "category": "Scout",
+        "enablement": "workspaceFolderCount != 0 && inspect_ai.inspect_scout.installed == true"
+      },
+      {
+        "command": "inspect.scoutViewScan",
+        "title": "Open Scan...",
+        "icon": "$(code-oss)",
+        "category": "Scout",
+        "enablement": "workspaceFolderCount != 0 && inspect_ai.inspect_scout.installed == true"
       },
       {
         "command": "inspect.createTask",
@@ -220,6 +247,55 @@
         "command": "inspect.openLogViewer",
         "title": "Open in Inspect Log Viewer",
         "enablement": "workspaceFolderCount != 0"
+      },
+      {
+        "command": "inspect.openScanViewer",
+        "title": "Open in Scout Scan Viewer",
+        "enablement": "workspaceFolderCount != 0"
+      },
+      {
+        "command": "inspect.scanListing",
+        "title": "Scan Listing...",
+        "icon": "$(root-folder-opened)",
+        "category": "Scout",
+        "enablement": "workspaceFolderCount != 0 && inspect_ai.inspect_scout.installed == true"
+      },
+      {
+        "command": "inspect.scanListingReveal",
+        "title": "Reveal Scan Listing",
+        "category": "Scout",
+        "enablement": "workspaceFolderCount != 0"
+      },
+      {
+        "command": "inspect.scanListingRefresh",
+        "title": "Refresh Scan Listing",
+        "icon": "$(refresh)",
+        "category": "Scout",
+        "enablement": "workspaceFolderCount != 0"
+      },
+      {
+        "command": "inspect.scanListingRevealInExplorer",
+        "title": "Reveal in Explorer",
+        "enablement": "workspaceFolderCount != 0"
+      },
+      {
+        "command": "inspect.scanListingDeleteScan",
+        "title": "Delete Scan...",
+        "enablement": "workspaceFolderCount != 0"
+      },
+      {
+        "command": "inspect.runScoutScan",
+        "title": "Run Scan",
+        "icon": "$(play)",
+        "category": "Scout",
+        "enablement": "workspaceFolderCount != 0"
+      },
+      {
+        "command": "inspect.debugScoutScan",
+        "title": "Debug Scan",
+        "icon": "$(debug-alt)",
+        "category": "Scout",
+        "enablement": "workspaceFolderCount != 0"
       }
     ],
     "keybindings": [
@@ -245,6 +321,12 @@
           "markdownDescription": "Show a notification with a **View Log** button when evals complete.",
           "order": 1
         },
+        "inspect_ai.notifyScanComplete": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Show a notification with a **View Scan** button when scans complete.",
+          "order": 1
+        },
         "inspect_ai.taskListView": {
           "type": "string",
           "default": "tree",
@@ -261,10 +343,16 @@
           "description": "Limit evaluation to one sample when debugging.",
           "order": 5
         },
+        "inspect_ai.debugSingleTranscript": {
+          "type": "boolean",
+          "default": true,
+          "description": "Limit scanning to one transcript when debugging.",
+          "order": 5
+        },
         "inspect_ai.useSubdirectoryEnvironments": {
           "type": "boolean",
           "default": true,
-          "description": "Run and debug inspect commands using subdirectory environments when present.",
+          "description": "Run and debug commands using subdirectory environments when present.",
           "order": 2
         }
       }
@@ -278,6 +366,12 @@
           "id": "inspect_ai-activity-bar",
           "title": "Inspect",
           "icon": "assets/logo/inspect.svg"
+        },
+        {
+          "id": "inspect_ai-activity-bar-scout",
+          "title": "Scout",
+          "icon": "assets/logo/scout.svg",
+          "when": "inspect_ai.inspect_scout.installed"
         }
       ]
     },
@@ -305,6 +399,19 @@
           "name": "Task",
           "when": "workspaceFolderCount != 0 && inspect_ai.task-outline-view.noInspect == false",
           "collapsed": true
+        }
+      ],
+      "inspect_ai-activity-bar-scout": [
+        {
+          "type": "webview",
+          "id": "inspect_ai.scout-env-configuration-view",
+          "name": "Configuration (.env)",
+          "when": "workspaceFolderCount != 0 && inspect_ai.task-outline-view.noInspect == false && inspect_ai.inspect_scout.installed == true"
+        },
+        {
+          "id": "inspect_ai.scans-view",
+          "name": "Scans",
+          "when": "workspaceFolderCount != 0 && inspect_ai.inspect_scout.installed == true"
         }
       ]
     },
@@ -348,6 +455,16 @@
         {
           "command": "inspect.runConfigTask",
           "when": "view == inspect_ai.task-configuration && inspect_ai.activeTask",
+          "group": "navigation"
+        },
+        {
+          "command": "inspect.scanListing",
+          "when": "view == inspect_ai.scans-view",
+          "group": "navigation"
+        },
+        {
+          "command": "inspect.logListingRefresh",
+          "when": "view == inspect_ai.scans-view",
           "group": "navigation"
         }
       ],
@@ -393,6 +510,16 @@
           "command": "inspect.logListingDeleteLogFile",
           "group": "2_modification",
           "when": "view == inspect_ai.logs-view && inspect_ai.haveEvalLogFormat && viewItem =~ /file/"
+        },
+        {
+          "command": "inspect.scanListingRevealInExplorer",
+          "group": "navigation",
+          "when": "view == inspect_ai.scans-view && viewItem =~ /file\\+local/"
+        },
+        {
+          "command": "inspect.scanListingDeleteScan",
+          "group": "2_modification",
+          "when": "view == inspect_ai.scans-view &&  viewItem =~ /file/"
         }
       ],
       "commandPalette": [
@@ -451,6 +578,26 @@
         {
           "command": "inspect.openLogViewer",
           "when": "false"
+        },
+        {
+          "command": "inspect.openScanViewer",
+          "when": "false"
+        },
+        {
+          "command": "inspect.scanListingReveal",
+          "when": "false"
+        },
+        {
+          "command": "inspect.scanListingRefresh",
+          "when": "false"
+        },
+        {
+          "command": "inspect.runScoutScan",
+          "when": "false"
+        },
+        {
+          "command": "inspect.debugScoutScan",
+          "when": "false"
         }
       ]
     }
@@ -466,7 +613,8 @@
     "lint": "eslint src --ext ts",
     "lint:fix": "eslint src --ext ts --fix",
     "prettier": "prettier --write .",
-    "test": "node ./out/test/runTest.js"
+    "test": "node ./out/test/runTest.js",
+    "check-all": "yarn lint && yarn prettier && yarn test"
   },
   "devDependencies": {
     "@types/async-lock": "^1.4.2",

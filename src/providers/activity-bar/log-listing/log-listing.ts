@@ -1,8 +1,11 @@
-import { ExtensionContext, MarkdownString, ThemeIcon, Uri } from "vscode";
-import { InspectViewServer } from "../../inspect/inspect-view-server";
+import vscode, { Event, EventEmitter, TreeItem } from "vscode";
+
+import { MarkdownString, ThemeIcon, TreeDataProvider, Uri } from "vscode";
 import { log } from "../../../core/log";
-import { LogListingMRU } from "./log-listing-mru";
 import { normalizeWindowsUri } from "../../../core/uri";
+import { ListingMRU } from "../../../core/listing-mru";
+import { throttle } from "lodash";
+import { isToday, format, isThisYear } from "date-fns";
 
 export type LogNode =
   | ({
@@ -14,34 +17,33 @@ export type LogNode =
   | ({
       type: "file";
       iconPath?: string | ThemeIcon;
-      tooltip?: MarkdownString;
       parent?: LogNode;
-    } & LogFile);
+    } & LogItem);
 
 export interface LogDirectory {
   name: string;
   children: LogNode[];
 }
 
-export interface LogFile {
+export interface LogItem {
   name: string;
-  size: number;
   mtime: number;
-  task: string;
-  task_id: string;
-  suffix: string | null;
+  display_name: string;
+  item_id: string;
+  tooltip?: MarkdownString;
+}
+
+export interface Logs {
+  log_dir: string;
+  items: LogItem[];
 }
 
 export class LogListing {
-  private readonly mru_: LogListingMRU;
-
   constructor(
-    context: ExtensionContext,
     private readonly logDir_: Uri,
-    private readonly viewServer_: InspectViewServer
-  ) {
-    this.mru_ = new LogListingMRU(context);
-  }
+    private readonly mru_: ListingMRU,
+    private readonly logsFetcher_: (uri: Uri) => Promise<Logs | undefined>
+  ) {}
 
   public logDir(): Uri {
     return this.logDir_;
@@ -112,29 +114,25 @@ export class LogListing {
 
   private async listLogs(): Promise<LogNode[]> {
     try {
-      const logsJSON = await this.viewServer_.evalLogs(this.logDir_);
-      if (logsJSON) {
-        const logs = JSON.parse(logsJSON) as {
-          log_dir: string;
-          files: LogFile[];
-        };
+      const logs = await this.logsFetcher_(this.logDir_);
+      if (logs) {
         const log_dir = normalizeWindowsUri(
           logs.log_dir.endsWith("/") ? logs.log_dir : `${logs.log_dir}/`
         );
-        for (const file of logs.files) {
+        for (const file of logs.items) {
           file.name = normalizeWindowsUri(file.name).replace(`${log_dir}`, "");
         }
-        const tree = buildLogTree(logs.files);
+        const tree = buildLogTree(logs.items);
         return tree;
       } else {
         log.error(
-          `No response retreiving logs from ${this.logDir_.toString(false)}`
+          `No response retreiving from ${this.logDir_.toString(false)}`
         );
         return [];
       }
     } catch (error) {
       log.error(
-        `Unexpected error retreiving logs from ${this.logDir_.toString(false)}`
+        `Unexpected error retreiving from ${this.logDir_.toString(false)}`
       );
       log.error(error instanceof Error ? error : String(error));
       return [];
@@ -163,7 +161,7 @@ export class LogListing {
   private nodes_: LogNode[] | undefined;
 }
 
-function buildLogTree(logs: LogFile[]): LogNode[] {
+function buildLogTree(logs: LogItem[]): LogNode[] {
   const root: LogNode[] = [];
   const dirCache: Map<string, LogNode> = new Map();
 
@@ -178,7 +176,7 @@ function buildLogTree(logs: LogFile[]): LogNode[] {
   }
 
   // Helper to create a file node
-  function createFileNode(file: LogFile, parent?: LogNode): LogNode {
+  function createFileNode(file: LogItem, parent?: LogNode): LogNode {
     return {
       ...file,
       type: "file",
@@ -252,4 +250,68 @@ function sortLogTree(nodes: LogNode[]): LogNode[] {
       return 1;
     }
   });
+}
+
+export abstract class LogListingTreeDataProvider
+  implements TreeDataProvider<LogNode>, vscode.Disposable
+{
+  private readonly throttledRefresh_: () => void;
+
+  constructor() {
+    this.throttledRefresh_ = throttle(() => {
+      this.logListing_?.invalidate();
+      this._onDidChangeTreeData.fire();
+    }, 1000);
+  }
+
+  dispose() {}
+
+  public setLogListing(logListing: LogListing) {
+    this.logListing_ = logListing;
+    this.refresh();
+  }
+
+  public getLogListing(): LogListing | undefined {
+    return this.logListing_;
+  }
+
+  public refresh(): void {
+    this.throttledRefresh_();
+  }
+
+  abstract getTreeItem(element: LogNode): TreeItem;
+
+  async getChildren(element?: LogNode): Promise<LogNode[]> {
+    if (!element || element.type === "dir") {
+      return (await this.logListing_?.ls(element)) || [];
+    } else {
+      return [];
+    }
+  }
+
+  getParent(element: LogNode): LogNode | undefined {
+    return element.parent;
+  }
+
+  private _onDidChangeTreeData: EventEmitter<
+    LogNode | undefined | null | void
+  > = new vscode.EventEmitter<LogNode | undefined | null | void>();
+  readonly onDidChangeTreeData: Event<LogNode | undefined | null | void> =
+    this._onDidChangeTreeData.event;
+
+  protected logListing_?: LogListing;
+}
+export function formatPrettyDateTime(date: Date) {
+  // For today, just show time
+  if (isToday(date)) {
+    return `Today, ${format(date, "h:mmaaa")}`;
+  }
+
+  // For this year, show month and day
+  if (isThisYear(date)) {
+    return format(date, "MMM d, h:mmaaa");
+  }
+
+  // For other years, include the year
+  return format(date, "MMM d yyyy, h:mmaaa");
 }

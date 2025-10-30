@@ -7,17 +7,14 @@ import {
   env,
   commands,
 } from "vscode";
-import { getNonce } from "../../core/nonce";
 import { WorkspaceStateManager } from "../workspace/workspace-state-provider";
 import { WorkspaceEnvManager } from "../workspace/workspace-env-provider";
-import { kInspectEnvValues } from "../inspect/inspect-constants";
 import { inspectVersion } from "../../inspect";
-import {
-  InspectChangedEvent,
-  InspectManager,
-} from "../inspect/inspect-manager";
-import { inspectVersionDescriptor } from "../../inspect/props";
 import { debounce } from "lodash";
+import {
+  PackageChangedEvent,
+  PackageManager,
+} from "../../core/package/manager";
 
 export const kActiveTaskChanged = "activeTaskChanged";
 export const kInitialize = "initialize";
@@ -38,55 +35,32 @@ export type OpenUrlCommand = {
   url: string;
 };
 
-export interface EnvConfiguration {
+export interface EnvConfig {
   provider?: string;
-  model?: string;
-  maxConnections?: string;
-  maxRetries?: string;
-  timeout?: string;
-  logDir?: string;
-  logLevel?: string;
-  modelBaseUrl?: string;
 }
 
-// A list of the auto-complete models and the minimum
-// version required in order to support the model
-const kInspectModels: Record<string, string> = {
-  openai: "0.3.8",
-  anthropic: "0.3.8",
-  google: "0.3.8",
-  mistral: "0.3.8",
-  hf: "0.3.8",
-  together: "0.3.8",
-  bedrock: "0.3.8",
-  ollama: "0.3.9",
-  azureai: "0.3.8",
-  cf: "0.3.8",
-  "llama-cpp-python": "0.3.39",
-};
+export interface EnvConfigManager<T extends EnvConfig> {
+  defaultConfig: () => T;
+  configToEnv: (config: T) => Record<string, string>;
+  envToConfig: (envMgr: WorkspaceEnvManager) => T;
+  setConfiguration: (key: string, value: string, state: T) => void;
+}
 
-const inspectModels = () => {
-  const descriptor = inspectVersionDescriptor();
-  return Object.keys(kInspectModels).filter(key => {
-    const ver = kInspectModels[key];
-    if (descriptor !== null) {
-      return descriptor.version.compare(ver) > -1;
-    } else {
-      return false;
-    }
-  });
-};
-
-export class EnvConfigurationProvider implements WebviewViewProvider {
-  public static readonly viewType = "inspect_ai.env-configuration-view";
-
+export class EnvConfigurationProvider<T extends EnvConfig>
+  implements WebviewViewProvider
+{
   constructor(
-    private readonly extensionUri_: Uri,
-    private readonly envManager_: WorkspaceEnvManager,
+    protected readonly extensionUri_: Uri,
+    protected readonly envManager_: WorkspaceEnvManager,
+    private readonly envConfigManager_: EnvConfigManager<T>,
     private readonly stateManager_: WorkspaceStateManager,
-    private readonly inspectManager_: InspectManager
-  ) {}
-  private env: EnvConfiguration = {};
+    private readonly packageManager_: PackageManager,
+    private readonly updateListingVar_: string,
+    private readonly updateListingCommand_: string
+  ) {
+    this.env = envConfigManager_.defaultConfig();
+  }
+  private env: T;
 
   public resolveWebviewView(webviewView: WebviewView) {
     webviewView.webview.options = {
@@ -104,7 +78,7 @@ export class EnvConfigurationProvider implements WebviewViewProvider {
         switch (command) {
           case "initialize": {
             if (inspectVersion() === null) {
-              await noInspectMsg();
+              await noPackageMsg();
             } else {
               await initMsg();
             }
@@ -112,14 +86,22 @@ export class EnvConfigurationProvider implements WebviewViewProvider {
           }
           case "setEnvValue": {
             // Set the value
-            setConfiguration(data.default, data.value, this.env);
+            this.envConfigManager_.setConfiguration(
+              data.default,
+              data.value,
+              this.env
+            );
 
             // Special case for provider, potentially restoring the
             // previously used model
             let updateWebview = false;
             if (data.default === "provider") {
               const modelState = this.stateManager_.getModelState(data.value);
-              setConfiguration("model", modelState.lastModel || "", this.env);
+              this.envConfigManager_.setConfiguration(
+                "model",
+                modelState.lastModel || "",
+                this.env
+              );
               updateWebview = true;
             }
 
@@ -136,7 +118,9 @@ export class EnvConfigurationProvider implements WebviewViewProvider {
             }
 
             // Save the env
-            this.envManager_.setValues(configToEnv(this.env));
+            this.envManager_.setValues(
+              this.envConfigManager_.configToEnv(this.env)
+            );
 
             if (updateWebview) {
               await webviewView.webview.postMessage({
@@ -147,11 +131,11 @@ export class EnvConfigurationProvider implements WebviewViewProvider {
               });
             }
 
-            if (data.default === "logDir") {
+            if (data.default === this.updateListingVar_) {
               // The log dir was changed, update the task tree if needed
               await debounce(
                 async () => {
-                  await commands.executeCommand("inspect.logListingUpdate");
+                  await commands.executeCommand(this.updateListingCommand_);
                 },
                 500,
                 { leading: false, trailing: true }
@@ -169,7 +153,7 @@ export class EnvConfigurationProvider implements WebviewViewProvider {
 
     const initMsg = async () => {
       // Merge current state
-      this.env = envToConfig(this.envManager_);
+      this.env = this.envConfigManager_.envToConfig(this.envManager_);
 
       // Send the state over
       await webviewView.webview.postMessage({
@@ -180,16 +164,16 @@ export class EnvConfigurationProvider implements WebviewViewProvider {
       });
     };
 
-    const noInspectMsg = async () => {
+    const noPackageMsg = async () => {
       await webviewView.webview.postMessage({
-        type: "noInspect",
+        type: "noPackage",
       });
     };
 
     // Update the panel if the environment changes
     this.disposables_.push(
       this.envManager_.onEnvironmentChanged(async () => {
-        this.env = envToConfig(this.envManager_);
+        this.env = this.envConfigManager_.envToConfig(this.envManager_);
         await webviewView.webview.postMessage({
           type: kEnvChanged,
           message: {
@@ -201,11 +185,11 @@ export class EnvConfigurationProvider implements WebviewViewProvider {
 
     // If the interpreter changes, refresh the tasks
     this.disposables_.push(
-      this.inspectManager_.onInspectChanged(async (e: InspectChangedEvent) => {
+      this.packageManager_.onPackageChanged(async (e: PackageChangedEvent) => {
         if (e.available) {
           await initMsg();
         } else {
-          await noInspectMsg();
+          await noPackageMsg();
         }
       })
     );
@@ -215,85 +199,97 @@ export class EnvConfigurationProvider implements WebviewViewProvider {
       this.dispose();
     });
   }
+
+  protected htmlForWebview(_webview: Webview): string {
+    return "";
+  }
+
   private disposables_: Disposable[] = [];
   private dispose() {
     this.disposables_.forEach(disposable => {
       disposable.dispose();
     });
   }
+}
 
-  private htmlForWebview(webview: Webview) {
-    // Get the local path to main script run in the webview, then convert it to a uri we can use in the webview.
-    const scriptUri = webview.asWebviewUri(
-      Uri.joinPath(this.extensionUri_, "out", "env-config-webview.js")
-    );
-    const codiconsUri = webview.asWebviewUri(
-      Uri.joinPath(
-        this.extensionUri_,
-        "assets",
-        "www",
-        "codicon",
-        "codicon.css"
-      )
-    );
+export function headHTML(
+  nonce: string,
+  webview: Webview,
+  extensionUri: Uri
+): string {
+  const codiconsUri = webview.asWebviewUri(
+    Uri.joinPath(extensionUri, "assets", "www", "codicon", "codicon.css")
+  );
 
-    const codiconsFontUri = webview.asWebviewUri(
-      Uri.joinPath(
-        this.extensionUri_,
-        "assets",
-        "www",
-        "codicon",
-        "codicon.ttf"
-      )
-    );
+  const codiconsFontUri = webview.asWebviewUri(
+    Uri.joinPath(extensionUri, "assets", "www", "codicon", "codicon.ttf")
+  );
 
-    // Use a nonce to only allow a specific script to be run.
-    const nonce = getNonce();
-
-    const modelOptions = inspectModels().map(model => {
-      return `<fast-option value="${model}">${model}</fast-option>`;
-    });
-
-    return `<!DOCTYPE html>
-              <html lang="en">
+  return `
               <head>
-                  <meta charset="UTF-8">
-  
-                  <!--
-                      Use a content security policy to only allow loading styles from our extension directory,
-                      and only allow scripts that have a specific nonce.
-                      (See the 'webview-sample' extension sample for img-src content security policy examples)
-                  -->
-                  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; font-src ${
-                    webview.cspSource
-                  }; style-src ${
-                    webview.cspSource
-                  } 'unsafe-inline'; script-src 'nonce-${nonce}';">
-                  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                  <style type="text/css">
-                  @font-face {
-                    font-family: "codicon";
-                    font-display: block;
-                    src: url("${codiconsFontUri.toString()}?939d3cf562f2f1379a18b5c3113b59cd") format("truetype");
-                  }
-                  </style>
-                  <link rel="stylesheet" type="text/css" href="${codiconsUri.toString()}">                  
-                  <title>Task Options</title>
-              </head>
-              <body>
-              <section class="component-container">
-                <form id="configuration-controls" class="hidden">
-                <vscode-panels>
-                  <vscode-panel-tab id="tab-1">Model</vscode-panel-tab>
-                  <vscode-panel-tab id="tab-2">Logging</vscode-panel-tab>
-                  <vscode-panel-view id="view-1">
+                <meta charset="UTF-8">
 
-                    <div class="group rows full-width" >
+                <!--
+                    Use a content security policy to only allow loading styles from our extension directory,
+                    and only allow scripts that have a specific nonce.
+                    (See the 'webview-sample' extension sample for img-src content security policy examples)
+                -->
+                <meta http-equiv="Content-Security-Policy" content="default-src 'none'; font-src ${
+                  webview.cspSource
+                }; style-src ${
+                  webview.cspSource
+                } 'unsafe-inline'; script-src 'nonce-${nonce}';">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <style type="text/css">
+                @font-face {
+                  font-family: "codicon";
+                  font-display: block;
+                  src: url("${codiconsFontUri.toString()}?939d3cf562f2f1379a18b5c3113b59cd") format("truetype");
+                }
+                </style>
+                <link rel="stylesheet" type="text/css" href="${codiconsUri.toString()}">                  
+                <title>Task Options</title>
+            </head>
+  
+  
+  `;
+}
+
+export function modelPickerHTML(modelCaption: string = "Model"): string {
+  const kInspectProviders = [
+    "openai",
+    "anthropic",
+    "google",
+    "mistral",
+    "deepseek",
+    "grok",
+    "bedrock",
+    "azureai",
+    "together",
+    "groq",
+    "fireworks",
+    "sambanova",
+    "cf",
+    "perplexity",
+    "hf",
+    "vllm",
+    "sglang",
+    "transformer_lens",
+    "ollama",
+    "llama-cpp-python",
+    "openai-api",
+    "openrouter",
+    "hf-inference-providers",
+  ];
+  const modelOptions = kInspectProviders.map(model => {
+    return `<fast-option value="${model}">${model}</fast-option>`;
+  });
+  return `
                       <div class="dropdown-container full-width">
-                        <div id="provider-label-container"><label id="provider-label" for="provider">Model</label></div>
+                        <div id="provider-label-container"><label id="provider-label" for="provider">${modelCaption}</label></div>
                         <div class="cols full-width no-wrap">
                           <fast-combobox autocomplete="both" id="provider" placeholder="Provider">
-                            <fast-option value="">None</fast-option>
+                            <fast-option value="">(none)</fast-option>
                             ${modelOptions.join("\n")}
                           </fast>
                         </div>
@@ -307,142 +303,5 @@ export class EnvConfigurationProvider implements WebviewViewProvider {
                       <div id="model-base-url-container" class="hidden full-width">
                         <vscode-text-field placeholder="Model Base Url" id="model-base-url" class="full-width"></vscode-text-field>
                       </div>
-                      <div class="cols control-column full-width">
-                        <vscode-text-field id="max-connections" size="3" placeholder="default" min="1">Connections</vscode-text-field>
-                        <vscode-text-field id="max-retries" size="3" placeholder="default" min="1">Retries</vscode-text-field>
-                        <vscode-text-field id="timeout" size="3" placeholder="default" min="1">Timeout</vscode-text-field>
-                      </div>                      
-                    </div>
-                  </vscode-panel-view>
-                  <vscode-panel-view id="view-2">
-                    <div class="rows full-width">
-                      <div class="cols full-width">
-                        <vscode-text-field placeholder="default" id="log-dir" size="16" class="full-width"
-                          >Log Directory</vscode-text-field
-                        >
-                        
-                        <div class="dropdown-container full-width">
-                          <label for="provider">Log Level</label>  
-                          <vscode-dropdown id="log-level" position="below" class="full-width">
-                            <vscode-option value="">default</vscode-option>
-                            <vscode-option value="debug">debug</vscode-option>
-                            <vscode-option value="http">http</vscode-option>
-                            <vscode-option value="info">info</vscode-option>
-                            <vscode-option value="warning" selected="true">warning</vscode-option>
-                            <vscode-option value="error">error</vscode-option>
-                            <vscode-option value="critical">critical</vscode-option>
-                          </vscode-dropdown>
-                        </div>
-                      </div>
-                    </div>
-                  </vscode-panel-view>
-                </vscode-panels>
-                </form>
-              </section>
-            
-              <script type="module" nonce="${nonce}" src="${scriptUri.toString()}"></script>
-              </body>
-              </html>`;
-  }
+    `;
 }
-
-const envToConfig = (envManager: WorkspaceEnvManager) => {
-  const config: EnvConfiguration = {};
-  const env = envManager.getValues();
-  const providerModelStr = env[kInspectEnvValues.providerModel];
-  if (providerModelStr) {
-    const providerModelParts = providerModelStr.split("/");
-    if (providerModelParts.length > 1) {
-      config.provider = providerModelParts[0];
-      config.model = providerModelParts.slice(1).join("/");
-    } else {
-      config.provider = providerModelStr;
-    }
-  } else {
-    config.provider = "";
-    config.model = "";
-  }
-
-  const logLevel = env[kInspectEnvValues.logLevel];
-  if (logLevel) {
-    config.logLevel = logLevel;
-  }
-
-  const logDir = env[kInspectEnvValues.logDir];
-  if (logDir) {
-    config.logDir = logDir;
-  }
-
-  const maxConnections = env[kInspectEnvValues.connections];
-  if (maxConnections) {
-    config.maxConnections = maxConnections;
-  }
-
-  const maxRetries = env[kInspectEnvValues.retries];
-  if (maxRetries) {
-    config.maxRetries = maxRetries;
-  }
-
-  const timeout = env[kInspectEnvValues.timeout];
-  if (timeout) {
-    config.timeout = timeout;
-  }
-
-  const modelBaseUrl = env[kInspectEnvValues.modelBaseUrl];
-  if (modelBaseUrl) {
-    config.modelBaseUrl = modelBaseUrl;
-  }
-
-  return config;
-};
-
-const configToEnv = (config: EnvConfiguration): Record<string, string> => {
-  const env: Record<string, string> = {};
-  if (config.provider && config.model) {
-    env[kInspectEnvValues.providerModel] = `${config.provider}/${config.model}`;
-  } else {
-    env[kInspectEnvValues.providerModel] = "";
-  }
-
-  env[kInspectEnvValues.logLevel] = config.logLevel || "";
-  env[kInspectEnvValues.logDir] = config.logDir || "";
-  env[kInspectEnvValues.connections] = config.maxConnections || "";
-  env[kInspectEnvValues.retries] = config.maxRetries || "";
-  env[kInspectEnvValues.timeout] = config.timeout || "";
-  env[kInspectEnvValues.modelBaseUrl] = config.modelBaseUrl || "";
-
-  return env;
-};
-
-const setConfiguration = (
-  key: string,
-  value: string,
-  state: EnvConfiguration
-) => {
-  switch (key) {
-    case "provider":
-      state.provider = value;
-      break;
-    case "model":
-      state.model = value;
-      break;
-    case "logDir":
-      state.logDir = value;
-      break;
-    case "logLevel":
-      state.logLevel = value;
-      break;
-    case "maxConnections":
-      state.maxConnections = value;
-      break;
-    case "maxRetries":
-      state.maxRetries = value;
-      break;
-    case "timeout":
-      state.timeout = value;
-      break;
-    case "modelBaseUrl":
-      state.modelBaseUrl = value;
-      break;
-  }
-};

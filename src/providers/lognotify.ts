@@ -1,16 +1,16 @@
 import { window, ExtensionContext, MessageItem, commands } from "vscode";
-import { InspectLogsWatcher } from "./inspect/inspect-logs-watcher";
+import { OutputWatcher } from "../core/package/output-watcher";
 import { InspectSettingsManager } from "./settings/inspect-settings";
 import { InspectViewManager } from "./logview/logview-view";
 
 export function activateLogNotify(
   context: ExtensionContext,
-  logsWatcher: InspectLogsWatcher,
+  outputWatcher: OutputWatcher,
   settingsMgr: InspectSettingsManager,
   viewManager: InspectViewManager
 ) {
   context.subscriptions.push(
-    logsWatcher.onInspectLogCreated(async e => {
+    outputWatcher.onInspectLogCreated(async e => {
       if (e.externalWorkspace) {
         return;
       }

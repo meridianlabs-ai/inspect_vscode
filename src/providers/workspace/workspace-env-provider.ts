@@ -13,6 +13,7 @@ import {
 } from "../../core/path";
 import { kInspectEnvValues } from "../inspect/inspect-constants";
 import { join } from "path";
+import { kScoutEnvValues } from "../scout/scout-constants";
 
 export function activateWorkspaceEnv(): [Command[], WorkspaceEnvManager] {
   // Monitor changes to the file
@@ -96,6 +97,23 @@ export class WorkspaceEnvManager implements Disposable {
         ? workspacePath(env_log).path
         : join(workspacePath().path, "logs");
       return Uri.file(logDir);
+    }
+  }
+
+  public getDefaultScanResultsDir() {
+    // See if there is a log dir
+    const envVals = this.getValues();
+    const envResults = envVals[kScoutEnvValues.scanResults];
+
+    // If there is a results dir, try to parse and use it
+    try {
+      return Uri.parse(envResults, true);
+    } catch {
+      // This isn't a uri, bud
+      const resultsDir = envResults
+        ? workspacePath(envResults).path
+        : join(workspacePath().path, "scans");
+      return Uri.file(resultsDir);
     }
   }
 

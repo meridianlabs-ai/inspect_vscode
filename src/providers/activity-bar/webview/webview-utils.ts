@@ -71,3 +71,55 @@ export function setControlsVisible(id: string, visible: boolean) {
     controls?.classList.add("hidden");
   }
 }
+export function openUrl(vscode: any, url: string) {
+  vscode.postMessage({
+    command: "openUrl",
+    url,
+  });
+}
+export function setEnvValue(vscode: any, key: string, value: string) {
+  vscode.postMessage({
+    command: "setEnvValue",
+    default: key,
+    value,
+  });
+}
+export const setEnvWhenValueChanged = (
+  vscode: any,
+  id: string,
+  key: string,
+  fn?: () => void
+) => {
+  const el = document.getElementById(id) as HTMLSelectElement;
+  el.addEventListener("change", (e: Event) => {
+    if (e.target) {
+      const index = el.selectedIndex;
+      const value = index > -1 ? el.options[index].value : el.value;
+      setEnvValue(vscode, key, value);
+    }
+    if (fn) {
+      fn();
+    }
+  });
+};
+export const setEnvWhenKeyup = (
+  vscode: any,
+  id: string,
+  key: string,
+  fn?: () => void
+) => {
+  const el = document.getElementById(id) as HTMLInputElement;
+  if (el) {
+    el.addEventListener(
+      "keyup",
+      debounce((e: Event) => {
+        if (e.target) {
+          setEnvValue(vscode, key, (e.target as HTMLInputElement).value);
+        }
+        if (fn) {
+          fn();
+        }
+      }, kBounceInterval)
+    );
+  }
+};

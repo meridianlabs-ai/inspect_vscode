@@ -16,22 +16,22 @@ import {
   DebugActiveTaskCommand,
   RunActiveTaskCommand,
 } from "./active-task-command";
-import { InspectEvalManager } from "../inspect/inspect-eval";
 import { Command } from "../../core/command";
 import { DocumentTaskInfo, readTaskData } from "../../components/task";
 import { cellTasks, isNotebook } from "../../components/notebook";
 import { debounce } from "lodash";
+import { ExecManager } from "../../core/package/exec-manager";
 
 // Activates the provider which tracks the currently active task (document and task name)
 export function activateActiveTaskProvider(
-  inspectEvalManager: InspectEvalManager,
+  inspectExecManager: ExecManager,
   context: ExtensionContext
 ): [Command[], ActiveTaskManager] {
   const activeTaskManager = new ActiveTaskManager(context);
 
   const commands = [
-    new RunActiveTaskCommand(activeTaskManager, inspectEvalManager),
-    new DebugActiveTaskCommand(activeTaskManager, inspectEvalManager),
+    new RunActiveTaskCommand(activeTaskManager, inspectExecManager),
+    new DebugActiveTaskCommand(activeTaskManager, inspectExecManager),
   ];
   return [commands, activeTaskManager];
 }

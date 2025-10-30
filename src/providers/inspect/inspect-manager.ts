@@ -1,89 +1,31 @@
-import { Disposable, Event, EventEmitter, ExtensionContext } from "vscode";
-import { pythonInterpreter } from "../../core/python";
+import { ExtensionContext } from "vscode";
 import { inspectBinPath } from "../../inspect/props";
 import { AbsolutePath } from "../../core/path";
 import { delimiter } from "path";
+import {
+  PackageChangedEvent,
+  PackageManager,
+} from "../../core/package/manager";
 
 // Activates the provider which tracks the availability of Inspect
 export function activateInspectManager(context: ExtensionContext) {
-  const inspectManager = new InspectManager(context);
+  const inspectManager = new PackageManager(
+    context,
+    "inspect_ai",
+    inspectBinPath
+  );
 
   // Initialize the terminal with the inspect bin path
   // on the path (if needed)
   const terminalEnv = terminalEnvironment(context);
   context.subscriptions.push(
-    inspectManager.onInspectChanged((e: InspectChangedEvent) => {
+    inspectManager.onPackageChanged((e: PackageChangedEvent) => {
       terminalEnv.update(e.binPath);
     })
   );
   terminalEnv.update(inspectBinPath());
 
   return inspectManager;
-}
-
-// Fired when the active task changes
-export interface InspectChangedEvent {
-  available: boolean;
-  binPath: AbsolutePath | null;
-}
-
-export class InspectManager implements Disposable {
-  constructor(context: ExtensionContext) {
-    // If the interpreter changes, refresh the tasks
-    context.subscriptions.push(
-      pythonInterpreter().onDidChange(() => {
-        this.updateInspectAvailable();
-      })
-    );
-    this.updateInspectAvailable();
-  }
-  private inspectBinPath_: string | undefined = undefined;
-
-  get available(): boolean {
-    return this.inspectBinPath_ !== null;
-  }
-
-  private updateInspectAvailable() {
-    const binPath = inspectBinPath();
-    const available = binPath !== null;
-    const valueChanged = this.inspectBinPath_ !== binPath?.path;
-    if (valueChanged) {
-      this.inspectBinPath_ = binPath?.path;
-      this.onInspectChanged_.fire({
-        available: !!this.inspectBinPath_,
-        binPath,
-      });
-    }
-    if (!available) {
-      this.watchForInspect();
-    }
-  }
-
-  watchForInspect() {
-    this.inspectTimer = setInterval(() => {
-      const path = inspectBinPath();
-      if (path) {
-        if (this.inspectTimer) {
-          clearInterval(this.inspectTimer);
-          this.inspectTimer = null;
-          this.updateInspectAvailable();
-        }
-      }
-    }, 3000);
-  }
-
-  private inspectTimer: NodeJS.Timeout | null = null;
-
-  dispose() {
-    if (this.inspectTimer) {
-      clearInterval(this.inspectTimer);
-      this.inspectTimer = null;
-    }
-  }
-
-  private readonly onInspectChanged_ = new EventEmitter<InspectChangedEvent>();
-  public readonly onInspectChanged: Event<InspectChangedEvent> =
-    this.onInspectChanged_.event;
 }
 
 // Configures the terminal environment to support inspect. We do this

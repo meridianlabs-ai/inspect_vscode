@@ -1,14 +1,9 @@
 import vscode from "vscode";
-import { env, ExtensionContext, MessageItem, Uri, window } from "vscode";
-import { getNonce } from "../../core/nonce";
+import { ExtensionContext, Uri } from "vscode";
 import { HostWebviewPanel } from "../../hooks";
 import { inspectViewPath } from "../../inspect/props";
-import { readFileSync } from "fs";
 import { Disposable } from "../../core/dispose";
 import {
-  jsonRpcPostMessageServer,
-  JsonRpcPostMessageTarget,
-  JsonRpcServerMethod,
   kMethodEvalLog,
   kMethodEvalLogBytes,
   kMethodEvalLogDir,
@@ -19,11 +14,15 @@ import {
   kMethodLogMessage,
   kMethodPendingSamples,
   kMethodSampleData,
+  webviewPanelJsonRpcServer,
 } from "../../core/jsonrpc";
 import { InspectViewServer } from "../inspect/inspect-view-server";
-import { workspacePath } from "../../core/path";
 import { LogviewState } from "./logview-state";
 import { log } from "../../core/log";
+import {
+  getWebviewPanelHtml,
+  handleWebviewPanelOpenMessages,
+} from "../../core/webview";
 
 export class LogviewPanel extends Disposable {
   constructor(
@@ -76,43 +75,7 @@ export class LogviewPanel extends Disposable {
     });
 
     // serve post message api to webview
-    this._pmUnsubcribe = panel_.webview.onDidReceiveMessage(
-      async (e: { type: string; url: string; [key: string]: unknown }) => {
-        switch (e.type) {
-          case "openExternal":
-            try {
-              const url = Uri.parse(e.url);
-              await env.openExternal(url);
-            } catch {
-              // Noop
-            }
-            break;
-          case "openWorkspaceFile":
-            {
-              if (e.url) {
-                const file = workspacePath(e.url);
-                try {
-                  await window.showTextDocument(Uri.file(file.path));
-                } catch (err) {
-                  if (
-                    err instanceof Error &&
-                    err.name === "CodeExpectedError"
-                  ) {
-                    const close: MessageItem = { title: "Close" };
-                    await window.showInformationMessage<MessageItem>(
-                      "This file is too large to be opened by the viewer.",
-                      close
-                    );
-                  } else {
-                    throw err;
-                  }
-                }
-              }
-            }
-            break;
-        }
-      }
-    );
+    this._pmUnsubcribe = handleWebviewPanelOpenMessages(panel_);
   }
 
   public override dispose() {
@@ -121,138 +84,37 @@ export class LogviewPanel extends Disposable {
   }
 
   public getHtml(state: LogviewState): string {
-    // read the index.html from the log view directory
-    const viewDir = inspectViewPath();
-    if (viewDir) {
-      // get nonce
-      const nonce = getNonce();
+    // get override css path (used for older unbundled version of view)
+    const overrideCssPath = this.extensionResourceUrl([
+      "assets",
+      "www",
+      "view",
+      "view-overrides.css",
+    ]);
 
-      // file uri for view dir
-      const viewDirUri = Uri.file(viewDir.path);
+    // If there is a log file selected in state, embed the startup message
+    // within the view itself. This will allow the log to be set immediately
+    // which avoids timing issues when first opening the view (e.g. the updateState
+    // message being sent before the view itself is configured to receive messages)
+    const stateMsg = {
+      type: "updateState",
+      url: state.log_file?.toString(),
+      sample_id: state.sample?.id,
+      sample_epoch: state.sample?.epoch,
+    };
+    const stateScript = state.log_file
+      ? `<script id="logview-state" type="application/json">${JSON.stringify(
+          stateMsg
+        )}</script>`
+      : "";
 
-      // get base html
-      let indexHtml = readFileSync(viewDir.child("index.html").path, "utf-8");
-
-      // Determine whether this is the old unbundled version of the html or the new
-      // bundled version
-      const isUnbundled = indexHtml.match(/"\.(\/App\.mjs)"/g);
-
-      // Add a stylesheet to further customize the view appearance
-      const overrideCssPath = this.extensionResourceUrl([
-        "assets",
-        "www",
-        "view",
-        "view-overrides.css",
-      ]);
-      const overrideCssHtml = isUnbundled
-        ? `<link rel="stylesheet" type ="text/css" href="${overrideCssPath.toString()}" >`
-        : "";
-
-      // If there is a log file selected in state, embed the startup message
-      // within the view itself. This will allow the log to be set immediately
-      // which avoids timing issues when first opening the view (e.g. the updateState
-      // message being sent before the view itself is configured to receive messages)
-      const stateMsg = {
-        type: "updateState",
-        url: state.log_file?.toString(),
-        sample_id: state.sample?.id,
-        sample_epoch: state.sample?.epoch,
-      };
-      const stateScript = state.log_file
-        ? `<script id="logview-state" type="application/json">${JSON.stringify(
-            stateMsg
-          )}</script>`
-        : "";
-
-      // decorate the html tag
-      indexHtml = indexHtml.replace("<html ", '<html class="vscode" ');
-
-      // add content security policy
-      indexHtml = indexHtml.replace(
-        "<head>\n",
-        `<head>
-          <meta name="inspect-extension:version" content="${this.getExtensionVersion()}">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${
-      this.panel_.webview.cspSource
-    } data:; font-src ${this.panel_.webview.cspSource} data:; style-src ${
-      this.panel_.webview.cspSource
-    } 'unsafe-inline'; worker-src 'self' ${
-      this.panel_.webview.cspSource
-    } blob:; script-src 'nonce-${nonce}' 'unsafe-eval'; connect-src ${
-      this.panel_.webview.cspSource
-    } blob:;">
-    ${stateScript}
-    ${overrideCssHtml}
-
-    `
-      );
-
-      // function to resolve resource uri
-      const resourceUri = (path: string) =>
-        this.panel_.webview
-          .asWebviewUri(Uri.joinPath(viewDirUri, path))
-          .toString();
-
-      // nonces for scripts
-      indexHtml = indexHtml.replace(
-        /<script([ >])/g,
-        `<script nonce="${nonce}"$1`
-      );
-
-      // Determine whether this is the old index.html format (before bundling),
-      // or the newer one. Fix up the html properly in each case
-
-      if (isUnbundled) {
-        // Old unbundle html
-        // fixup css references
-        indexHtml = indexHtml.replace(/href="\.([^"]+)"/g, (_, p1: string) => {
-          return `href="${resourceUri(p1)}"`;
-        });
-
-        // fixup js references
-        indexHtml = indexHtml.replace(/src="\.([^"]+)"/g, (_, p1: string) => {
-          return `src="${resourceUri(p1)}"`;
-        });
-
-        // fixup import maps
-        indexHtml = indexHtml.replace(
-          /": "\.([^?"]+)(["?])/g,
-          (_, p1: string, p2: string) => {
-            return `": "${resourceUri(p1)}${p2}`;
-          }
-        );
-
-        // fixup App.mjs
-        indexHtml = indexHtml.replace(/"\.(\/App\.mjs)"/g, (_, p1: string) => {
-          return `"${resourceUri(p1)}"`;
-        });
-      } else {
-        // New bundled html
-        // fixup css references
-        indexHtml = indexHtml.replace(/href="([^"]+)"/g, (_, p1: string) => {
-          return `href="${resourceUri(p1)}"`;
-        });
-
-        // fixup js references
-        indexHtml = indexHtml.replace(/src="([^"]+)"/g, (_, p1: string) => {
-          return `src="${resourceUri(p1)}"`;
-        });
-      }
-
-      return indexHtml;
-    } else {
-      return `
-<!DOCTYPE html>
-<html>
-<head>
-    <meta http-equiv="Content-type" content="text/html;charset=UTF-8">
-</head>
-<body>
-Inspect not available.
-</body>
-</html>
-`;
-    }
+    return getWebviewPanelHtml(
+      inspectViewPath(),
+      this.panel_,
+      this.getExtensionVersion(),
+      overrideCssPath,
+      stateScript
+    );
   }
 
   protected getExtensionVersion(): string {
@@ -268,26 +130,4 @@ Inspect not available.
 
   private _rpcDisconnect: VoidFunction;
   private _pmUnsubcribe: vscode.Disposable;
-}
-
-function webviewPanelJsonRpcServer(
-  webviewPanel: HostWebviewPanel,
-  methods:
-    | Record<string, JsonRpcServerMethod>
-    | ((name: string) => JsonRpcServerMethod | undefined)
-): () => void {
-  const target: JsonRpcPostMessageTarget = {
-    postMessage: (data: unknown) => {
-      void webviewPanel.webview.postMessage(data);
-    },
-    onMessage: (handler: (data: unknown) => void) => {
-      const disposable = webviewPanel.webview.onDidReceiveMessage(ev => {
-        handler(ev);
-      });
-      return () => {
-        disposable.dispose();
-      };
-    },
-  };
-  return jsonRpcPostMessageServer(target, methods);
 }

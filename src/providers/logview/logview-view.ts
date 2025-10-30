@@ -5,10 +5,6 @@ import {
   InspectWebviewManager,
 } from "../../components/webview";
 import { inspectViewPath } from "../../inspect/props";
-import {
-  InspectChangedEvent,
-  InspectManager,
-} from "../inspect/inspect-manager";
 import { LogviewState } from "./logview-state";
 import { ExtensionHost, HostWebviewPanel } from "../../hooks";
 import { showError } from "../../components/error";
@@ -17,7 +13,11 @@ import { WorkspaceEnvManager } from "../workspace/workspace-env-provider";
 import { LogviewPanel } from "./logview-panel";
 import { selectLogDirectory } from "../activity-bar/log-listing/log-directory-selector";
 import { dirname, getRelativeUri } from "../../core/uri";
-import { InspectLogsWatcher } from "../inspect/inspect-logs-watcher";
+import { OutputWatcher } from "../../core/package/output-watcher";
+import {
+  PackageChangedEvent,
+  PackageManager,
+} from "../../core/package/manager";
 
 const kLogViewId = "inspect.logview";
 
@@ -26,10 +26,10 @@ export class InspectViewManager {
     private readonly context_: ExtensionContext,
     private readonly webViewManager_: InspectViewWebviewManager,
     private readonly envMgr_: WorkspaceEnvManager,
-    logsWatcher: InspectLogsWatcher
+    outputWatcher: OutputWatcher
   ) {
     this.context_.subscriptions.push(
-      logsWatcher.onInspectLogCreated(async e => {
+      outputWatcher.onInspectLogCreated(async e => {
         // if this log is contained in the directory currently being viewed
         // then do a background refresh on it
         if (this.webViewManager_.hasWebview()) {
@@ -69,17 +69,18 @@ export class InspectViewManager {
 
 export class InspectViewWebviewManager extends InspectWebviewManager<
   InspectViewWebview,
+  InspectViewServer,
   LogviewState
 > {
   constructor(
-    inspectManager: InspectManager,
+    inspectManager: PackageManager,
     server: InspectViewServer,
     context: ExtensionContext,
     host: ExtensionHost
   ) {
     // If the interpreter changes, refresh the tasks
     context.subscriptions.push(
-      inspectManager.onInspectChanged((e: InspectChangedEvent) => {
+      inspectManager.onPackageChanged((e: PackageChangedEvent) => {
         if (!e.available && this.activeView_) {
           this.activeView_?.dispose();
         }

@@ -1,19 +1,19 @@
 import { Uri } from "vscode";
 import { Command } from "../../core/command";
-import { InspectEvalManager } from "./inspect-eval";
 import { toAbsolutePath } from "../../core/path";
 import { scheduleFocusActiveEditor } from "../../components/focus";
+import { ExecManager } from "../../core/package/exec-manager";
 
-export function inspectEvalCommands(manager: InspectEvalManager): Command[] {
+export function inspectEvalCommands(manager: ExecManager): Command[] {
   return [new RunEvalCommand(manager), new DebugEvalCommand(manager)];
 }
 
 export class RunEvalCommand implements Command {
-  constructor(private readonly manager_: InspectEvalManager) {}
+  constructor(private readonly manager_: ExecManager) {}
   async execute(documentUri: Uri, fnName: string): Promise<void> {
     const cwd = toAbsolutePath(documentUri.fsPath);
 
-    const evalPromise = this.manager_.startEval(cwd, fnName, false);
+    const evalPromise = this.manager_.start(cwd, fnName, false);
     scheduleFocusActiveEditor();
     await evalPromise;
   }
@@ -22,10 +22,10 @@ export class RunEvalCommand implements Command {
 }
 
 export class DebugEvalCommand implements Command {
-  constructor(private readonly manager_: InspectEvalManager) {}
+  constructor(private readonly manager_: ExecManager) {}
   async execute(documentUri: Uri, fnName: string): Promise<void> {
     const cwd = toAbsolutePath(documentUri.fsPath);
-    await this.manager_.startEval(cwd, fnName, true);
+    await this.manager_.start(cwd, fnName, true);
   }
   private static readonly id = "inspect.debugTask";
   public readonly id = DebugEvalCommand.id;

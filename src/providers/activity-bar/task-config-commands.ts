@@ -1,19 +1,19 @@
 import { Command } from "../../core/command";
 import { toAbsolutePath } from "../../core/path";
-import { InspectEvalManager } from "../inspect/inspect-eval";
 import { ActiveTaskManager } from "../active-task/active-task-provider";
 import { scheduleReturnFocus } from "../../components/focus";
+import { ExecManager } from "../../core/package/exec-manager";
 
 export class RunConfigTaskCommand implements Command {
   constructor(
     private readonly manager_: ActiveTaskManager,
-    private readonly inspectMgr_: InspectEvalManager
+    private readonly inspectMgr_: ExecManager
   ) {}
   async execute(): Promise<void> {
     const taskInfo = this.manager_.getActiveTaskInfo();
     if (taskInfo) {
       const docPath = toAbsolutePath(taskInfo.document.fsPath);
-      const evalPromise = this.inspectMgr_.startEval(
+      const evalPromise = this.inspectMgr_.start(
         docPath,
         taskInfo.activeTask?.name,
         false
@@ -30,13 +30,13 @@ export class RunConfigTaskCommand implements Command {
 export class DebugConfigTaskCommand implements Command {
   constructor(
     private readonly manager_: ActiveTaskManager,
-    private readonly inspectMgr_: InspectEvalManager
+    private readonly inspectMgr_: ExecManager
   ) {}
   async execute(): Promise<void> {
     const taskInfo = this.manager_.getActiveTaskInfo();
     if (taskInfo) {
       const docPath = toAbsolutePath(taskInfo.document.fsPath);
-      const evalPromise = this.inspectMgr_.startEval(
+      const evalPromise = this.inspectMgr_.start(
         docPath,
         taskInfo.activeTask?.name,
         true
