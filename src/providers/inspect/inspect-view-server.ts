@@ -30,6 +30,7 @@ export class InspectViewServer extends PackageViewServer {
       inspectManager,
       ["view", "start"],
       7676,
+      "Inspect",
       "inspect",
       inspectBinPath,
       ["--no-ansi"],

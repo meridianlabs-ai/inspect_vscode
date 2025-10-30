@@ -17,6 +17,7 @@ export class PackageViewServer implements Disposable {
     packageManager: PackageManager,
     private startCommand_: string[],
     private defaultPort_: number,
+    private packageDisplayName_: string,
     private packageBin_: string,
     private packageBinPath_: () => AbsolutePath | null,
     private viewArgs_: string[],
@@ -24,7 +25,7 @@ export class PackageViewServer implements Disposable {
   ) {
     // create output channel for debugging
     this.outputChannel_ = window.createOutputChannel(
-      `${this.packageBin_} view`
+      `${this.packageDisplayName_} View`
     );
 
     // shutdown server when inspect version changes (then we'll launch

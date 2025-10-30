@@ -11,6 +11,7 @@ export class ScoutViewServer extends PackageViewServer {
       scoutManager,
       ["view"],
       7576,
+      "Scout",
       "scout",
       scoutBinPath,
       ["--display", "rich"],
