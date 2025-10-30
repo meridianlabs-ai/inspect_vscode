@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.4.1...v0.5.0) (2025-10-30)
+
+
+### Features
+
+* Inspect Scout Support ([#14](https://github.com/meridianlabs-ai/inspect_vscode/issues/14)) ([cbc0819](https://github.com/meridianlabs-ai/inspect_vscode/commit/cbc081976f7cf6a669c37735e51054cadbb27b09))
+
 ## [0.4.1](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.4.0...v0.4.1) (2025-10-27)
 
 
