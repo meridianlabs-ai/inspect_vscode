@@ -36,7 +36,6 @@ import { initScoutProps } from "./scout/props";
 import { scanviewTerminalLinkProvider } from "./providers/scanview/scanview-link-provider";
 import { activateScoutManager } from "./providers/scout/scout-manager";
 import { ScoutViewServer } from "./providers/scout/scout-view-server";
-import { activateOpenScan } from "./providers/openscan";
 import { activateScanview } from "./providers/scanview/scanview";
 import { activateScoutActivityBar } from "./providers/activity-bar/scout-activity-bar-provider";
 import { activateScanNotify } from "./providers/scannotify";
@@ -251,7 +250,7 @@ export async function activateScout(
     context,
     host
   );
-  activateOpenScan(context);
+  // activateOpenScan(context);
   end("Setup Scout Viewer");
 
   // Activate the Activity Bar
