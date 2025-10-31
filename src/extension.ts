@@ -42,6 +42,7 @@ import { activateScoutCodeLens } from "./providers/codelens/scout-codelens-provi
 import { activateScoutScanManager } from "./providers/scout/scout-scan";
 import { activateWorkspaceEnvironment } from "./providers/environment";
 import { activateOpenScan } from "./providers/openscan";
+import { PackageManager } from "./core/package/manager";
 
 const kInspectMinimumVersion = "0.3.8";
 
@@ -173,7 +174,7 @@ export async function activate(context: ExtensionContext) {
 
   // Activate Scout
   start("Setup Scout");
-  const scoutCommands = await activateScout(
+  const [scoutManager, scoutCommands] = await activateScout(
     context,
     workspaceEnvManager,
     stateManager,
@@ -193,7 +194,7 @@ export async function activate(context: ExtensionContext) {
   activateCodeLens(context);
 
   // Activate Status Bar
-  activateStatusBar(context, inspectManager);
+  activateStatusBar(context, inspectManager, scoutManager);
 
   // Activate Log Notification
   activateLogNotify(context, outputWatcher, settingsMgr, inspectLogviewManager);
@@ -225,7 +226,7 @@ export async function activateScout(
   outputWatcher: OutputWatcher,
   _settingsMgr: InspectSettingsManager,
   host: ExtensionHost
-): Promise<Command[]> {
+): Promise<[PackageManager, Command[]]> {
   // Scout Manager watches for changes to scout binary
   start("Monitor Scout Binary");
   const scoutManager = activateScoutManager(context);
@@ -278,9 +279,8 @@ export async function activateScout(
   activateScoutCodeLens(context);
 
   return Promise.resolve([
-    ...scoutViewCommands,
-    ...activityBarCommands,
-    ...scanManagerCommands,
+    scoutManager,
+    [...scoutViewCommands, ...activityBarCommands, ...scanManagerCommands],
   ]);
 }
 
