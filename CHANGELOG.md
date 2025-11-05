@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.5.2](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.5.1...v0.5.2) (2025-11-05)
+
+
+### Bug Fixes
+
+* Fix support for scout view ([#20](https://github.com/meridianlabs-ai/inspect_vscode/issues/20)) ([005fda2](https://github.com/meridianlabs-ai/inspect_vscode/commit/005fda218a2c3eb6cb5d1a8a0dcb8f66afb90e4b))
+* Properly resolve imports to other Meridian packages ([#18](https://github.com/meridianlabs-ai/inspect_vscode/issues/18)) ([81d763c](https://github.com/meridianlabs-ai/inspect_vscode/commit/81d763c7ce3421489e96bc67b27af113d04d3c88))
+* Use non-conflicting scout port ([#19](https://github.com/meridianlabs-ai/inspect_vscode/issues/19)) ([d9e1de1](https://github.com/meridianlabs-ai/inspect_vscode/commit/d9e1de1ffbf2cec35b76edc9c53410e3279908e7))
+
 ## [0.5.1](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.5.0...v0.5.1) (2025-10-30)
 
 
