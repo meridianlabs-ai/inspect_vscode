@@ -46,9 +46,9 @@ export function getWebviewPanelHtml(
       panel.webview.cspSource
     } 'unsafe-inline'; worker-src 'self' ${
       panel.webview.cspSource
-    } blob:; script-src 'nonce-${nonce}' 'unsafe-eval'; connect-src ${
+    } blob:; script-src 'nonce-${nonce}' 'unsafe-eval'; script-src-elem 'nonce-${nonce}' ${
       panel.webview.cspSource
-    } blob:;">
+    }; connect-src ${panel.webview.cspSource} blob:;">
     ${overrideCssHtml}
     ${extraHead}
 
