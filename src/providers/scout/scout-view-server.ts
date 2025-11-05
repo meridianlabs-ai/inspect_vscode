@@ -10,7 +10,7 @@ export class ScoutViewServer extends PackageViewServer {
       context,
       scoutManager,
       ["view"],
-      7576,
+      7776,
       "Scout",
       "scout",
       scoutBinPath,
