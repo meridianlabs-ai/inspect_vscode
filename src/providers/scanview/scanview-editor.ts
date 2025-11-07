@@ -106,13 +106,12 @@ class ScoutScanReadonlyEditor implements vscode.CustomReadonlyEditorProvider {
     const logViewState: ScanviewState = {
       scan_dir: docUriNoParams,
       results_dir: dirname(docUriNoParams),
-      scan:
-        scanner && transcript_id
-          ? {
-              scanner: scanner,
-              transcript_id: transcript_id,
-            }
-          : undefined,
+      scan: scanner
+        ? {
+            scanner: scanner,
+            transcript_id: transcript_id,
+          }
+        : undefined,
     };
     webviewPanel.webview.html = this.scanviewPanel_.getHtml(logViewState);
     return Promise.resolve();

@@ -5,7 +5,7 @@ export interface ScanviewState {
   results_dir: Uri;
   scan?: {
     scanner: string;
-    transcript_id: string;
+    transcript_id?: string;
   };
   background_refresh?: boolean;
 }
