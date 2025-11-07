@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.3](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.5.2...v0.5.3) (2025-11-07)
+
+
+### Bug Fixes
+
+* Support scout navigate to specific scanner ([a721662](https://github.com/meridianlabs-ai/inspect_vscode/commit/a721662dac1f2ba4850cd6cd8cb263e4c0be95b4))
+* Support scout navigate to specific scanner ([5deeeea](https://github.com/meridianlabs-ai/inspect_vscode/commit/5deeeeacaf9cbc05a362e22e252f59c008345c79))
+
 ## [0.5.2](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.5.1...v0.5.2) (2025-11-05)
 
 
