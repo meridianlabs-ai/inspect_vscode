@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.4](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.5.3...v0.5.4) (2025-11-11)
+
+
+### Bug Fixes
+
+* trigger release for recent changes ([#26](https://github.com/meridianlabs-ai/inspect_vscode/issues/26)) ([0e07fbb](https://github.com/meridianlabs-ai/inspect_vscode/commit/0e07fbb480bb55dee691b5358bd54132b29cfc1f))
+
 ## [0.5.3](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.5.2...v0.5.3) (2025-11-07)
 
 
