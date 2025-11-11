@@ -28,7 +28,19 @@ export class ScoutViewServer extends PackageViewServer {
   }
 
   async getScan(scanLocation: string): Promise<string> {
-    return this.api_json(`/api/scan/${encodeURIComponent(scanLocation)}`);
+    return this.api_json(
+      `/api/scan/${encodeURIComponent(scanLocation)}?status_only=true`
+    );
+  }
+
+  async getScannerDataframe(
+    scanLocation: string,
+    scanner: string
+  ): Promise<Uint8Array> {
+    const uri = `/api/scanner_df/${encodeURIComponent(
+      scanLocation
+    )}?scanner=${encodeURIComponent(scanner)}`;
+    return this.api_bytes(uri);
   }
 
   async deleteScan(scanLocation: Uri): Promise<string> {
