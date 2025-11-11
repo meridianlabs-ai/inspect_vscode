@@ -3,6 +3,7 @@ import { ExtensionContext, Uri } from "vscode";
 import { HostWebviewPanel } from "../../hooks";
 import {
   kMethodGetScan,
+  kMethodGetScannerDataframe,
   kMethodGetScans,
   webviewPanelJsonRpcServer,
 } from "../../core/jsonrpc";
@@ -30,6 +31,8 @@ export class ScanviewPanel extends Disposable {
       [kMethodGetScans]: async () => server.getScans(),
       [kMethodGetScan]: async (params: unknown[]) =>
         server.getScan(params[0] as string),
+      [kMethodGetScannerDataframe]: async (params: unknown[]) =>
+        server.getScannerDataframe(params[0] as string, params[1] as string),
     });
 
     // serve post message api to webview
