@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.5.4...v0.6.0) (2025-12-10)
+
+
+### Features
+
+* show log and scan views in main column ([#28](https://github.com/meridianlabs-ai/inspect_vscode/issues/28)) ([f873c10](https://github.com/meridianlabs-ai/inspect_vscode/commit/f873c10c5c2e48f4cec6daf8d57850530e0a2591))
+
 ## [0.5.4](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.5.3...v0.5.4) (2025-11-11)
 
 
