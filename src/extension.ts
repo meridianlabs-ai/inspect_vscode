@@ -23,7 +23,6 @@ import { initInspectProps } from "./inspect";
 import { activateInspectManager } from "./providers/inspect/inspect-manager";
 import { checkActiveWorkspaceFolder } from "./core/workspace";
 import { inspectBinPath, inspectVersionDescriptor } from "./inspect/props";
-import { ExtensionHost, extensionHost } from "./hooks";
 import { activateStatusBar } from "./providers/statusbar";
 import { InspectViewServer } from "./providers/inspect/inspect-view-server";
 import { OutputWatcher } from "./core/package/output-watcher";
@@ -53,9 +52,6 @@ export async function activate(context: ExtensionContext) {
   if (!checkActiveWorkspaceFolder()) {
     return;
   }
-
-  // Get the host
-  const host = extensionHost();
 
   const commandManager = new CommandManager();
 
@@ -147,8 +143,7 @@ export async function activate(context: ExtensionContext) {
     server,
     workspaceEnvManager,
     outputWatcher,
-    context,
-    host
+    context
   );
   const inspectLogviewManager = logviewWebviewManager;
 
@@ -179,8 +174,7 @@ export async function activate(context: ExtensionContext) {
     workspaceEnvManager,
     stateManager,
     outputWatcher,
-    settingsMgr,
-    host
+    settingsMgr
   );
   end("Setup Scout");
 
@@ -224,8 +218,7 @@ export async function activateScout(
   workspaceEnvManager: WorkspaceEnvManager,
   workspaceStateManager: WorkspaceStateManager,
   outputWatcher: OutputWatcher,
-  _settingsMgr: InspectSettingsManager,
-  host: ExtensionHost
+  _settingsMgr: InspectSettingsManager
 ): Promise<[PackageManager, Command[]]> {
   // Scout Manager watches for changes to scout binary
   start("Monitor Scout Binary");
@@ -248,8 +241,7 @@ export async function activateScout(
     scoutManager,
     server,
     workspaceEnvManager,
-    context,
-    host
+    context
   );
   activateOpenScan(context);
   end("Setup Scout Viewer");

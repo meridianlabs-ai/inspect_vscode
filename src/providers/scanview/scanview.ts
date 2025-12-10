@@ -5,7 +5,6 @@ import { scanviewCommands } from "./commands";
 import { ScoutViewWebviewManager } from "./scanview-view";
 import { ScoutViewManager } from "./scanview-view";
 import { WorkspaceEnvManager } from "../workspace/workspace-env-provider";
-import { ExtensionHost } from "../../hooks";
 import { activateScanviewEditor } from "./scanview-editor";
 import { PackageManager } from "../../core/package/manager";
 import { ScoutViewServer } from "../scout/scout-view-server";
@@ -14,8 +13,7 @@ export function activateScanview(
   scoutManager: PackageManager,
   server: ScoutViewServer,
   envMgr: WorkspaceEnvManager,
-  context: ExtensionContext,
-  host: ExtensionHost
+  context: ExtensionContext
 ): [Command[], ScoutViewManager] {
   // activate the log viewer editor
   activateScanviewEditor(context, server);
@@ -24,8 +22,7 @@ export function activateScanview(
   const scanviewWebManager = new ScoutViewWebviewManager(
     scoutManager,
     server,
-    context,
-    host
+    context
   );
   const scanviewManager = new ScoutViewManager(
     context,
