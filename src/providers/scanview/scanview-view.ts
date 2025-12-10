@@ -4,7 +4,7 @@ import {
   InspectWebview,
   InspectWebviewManager,
 } from "../../components/webview";
-import { ExtensionHost, HostWebviewPanel } from "../../hooks";
+import { HostWebviewPanel } from "../../hooks";
 import { WorkspaceEnvManager } from "../workspace/workspace-env-provider";
 import { dirname, getRelativeUri } from "../../core/uri";
 import {
@@ -66,8 +66,7 @@ export class ScoutViewWebviewManager extends InspectWebviewManager<
   constructor(
     scoutManager: PackageManager,
     server: ScoutViewServer,
-    context: ExtensionContext,
-    host: ExtensionHost
+    context: ExtensionContext
   ) {
     // If the interpreter changes then
     context.subscriptions.push(
@@ -90,8 +89,7 @@ export class ScoutViewWebviewManager extends InspectWebviewManager<
       kScanViewId,
       "Scout View",
       localResourceRoots,
-      ScoutViewWebview,
-      host
+      ScoutViewWebview
     );
   }
   private activeResultsDir_: Uri | null = null;
@@ -211,7 +209,7 @@ export class ScoutViewWebviewManager extends InspectWebviewManager<
       if (activation) {
         this.showWebview(state, {
           preserveFocus: activation !== "activate",
-          viewColumn: ViewColumn.Beside,
+          viewColumn: ViewColumn.One,
         });
       }
     }

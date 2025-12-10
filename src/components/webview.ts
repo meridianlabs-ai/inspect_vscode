@@ -10,7 +10,7 @@ import {
 
 import { Disposable } from "../core/dispose";
 import { getNonce } from "../core/nonce";
-import { ExtensionHost, HostWebviewPanel } from "../hooks";
+import { HostWebviewPanel } from "../hooks";
 import { isNotebook } from "./notebook";
 import { FocusManager } from "./focus";
 import { log } from "../core/log";
@@ -37,8 +37,7 @@ export class InspectWebviewManager<
       server: PS,
       state: S,
       webviewPanel: HostWebviewPanel
-    ) => T,
-    private host_: ExtensionHost
+    ) => T
   ) {
     context_.subscriptions.push(
       window.registerWebviewPanelSerializer(this.viewType_, {
@@ -177,10 +176,13 @@ export class InspectWebviewManager<
     state: S,
     showOptions?: ShowOptions
   ): T {
-    const previewPanel = this.host_.createPreviewPanel(
+    const previewPanel = window.createWebviewPanel(
       this.viewType_,
       this.title_,
-      showOptions?.preserveFocus,
+      {
+        viewColumn: showOptions?.viewColumn || ViewColumn.Active,
+        preserveFocus: showOptions?.preserveFocus,
+      },
       {
         enableScripts: true,
         enableForms: true,
@@ -190,7 +192,7 @@ export class InspectWebviewManager<
           Uri.joinPath(context.extensionUri, "assets", "www"),
         ],
       }
-    );
+    ) as HostWebviewPanel;
 
     const inspectWebView = new this.webviewType_(
       context,

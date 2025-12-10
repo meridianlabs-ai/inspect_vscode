@@ -6,7 +6,7 @@ import {
 } from "../../components/webview";
 import { inspectViewPath } from "../../inspect/props";
 import { LogviewState } from "./logview-state";
-import { ExtensionHost, HostWebviewPanel } from "../../hooks";
+import { HostWebviewPanel } from "../../hooks";
 import { showError } from "../../components/error";
 import { InspectViewServer } from "../inspect/inspect-view-server";
 import { WorkspaceEnvManager } from "../workspace/workspace-env-provider";
@@ -75,8 +75,7 @@ export class InspectViewWebviewManager extends InspectWebviewManager<
   constructor(
     inspectManager: PackageManager,
     server: InspectViewServer,
-    context: ExtensionContext,
-    host: ExtensionHost
+    context: ExtensionContext
   ) {
     // If the interpreter changes, refresh the tasks
     context.subscriptions.push(
@@ -99,8 +98,7 @@ export class InspectViewWebviewManager extends InspectWebviewManager<
       kLogViewId,
       "Inspect View",
       localResourceRoots,
-      InspectViewWebview,
-      host
+      InspectViewWebview
     );
   }
   private activeLogDir_: Uri | null = null;
@@ -220,7 +218,7 @@ export class InspectViewWebviewManager extends InspectWebviewManager<
       if (activation) {
         this.showWebview(state, {
           preserveFocus: activation !== "activate",
-          viewColumn: ViewColumn.Beside,
+          viewColumn: ViewColumn.One,
         });
       }
     }
