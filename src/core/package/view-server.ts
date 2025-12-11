@@ -41,12 +41,22 @@ export class PackageViewServer implements Disposable {
     path: string,
     headers?: Record<string, string>,
     handleError?: (status: number) => string | undefined
-  ): Promise<string> {
-    return (await this.api(path, false, headers, handleError)) as string;
+  ): Promise<{ data: string; headers: Headers }> {
+    const result = await this.api(path, false, headers, handleError);
+    return {
+      data: result.data as string,
+      headers: result.headers,
+    };
   }
 
-  protected async api_bytes(path: string): Promise<Uint8Array> {
-    return (await this.api(path, true)) as Uint8Array;
+  protected async api_bytes(
+    path: string
+  ): Promise<{ data: Uint8Array; headers: Headers }> {
+    const result = await this.api(path, true);
+    return {
+      data: result.data as Uint8Array,
+      headers: result.headers,
+    };
   }
 
   protected async api(
@@ -54,7 +64,7 @@ export class PackageViewServer implements Disposable {
     binary: boolean = false,
     headers: Record<string, string> = {},
     handleError?: (status: number) => string | undefined
-  ): Promise<string | Uint8Array> {
+  ): Promise<{ data: string | Uint8Array; headers: Headers }> {
     // ensure the server is started and ready
     await this.ensureRunning();
 
@@ -76,15 +86,16 @@ export class PackageViewServer implements Disposable {
     if (response.ok) {
       if (binary) {
         const buffer = await response.arrayBuffer();
-        return new Uint8Array(buffer);
+        return { data: new Uint8Array(buffer), headers: response.headers };
       } else {
-        return await response.text();
+        const result = await response.text();
+        return { data: result, headers: response.headers };
       }
     } else if (response.status !== 200) {
       if (handleError) {
         const error_response = handleError(response.status);
         if (error_response) {
-          return error_response;
+          return { data: error_response, headers: response.headers };
         }
       }
       const message = (await response.text()) || response.statusText;
