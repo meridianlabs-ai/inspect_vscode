@@ -2,36 +2,18 @@
  * Shared mock utilities for testing view servers
  */
 
-import { ExtensionContext, OutputChannel, Disposable } from "vscode";
+import { OutputChannel, Disposable } from "vscode";
 
 /**
  * Mock ExtensionContext for testing
+ * Note: This is a partial mock for testing purposes only
  */
-export class MockExtensionContext implements Partial<ExtensionContext> {
+export class MockExtensionContext {
   subscriptions: Array<{ dispose: () => void }> = [];
-  workspaceState: any = {
-    get: () => undefined,
-    update: () => Promise.resolve(),
-  };
-  globalState: any = {
-    get: () => undefined,
-    update: () => Promise.resolve(),
-    setKeysForSync: () => {},
-  };
   extensionPath: string = "/mock/extension/path";
-  extensionUri: any = { scheme: "file", path: "/mock/extension/path" };
-  environmentVariableCollection: any = {
-    replace: () => {},
-    append: () => {},
-    prepend: () => {},
-    get: () => undefined,
-    forEach: () => {},
-    clear: () => {},
-  };
   storagePath: string | undefined = "/mock/storage";
   globalStoragePath: string = "/mock/global/storage";
   logPath: string = "/mock/logs";
-  extensionMode: any = 1; // Normal mode
 }
 
 /**
@@ -131,7 +113,7 @@ export interface MockFetchResponse {
   status: number;
   statusText: string;
   text: () => Promise<string>;
-  json: () => Promise<any>;
+  json: () => Promise<unknown>;
   arrayBuffer: () => Promise<ArrayBuffer>;
   headers: Map<string, string>;
 }
@@ -164,9 +146,9 @@ export class FetchMockManager {
       ok: true,
       status: 200,
       statusText: "OK",
-      text: async () => JSON.stringify({}),
-      json: async () => ({}),
-      arrayBuffer: async () => new ArrayBuffer(0),
+      text: () => Promise.resolve(JSON.stringify({})),
+      json: () => Promise.resolve({}),
+      arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
       headers: new Map(),
       ...response,
     };
@@ -176,26 +158,26 @@ export class FetchMockManager {
   /**
    * Set a successful JSON response
    */
-  setJsonResponse(urlPattern: string, data: any, status: number = 200) {
+  setJsonResponse(urlPattern: string, data: unknown, status = 200) {
     this.setResponse(urlPattern, {
       ok: status >= 200 && status < 300,
       status,
       statusText: status === 200 ? "OK" : "Error",
-      text: async () => JSON.stringify(data),
-      json: async () => data,
+      text: () => Promise.resolve(JSON.stringify(data)),
+      json: () => Promise.resolve(data),
     });
   }
 
   /**
    * Set a successful binary response
    */
-  setBinaryResponse(urlPattern: string, data: Uint8Array, status: number = 200) {
+  setBinaryResponse(urlPattern: string, data: Uint8Array, status = 200) {
     const buffer = data.buffer as ArrayBuffer;
     this.setResponse(urlPattern, {
       ok: status >= 200 && status < 300,
       status,
       statusText: status === 200 ? "OK" : "Error",
-      arrayBuffer: async () => buffer,
+      arrayBuffer: () => Promise.resolve(buffer),
     });
   }
 
@@ -207,7 +189,7 @@ export class FetchMockManager {
       ok: false,
       status,
       statusText: message,
-      text: async () => message,
+      text: () => Promise.resolve(message),
     });
   }
 
@@ -215,17 +197,17 @@ export class FetchMockManager {
    * Install the fetch mock
    */
   install() {
-    global.fetch = async (
+    global.fetch = (
       url: string | URL | Request,
       options?: RequestInit
     ): Promise<Response> => {
-      const urlString = typeof url === "string" ? url : url.toString();
+      const urlString = typeof url === "string" ? url : (url as URL).toString();
       this.callLog.push({ url: urlString, options: options || {} });
 
       // Find matching response
       for (const [pattern, response] of this.responses) {
         if (urlString.includes(pattern)) {
-          return {
+          return Promise.resolve({
             ok: response.ok,
             status: response.status,
             statusText: response.statusText,
@@ -233,20 +215,20 @@ export class FetchMockManager {
             json: response.json,
             arrayBuffer: response.arrayBuffer,
             headers: new Map(response.headers),
-          } as unknown as Response;
+          } as unknown as Response);
         }
       }
 
       // Default response if no match
-      return {
+      return Promise.resolve({
         ok: true,
         status: 200,
         statusText: "OK",
-        text: async () => JSON.stringify({}),
-        json: async () => ({}),
-        arrayBuffer: async () => new ArrayBuffer(0),
+        text: () => Promise.resolve(JSON.stringify({})),
+        json: () => Promise.resolve({}),
+        arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
         headers: new Map(),
-      } as unknown as Response;
+      } as unknown as Response);
     };
   }
 
@@ -397,15 +379,15 @@ export class TestUriFactory {
  */
 export async function waitFor(
   condition: () => boolean,
-  timeout: number = 1000,
-  interval: number = 10
+  timeout = 1000,
+  interval = 10
 ): Promise<void> {
   const start = Date.now();
   while (!condition()) {
     if (Date.now() - start > timeout) {
       throw new Error("Timeout waiting for condition");
     }
-    await new Promise((resolve) => setTimeout(resolve, interval));
+    await new Promise<void>((resolve) => setTimeout(resolve, interval));
   }
 }
 
@@ -420,8 +402,8 @@ export function assertError(
   try {
     const result = fn();
     if (result instanceof Promise) {
-      result.catch((e) => {
-        error = e;
+      result.catch((e: unknown) => {
+        error = e as Error;
       });
     }
   } catch (e) {

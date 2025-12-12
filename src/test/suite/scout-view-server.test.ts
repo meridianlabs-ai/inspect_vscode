@@ -26,30 +26,30 @@ suite("ScoutViewServer Test Suite", () => {
     mockFetchResponse = null;
 
     // Mock global fetch
-    global.fetch = async (url: string | URL | Request, options?: RequestInit) => {
-      const urlString = typeof url === "string" ? url : url.toString();
+    global.fetch = (url: string | URL | Request, options?: RequestInit): Promise<Response> => {
+      const urlString = typeof url === "string" ? url : (url as URL).toString();
       fetchCallLog.push({ url: urlString, options: options || {} });
 
       if (mockFetchResponse) {
-        return {
+        return Promise.resolve({
           ok: mockFetchResponse.ok,
           status: mockFetchResponse.status,
           statusText: mockFetchResponse.statusText,
           text: mockFetchResponse.text,
           arrayBuffer: mockFetchResponse.arrayBuffer,
           headers: new Map(mockFetchResponse.headers),
-        } as unknown as Response;
+        } as unknown as Response);
       }
 
       // Default successful response
-      return {
+      return Promise.resolve({
         ok: true,
         status: 200,
         statusText: "OK",
-        text: async () => JSON.stringify({ data: "test" }),
-        arrayBuffer: async () => new ArrayBuffer(0),
+        text: () => Promise.resolve(JSON.stringify({ data: "test" })),
+        arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
         headers: new Map(),
-      } as unknown as Response;
+      } as unknown as Response);
     };
 
     // Note: We cannot fully instantiate ScoutViewServer without mocking more dependencies
@@ -72,7 +72,7 @@ suite("ScoutViewServer Test Suite", () => {
   });
 
   suite("API Endpoint Construction", () => {
-    test("getScans should construct correct API path without results_dir", async () => {
+    test("getScans should construct correct API path without results_dir", () => {
       // Test URL construction logic
       const expectedPath = "/api/scans";
 
@@ -273,19 +273,19 @@ suite("ScoutViewServer Test Suite", () => {
   });
 
   suite("Integration Concepts", () => {
-    test("should verify ensureRunning is called before API requests", () => {
+    test("should verify ensureRunning is called before API requests", async () => {
       // This test documents that ensureRunning should be called
       // In actual implementation, each API method calls ensureRunning()
       let ensureRunningCalled = false;
 
-      const mockEnsureRunning = async () => {
+      const mockEnsureRunning = () => {
         ensureRunningCalled = true;
+        return Promise.resolve();
       };
 
       // Simulate what happens in the actual methods
-      mockEnsureRunning().then(() => {
-        assert.strictEqual(ensureRunningCalled, true);
-      });
+      await mockEnsureRunning();
+      assert.strictEqual(ensureRunningCalled, true);
     });
 
     test("should verify API methods call api_json for JSON responses", () => {

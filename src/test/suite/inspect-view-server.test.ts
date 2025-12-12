@@ -475,16 +475,16 @@ suite("InspectViewServer Test Suite", () => {
   });
 
   suite("Integration Concepts", () => {
-    test("should call ensureRunning before API requests", () => {
+    test("should call ensureRunning before API requests", async () => {
       let ensureRunningCalled = false;
 
-      const mockEnsureRunning = async () => {
+      const mockEnsureRunning = () => {
         ensureRunningCalled = true;
+        return Promise.resolve();
       };
 
-      mockEnsureRunning().then(() => {
-        assert.strictEqual(ensureRunningCalled, true);
-      });
+      await mockEnsureRunning();
+      assert.strictEqual(ensureRunningCalled, true);
     });
 
     test("should use api_json for JSON endpoints", () => {
