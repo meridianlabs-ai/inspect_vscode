@@ -108,7 +108,7 @@ export class InspectViewServer extends PackageViewServer {
   public async evalLogSize(file: string): Promise<number> {
     if (this.haveInspectEvalLogFormat()) {
       return Number(
-        await this.api_json(`/api/log-size/${encodeURIComponent(file)}`)
+        (await this.api_json(`/api/log-size/${encodeURIComponent(file)}`)).data
       );
     } else {
       throw new Error("evalLogSize not implemented");
@@ -118,7 +118,8 @@ export class InspectViewServer extends PackageViewServer {
   public async evalLogDelete(file: string): Promise<number> {
     if (this.haveInspectEvalLogFormat()) {
       return Number(
-        await this.api_json(`/api/log-delete/${encodeURIComponent(file)}`)
+        (await this.api_json(`/api/log-delete/${encodeURIComponent(file)}`))
+          .data
       );
     } else {
       throw new Error("evalLogDelete not implemented");
