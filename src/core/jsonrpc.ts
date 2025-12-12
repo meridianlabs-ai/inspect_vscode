@@ -17,6 +17,7 @@ export const kMethodEvalSet = "eval_set";
 export const kMethodGetScans = "get_scans";
 export const kMethodGetScan = "get_scan";
 export const kMethodGetScannerDataframe = "get_scanner_dataframe";
+export const kMethodGetScannerDataframeInput = "get_scanner_dataframe_input";
 
 // json rpc client (talk from the webview to the extension)
 export function webViewJsonRpcClient(vscode: {

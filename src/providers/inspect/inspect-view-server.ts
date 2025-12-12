@@ -40,7 +40,7 @@ export class InspectViewServer extends PackageViewServer {
 
   public async evalLogDir(): Promise<string | undefined> {
     if (this.haveInspectEvalLogFormat()) {
-      return this.api_json(`/api/log-dir`);
+      return (await this.api_json(`/api/log-dir`)).data;
     } else {
       throw new Error("evalLogDir not implemented");
     }
@@ -62,7 +62,7 @@ export class InspectViewServer extends PackageViewServer {
       if (token) {
         headers["If-None-Match"] = token;
       }
-      return this.api_json("/api/log-files", headers);
+      return (await this.api_json("/api/log-files", headers)).data;
     } else {
       throw new Error("evalLogFile not implemented");
     }
@@ -70,9 +70,11 @@ export class InspectViewServer extends PackageViewServer {
 
   public async evalLogs(log_dir: Uri): Promise<string | undefined> {
     if (this.haveInspectEvalLogFormat()) {
-      return this.api_json(
-        `/api/logs?log_dir=${encodeURIComponent(log_dir.toString())}`
-      );
+      return (
+        await this.api_json(
+          `/api/logs?log_dir=${encodeURIComponent(log_dir.toString())}`
+        )
+      ).data;
     } else {
       return evalLogs(log_dir);
     }
@@ -93,9 +95,11 @@ export class InspectViewServer extends PackageViewServer {
     headerOnly: boolean | number
   ): Promise<string | undefined> {
     if (this.haveInspectEvalLogFormat()) {
-      return await this.api_json(
-        `/api/logs/${encodeURIComponent(file)}?header-only=${headerOnly}`
-      );
+      return (
+        await this.api_json(
+          `/api/logs/${encodeURIComponent(file)}?header-only=${headerOnly}`
+        )
+      ).data;
     } else {
       return evalLog(file, headerOnly);
     }
@@ -127,9 +131,11 @@ export class InspectViewServer extends PackageViewServer {
     end: number
   ): Promise<Uint8Array> {
     if (this.haveInspectEvalLogFormat()) {
-      return this.api_bytes(
-        `/api/log-bytes/${encodeURIComponent(file)}?start=${start}&end=${end}`
-      );
+      return (
+        await this.api_bytes(
+          `/api/log-bytes/${encodeURIComponent(file)}?start=${start}&end=${end}`
+        )
+      ).data;
     } else {
       throw new Error("evalLogBytes not implemented");
     }
@@ -141,7 +147,8 @@ export class InspectViewServer extends PackageViewServer {
       for (const file of files) {
         params.append("file", file);
       }
-      return this.api_json(`/api/log-headers?${params.toString()}`);
+      return (await this.api_json(`/api/log-headers?${params.toString()}`))
+        .data;
     } else {
       return evalLogHeaders(files);
     }
@@ -169,11 +176,13 @@ export class InspectViewServer extends PackageViewServer {
       }
     };
 
-    return this.api_json(
-      `/api/pending-samples?${params.toString()}`,
-      headers,
-      handleError
-    );
+    return (
+      await this.api_json(
+        `/api/pending-samples?${params.toString()}`,
+        headers,
+        handleError
+      )
+    ).data;
   }
 
   public async evalLogSampleData(
@@ -204,11 +213,13 @@ export class InspectViewServer extends PackageViewServer {
         return kNotModifiedSignal;
       }
     };
-    return this.api_json(
-      `/api/pending-sample-data?${params.toString()}`,
-      {},
-      handleError
-    );
+    return (
+      await this.api_json(
+        `/api/pending-sample-data?${params.toString()}`,
+        {},
+        handleError
+      )
+    ).data;
   }
 
   public async logMessage(log_file: string, message?: string): Promise<void> {

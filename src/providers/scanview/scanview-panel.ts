@@ -4,6 +4,7 @@ import { HostWebviewPanel } from "../../hooks";
 import {
   kMethodGetScan,
   kMethodGetScannerDataframe,
+  kMethodGetScannerDataframeInput,
   kMethodGetScans,
   webviewPanelJsonRpcServer,
 } from "../../core/jsonrpc";
@@ -33,6 +34,12 @@ export class ScanviewPanel extends Disposable {
         server.getScan(params[0] as string),
       [kMethodGetScannerDataframe]: async (params: unknown[]) =>
         server.getScannerDataframe(params[0] as string, params[1] as string),
+      [kMethodGetScannerDataframeInput]: async (params: unknown[]) =>
+        server.getScannerDataframeInput(
+          params[0] as string,
+          params[1] as string,
+          params[2] as string
+        ),
     });
 
     // serve post message api to webview
