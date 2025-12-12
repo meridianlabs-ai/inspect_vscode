@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.1](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.7.0...v0.7.1) (2025-12-12)
+
+
+### Bug Fixes
+
+* Regression which broke log viewing ([#32](https://github.com/meridianlabs-ai/inspect_vscode/issues/32)) ([2815388](https://github.com/meridianlabs-ai/inspect_vscode/commit/2815388dd7166bf17ab951278dc6ce50de8af2f7))
+
 ## [0.7.0](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.6.0...v0.7.0) (2025-12-12)
 
 
