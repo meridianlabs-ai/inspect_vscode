@@ -50,11 +50,17 @@ export class ScoutViewServer extends PackageViewServer {
   async getScannerDataframeInput(
     scanLocation: string,
     scanner: string,
-    uuid: string
+    uuid: string,
+    exclude?: string[]
   ): Promise<[string, string]> {
-    const uri = `/api/scanner_df_input/${encodeURIComponent(
+    let uri = `/api/scanner_df_input/${encodeURIComponent(
       scanLocation
     )}?scanner=${encodeURIComponent(scanner)}&uuid=${encodeURIComponent(uuid)}`;
+    if (exclude) {
+      for (const column of exclude) {
+        uri = `${uri}&exclude=${encodeURIComponent(column)}`;
+      }
+    }
     const results = await this.api_json(uri);
     const input = results.data;
     const inputType = results.headers.get("X-Input-Type");
@@ -64,6 +70,16 @@ export class ScoutViewServer extends PackageViewServer {
     }
 
     return [input, inputType];
+  }
+
+  async getScannerField(
+    scanLocation: string,
+    scanner: string,
+    row: string,
+    column: string
+  ): Promise<string> {
+    const uri = `/scanner/${encodeURIComponent(scanLocation)}/${encodeURIComponent(scanner)}/${encodeURIComponent(row)}/${encodeURIComponent(column)}`;
+    return (await this.api_json(uri)).data;
   }
 
   async deleteScan(scanLocation: Uri): Promise<string> {
