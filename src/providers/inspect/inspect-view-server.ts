@@ -47,6 +47,7 @@ export class InspectViewServer extends PackageViewServer {
   }
 
   public async evalLogFiles(
+    log_dir: string,
     mtime: number,
     clientFileCount: number
   ): Promise<string | undefined> {
@@ -62,7 +63,14 @@ export class InspectViewServer extends PackageViewServer {
       if (token) {
         headers["If-None-Match"] = token;
       }
-      return (await this.api_json("/api/log-files", headers)).data;
+
+      // Forward the log_dir
+      const params = new URLSearchParams();
+      params.append("log_dir", log_dir);
+
+      return (
+        await this.api_json(`/api/log-files?${params.toString()}`, headers)
+      ).data;
     } else {
       throw new Error("evalLogFile not implemented");
     }
