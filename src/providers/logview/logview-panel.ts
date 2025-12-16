@@ -36,9 +36,21 @@ export class LogviewPanel extends Disposable {
 
     // serve eval log api to webview
     this._rpcDisconnect = webviewPanelJsonRpcServer(panel_, {
-      [kMethodEvalLogDir]: async () => server.evalLogDir(),
+      [kMethodEvalLogDir]: async () => {
+        if (type === "dir") {
+          return JSON.stringify({ log_dir: uri.toString() });
+        }
+        const result = await server.evalLogDir();
+        return result;
+      },
       [kMethodEvalLogFiles]: async (params: unknown[]) =>
-        server.evalLogFiles(params[0] as number, params[1] as number),
+        type === "dir"
+          ? server.evalLogFiles(
+              uri.toString(),
+              params[0] as number,
+              params[1] as number
+            )
+          : Promise.resolve(undefined),
       [kMethodEvalLogs]: async () =>
         type === "dir" ? server.evalLogs(uri) : server.evalLogsSolo(uri),
       [kMethodEvalLog]: (params: unknown[]) =>
