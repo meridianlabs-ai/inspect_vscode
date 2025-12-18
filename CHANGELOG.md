@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.2](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.7.1...v0.7.2) (2025-12-16)
+
+
+### Bug Fixes
+
+* ‘Inspect View’ command doesn’t respect the selected directory ([#35](https://github.com/meridianlabs-ai/inspect_vscode/issues/35)) ([48e3ff6](https://github.com/meridianlabs-ai/inspect_vscode/commit/48e3ff61d6710bdafd8893d626ce33bc073c4989))
+
 ## [0.7.1](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.7.0...v0.7.1) (2025-12-12)
 
 
