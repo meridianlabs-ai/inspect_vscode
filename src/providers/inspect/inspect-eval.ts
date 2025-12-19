@@ -61,6 +61,14 @@ export function activateEvalManager(
         args.push(...["--top-k", topK]);
       }
 
+      const sampleIds = docState.sampleIds;
+      if (sampleIds) {
+        const ids = sampleIds.split(",").map(id => id.trim());
+        if (ids.length > 0) {
+          args.push(...["--sample-id", ids.join(",")]);
+        }
+      }
+
       // Forwards task params
       const taskParams = docState.params;
       if (taskParams) {

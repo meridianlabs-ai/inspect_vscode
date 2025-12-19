@@ -98,6 +98,8 @@ function restoreState(state?: DocumentState) {
   restoreInputState("max_tokens", state?.maxTokens);
   restoreInputState("top_p", state?.topP);
   restoreInputState("top_k", state?.topK);
+  restoreInputState("sample_ids", state?.sampleIds);
+  validateFields();
 }
 
 function attachListeners() {
@@ -106,6 +108,7 @@ function attachListeners() {
   });
 
   whenChanged("limit", value => {
+    validateFields();
     setStateValue("limit", value);
   });
 
@@ -124,6 +127,34 @@ function attachListeners() {
   whenChanged("top_k", value => {
     setStateValue("topK", value);
   });
+
+  whenChanged("sample_ids", value => {
+    validateFields();
+    setStateValue("sampleIds", value);
+  });
+}
+
+function validateFields() {
+  const sampleIdsEl = document.getElementById(
+    "sample_ids"
+  ) as HTMLSelectElement;
+  const limitEl = document.getElementById("limit") as HTMLSelectElement;
+  const errorMsgEl = document.getElementById(
+    "validation-error"
+  ) as HTMLInputElement;
+
+  if (limitEl.value !== "" && sampleIdsEl.value !== "") {
+    errorMsgEl.innerText =
+      "Cannot set both limit and sample ids. Please choose one.";
+    errorMsgEl.classList.remove("hidden");
+    sampleIdsEl.classList.add("error-border");
+    limitEl.classList.add("error-border");
+  } else {
+    errorMsgEl.innerText = "";
+    errorMsgEl.classList.add("hidden");
+    sampleIdsEl.classList.remove("error-border");
+    limitEl.classList.remove("error-border");
+  }
 }
 
 function main() {

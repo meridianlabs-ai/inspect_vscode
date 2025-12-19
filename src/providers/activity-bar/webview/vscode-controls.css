@@ -27,8 +27,24 @@ body {
   flex-basis: calc(50% - 0.25em);
 }
 
+.two-cols > .span-cols {
+  flex-basis: 100%;
+}
+
 .hidden {
   display: none;
+}
+
+.flex-rows {
+  flex-direction: column;
+}
+
+#validation-error {
+  margin-top: 0.5em;
+}
+
+vscode-text-field.error-border::part(root) {
+  border: solid var(--vscode-inputValidation-errorBorder) 1px !important;
 }
 
 fast-number-field::part(label),
