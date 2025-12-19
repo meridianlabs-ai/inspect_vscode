@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.7.3](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.7.2...v0.7.3) (2025-12-19)
+
+
+### Bug Fixes
+
+* Add trace log level to tasks panel logging select box ([2e148f2](https://github.com/meridianlabs-ai/inspect_vscode/commit/2e148f2c31c79cbd34f9ff9384bbdb87d6557b8a))
+* Exclude empty task params when running an evaluation using the task panel ([4bc2140](https://github.com/meridianlabs-ai/inspect_vscode/commit/4bc214086379db83d3ecea89df2698442868dd53))
+* Improved task panel (add sample ids, add better help, add validation) ([ab09fdd](https://github.com/meridianlabs-ai/inspect_vscode/commit/ab09fddcc52ca41c840507e5140fb6a983a44bbc))
+
 ## [0.7.2](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.7.1...v0.7.2) (2025-12-16)
 
 
