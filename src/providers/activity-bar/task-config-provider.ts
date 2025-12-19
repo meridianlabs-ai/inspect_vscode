@@ -214,7 +214,11 @@ export class TaskConfigurationProvider implements WebviewViewProvider {
               break;
             case "setStateParam":
               currentState.params = currentState.params || {};
-              currentState.params[data.key] = data.value;
+              if (data.value === "") {
+                delete currentState.params[data.key];
+              } else {
+                currentState.params[data.key] = data.value;
+              }
               break;
           }
           await this.stateManager_.setTaskState(
