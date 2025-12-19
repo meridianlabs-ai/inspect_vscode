@@ -185,6 +185,7 @@ export class InspectConfigurationProvider extends EnvConfigurationProvider<EnvCo
                           <vscode-dropdown id="log-level" position="below" class="full-width">
                             <vscode-option value="">default</vscode-option>
                             <vscode-option value="debug">debug</vscode-option>
+                            <vscode-option value="trace">trace</vscode-option>
                             <vscode-option value="http">http</vscode-option>
                             <vscode-option value="info">info</vscode-option>
                             <vscode-option value="warning" selected="true">warning</vscode-option>
