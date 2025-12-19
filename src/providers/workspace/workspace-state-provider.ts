@@ -17,6 +17,7 @@ export interface DocumentState {
   topK?: string;
   maxTokens?: string;
   params?: Record<string, string>;
+  sampleIds?: string;
 }
 
 export interface ModelState {
