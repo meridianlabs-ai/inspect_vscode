@@ -27,7 +27,8 @@
     "Testing"
   ],
   "extensionDependencies": [
-    "ms-python.python"
+    "ms-python.python",
+    "redhat.vscode-yaml"
   ],
   "activationEvents": [
     "onWebviewPanel:inspect.logview",
