@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.4](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.7.3...v0.7.4) (2026-01-05)
+
+
+### Bug Fixes
+
+* Add yaml completion/diagnostics for Inspect Scout ([#39](https://github.com/meridianlabs-ai/inspect_vscode/issues/39)) ([7ac4333](https://github.com/meridianlabs-ai/inspect_vscode/commit/7ac433390558c8f1bdd3506c2fb562d452005fce))
+
 ## [0.7.3](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.7.2...v0.7.3) (2025-12-19)
 
 
