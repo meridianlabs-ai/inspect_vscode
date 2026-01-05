@@ -41,6 +41,7 @@ import { activateScoutCodeLens } from "./providers/codelens/scout-codelens-provi
 import { activateScoutScanManager } from "./providers/scout/scout-scan";
 import { activateWorkspaceEnvironment } from "./providers/environment";
 import { activateOpenScan } from "./providers/openscan";
+import { activateYamlSchemaProvider } from "./providers/yaml/yaml-schema-provider";
 import { PackageManager } from "./core/package/manager";
 
 const kInspectMinimumVersion = "0.3.8";
@@ -269,6 +270,14 @@ export async function activateScout(
 
   // Activate code lends
   activateScoutCodeLens(context);
+
+  // Activate YAML schema support for Scout config files
+  start("Setup YAML Schemas");
+  const yamlDisposable = await activateYamlSchemaProvider(context);
+  if (yamlDisposable) {
+    context.subscriptions.push(yamlDisposable);
+  }
+  end("Setup YAML Schemas");
 
   return Promise.resolve([
     scoutManager,
