@@ -59,6 +59,38 @@ export class PackageViewServer implements Disposable {
     };
   }
 
+  protected async apiGeneric(
+    path: string,
+    method: "GET" | "POST" | "PUT" | "DELETE",
+    headers: Record<string, string>,
+    body?: string
+  ): Promise<{ status: number; data: string | Uint8Array; headers: Headers }> {
+    await this.ensureRunning();
+
+    const requestHeaders: Record<string, string> = {
+      ...headers,
+      Authorization: this.serverAuthToken_,
+      Pragma: "no-cache",
+      Expires: "0",
+      "Cache-Control": "no-cache",
+    };
+
+    const response = await fetch(
+      `http://localhost:${this.serverPort_}${path}`,
+      { method, headers: requestHeaders, body }
+    );
+
+    const isBinary = response.headers
+      .get("Content-Type")
+      ?.includes("application/vnd.apache.arrow");
+
+    const data = isBinary
+      ? new Uint8Array(await response.arrayBuffer())
+      : await response.text();
+
+    return { status: response.status, data, headers: response.headers };
+  }
+
   protected async api(
     path: string,
     binary: boolean = false,

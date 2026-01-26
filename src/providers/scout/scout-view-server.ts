@@ -4,6 +4,20 @@ import { PackageManager } from "../../core/package/manager";
 import { PackageViewServer } from "../../core/package/view-server";
 import { scoutBinPath } from "../../scout/props";
 
+export interface HttpProxyRequest {
+  method: "GET" | "POST" | "PUT" | "DELETE";
+  path: string;
+  headers?: Record<string, string>;
+  body?: string;
+}
+
+export interface HttpProxyResponse {
+  status: number;
+  headers: Record<string, string>;
+  body: string | null;
+  bodyEncoding?: "utf8" | "base64";
+}
+
 export class ScoutViewServer extends PackageViewServer {
   constructor(context: ExtensionContext, scoutManager: PackageManager) {
     super(
@@ -73,5 +87,42 @@ export class ScoutViewServer extends PackageViewServer {
         `/api/scan-delete/${encodeURIComponent(scanLocation.toString(true))}`
       )
     ).data;
+  }
+
+  async httpRequest(request: HttpProxyRequest): Promise<HttpProxyResponse> {
+    const url = `/api/v2${request.path}`;
+    const result = await this.apiGeneric(
+      url,
+      request.method,
+      request.headers ?? {},
+      request.body
+    );
+
+    const headers: Record<string, string> = {};
+    result.headers.forEach((value, key) => {
+      headers[key.toLowerCase()] = value;
+    });
+
+    if (result.data instanceof Uint8Array) {
+      const chunks: string[] = [];
+      const chunkSize = 0xffff;
+      for (let i = 0; i < result.data.length; i += chunkSize) {
+        chunks.push(
+          String.fromCharCode(...result.data.subarray(i, i + chunkSize))
+        );
+      }
+      return {
+        status: result.status,
+        headers,
+        body: btoa(chunks.join("")),
+        bodyEncoding: "base64",
+      };
+    }
+    return {
+      status: result.status,
+      headers,
+      body: result.data,
+      bodyEncoding: "utf8",
+    };
   }
 }
