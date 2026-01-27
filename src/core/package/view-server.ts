@@ -59,7 +59,7 @@ export class PackageViewServer implements Disposable {
     };
   }
 
-  protected async apiGeneric(
+  protected async api_passthrough(
     path: string,
     method: "GET" | "POST" | "PUT" | "DELETE",
     headers: Record<string, string>,

@@ -101,9 +101,10 @@ export class ScoutViewServer extends PackageViewServer {
     ).data;
   }
 
-  async httpRequest(request: HttpProxyRequest): Promise<HttpProxyResponse> {
+  async proxyRequest(request: HttpProxyRequest): Promise<HttpProxyResponse> {
+    await this.ensureRunning();
     const url = `/api/v2${request.path}`;
-    const result = await this.apiGeneric(
+    const result = await this.api_passthrough(
       url,
       request.method,
       request.headers ?? {},

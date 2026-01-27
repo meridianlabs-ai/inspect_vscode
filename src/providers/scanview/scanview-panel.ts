@@ -14,10 +14,7 @@ import {
   getWebviewPanelHtml,
   handleWebviewPanelOpenMessages,
 } from "../../core/webview";
-import {
-  HttpProxyRequest,
-  ScoutViewServer,
-} from "../scout/scout-view-server";
+import { HttpProxyRequest, ScoutViewServer } from "../scout/scout-view-server";
 import { scoutViewPath } from "../../scout/props";
 import { Disposable } from "../../core/dispose";
 
@@ -45,7 +42,7 @@ export class ScanviewPanel extends Disposable {
           params[2] as string
         ),
       [kMethodHttpRequest]: async (params: unknown[]) =>
-        server.httpRequest(params[0] as HttpProxyRequest),
+        server.proxyRequest(params[0] as HttpProxyRequest),
     });
 
     // serve post message api to webview
