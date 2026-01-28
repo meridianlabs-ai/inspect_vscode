@@ -103,7 +103,7 @@ export class ScoutViewServer extends PackageViewServer {
 
   async proxyRequest(request: HttpProxyRequest): Promise<HttpProxyResponse> {
     await this.ensureRunning();
-    const url = `/api/v2${request.path}`;
+    const url = request.path;
     const result = await this.api_passthrough(
       url,
       request.method,
