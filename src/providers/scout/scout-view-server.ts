@@ -104,7 +104,7 @@ export class ScoutViewServer extends PackageViewServer {
   async proxyRequest(request: HttpProxyRequest): Promise<HttpProxyResponse> {
     await this.ensureRunning();
 
-    const result = await this.serverFetch(
+    const { status, headers, data } = await this.serverFetch(
       request.path,
       request.method,
       new Headers(request.headers),
@@ -112,20 +112,20 @@ export class ScoutViewServer extends PackageViewServer {
     );
 
     const responseHeaders: Record<string, string> = {};
-    result.headers.forEach((value, key) => {
+    headers.forEach((value, key) => {
       responseHeaders[key] = value;
     });
 
     return {
-      status: result.status,
+      status,
       headers: responseHeaders,
-      ...(result.data instanceof Uint8Array
+      ...(data instanceof Uint8Array
         ? {
-            body: Buffer.from(result.data).toString("base64"),
+            body: Buffer.from(data).toString("base64"),
             bodyEncoding: "base64",
           }
         : {
-            body: result.data,
+            body: data,
             bodyEncoding: "utf8",
           }),
     };
