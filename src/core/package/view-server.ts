@@ -59,21 +59,23 @@ export class PackageViewServer implements Disposable {
     };
   }
 
-  protected async api_passthrough(
+  protected async serverFetch(
     path: string,
     method: "GET" | "POST" | "PUT" | "DELETE",
-    headers: Record<string, string>,
+    headers: Headers,
     body?: string
-  ): Promise<{ status: number; data: string | Uint8Array; headers: Headers }> {
+  ): Promise<{
+    status: number;
+    data: string | Uint8Array;
+    headers: Headers;
+  }> {
     await this.ensureRunning();
 
-    const requestHeaders: Record<string, string> = {
-      ...headers,
-      Authorization: this.serverAuthToken_,
-      Pragma: "no-cache",
-      Expires: "0",
-      "Cache-Control": "no-cache",
-    };
+    const requestHeaders = new Headers(headers);
+    requestHeaders.set("Authorization", this.serverAuthToken_);
+    requestHeaders.set("Pragma", "no-cache");
+    requestHeaders.set("Expires", "0");
+    requestHeaders.set("Cache-Control", "no-cache");
 
     const response = await fetch(
       `http://localhost:${this.serverPort_}${path}`,
