@@ -6,6 +6,7 @@ import {
   kMethodGetScannerDataframe,
   kMethodGetScannerDataframeInput,
   kMethodGetScans,
+  kMethodHttpRequest,
   webviewPanelJsonRpcServer,
 } from "../../core/jsonrpc";
 import { ScanviewState } from "./scanview-state";
@@ -13,7 +14,10 @@ import {
   getWebviewPanelHtml,
   handleWebviewPanelOpenMessages,
 } from "../../core/webview";
-import { ScoutViewServer } from "../scout/scout-view-server";
+import {
+  HttpProxyRpcRequest,
+  ScoutViewServer,
+} from "../scout/scout-view-server";
 import { scoutViewPath } from "../../scout/props";
 import { Disposable } from "../../core/dispose";
 
@@ -40,6 +44,8 @@ export class ScanviewPanel extends Disposable {
           params[1] as string,
           params[2] as string
         ),
+      [kMethodHttpRequest]: async (params: unknown[]) =>
+        server.proxyRpcRequest(params[0] as HttpProxyRpcRequest),
     });
 
     // serve post message api to webview
@@ -57,6 +63,7 @@ export class ScanviewPanel extends Disposable {
       url: state.scan_dir?.toString(),
       scanner: state.scan?.scanner,
       transcript_id: state.scan?.transcript_id,
+      extensionProtocolVersion: 2,
     };
     const stateScript = state.scan_dir
       ? `<script id="scanview-state" type="application/json">${JSON.stringify(

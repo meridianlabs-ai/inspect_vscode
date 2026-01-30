@@ -59,6 +59,47 @@ export class PackageViewServer implements Disposable {
     };
   }
 
+  /**
+   * Low-level HTTP proxy to backend server. Unlike `api()`, passes through
+   * all status codes without throwing. Binary detection based on Content-Type.
+   */
+  protected async serverFetch(
+    path: string,
+    method: "GET" | "POST" | "PUT" | "DELETE",
+    headers: Headers,
+    body?: string
+  ): Promise<{
+    status: number;
+    data: string | Uint8Array;
+    headers: Headers;
+  }> {
+    await this.ensureRunning();
+
+    const requestHeaders = new Headers(headers);
+    requestHeaders.set("Authorization", this.serverAuthToken_);
+    requestHeaders.set("Pragma", "no-cache");
+    requestHeaders.set("Expires", "0");
+    requestHeaders.set("Cache-Control", "no-cache");
+
+    const response = await fetch(
+      `http://localhost:${this.serverPort_}${path}`,
+      { method, headers: requestHeaders, body }
+    );
+    const { status, headers: responseHeaders } = response;
+
+    const isBinary = responseHeaders
+      .get("Content-Type")
+      ?.includes("application/vnd.apache.arrow");
+
+    return {
+      status,
+      data: isBinary
+        ? new Uint8Array(await response.arrayBuffer())
+        : await response.text(),
+      headers: responseHeaders,
+    };
+  }
+
   protected async api(
     path: string,
     binary: boolean = false,
