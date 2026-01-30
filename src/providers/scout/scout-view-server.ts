@@ -16,18 +16,18 @@ import { scoutBinPath } from "../../scout/props";
 // - Binary data requires base64 encoding (adds ~33% overhead)
 // - Multi-value headers (e.g. Set-Cookie) collapse to single string
 // - Large request bodies must fit in memory
-export interface HttpProxyRequest {
+export interface HttpProxyRpcRequest {
   method: "GET" | "POST" | "PUT" | "DELETE";
   path: string;
   headers?: Record<string, string>;
   body?: string;
 }
 
-export interface HttpProxyResponse {
+export interface HttpProxyRpcResponse {
   status: number;
   headers: Record<string, string>;
   body: string | null;
-  bodyEncoding?: "utf8" | "base64";
+  bodyEncoding: "utf8" | "base64";
 }
 
 export class ScoutViewServer extends PackageViewServer {
@@ -101,7 +101,13 @@ export class ScoutViewServer extends PackageViewServer {
     ).data;
   }
 
-  async proxyRequest(request: HttpProxyRequest): Promise<HttpProxyResponse> {
+  /**
+   * JSON-RPC method handler that proxies webview HTTP requests to the backend.
+   * Converts HttpProxyRpcRequest to fetch call, then serializes response for JSON-RPC transport.
+   */
+  async proxyRpcRequest(
+    request: HttpProxyRpcRequest
+  ): Promise<HttpProxyRpcResponse> {
     await this.ensureRunning();
 
     const { status, headers, data } = await this.serverFetch(

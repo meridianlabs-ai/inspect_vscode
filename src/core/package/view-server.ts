@@ -59,6 +59,10 @@ export class PackageViewServer implements Disposable {
     };
   }
 
+  /**
+   * Low-level HTTP proxy to backend server. Unlike `api()`, passes through
+   * all status codes without throwing. Binary detection based on Content-Type.
+   */
   protected async serverFetch(
     path: string,
     method: "GET" | "POST" | "PUT" | "DELETE",
