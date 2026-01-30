@@ -81,16 +81,19 @@ export class PackageViewServer implements Disposable {
       `http://localhost:${this.serverPort_}${path}`,
       { method, headers: requestHeaders, body }
     );
+    const { status, headers: responseHeaders } = response;
 
-    const isBinary = response.headers
+    const isBinary = responseHeaders
       .get("Content-Type")
       ?.includes("application/vnd.apache.arrow");
 
-    const data = isBinary
-      ? new Uint8Array(await response.arrayBuffer())
-      : await response.text();
-
-    return { status: response.status, data, headers: response.headers };
+    return {
+      status,
+      data: isBinary
+        ? new Uint8Array(await response.arrayBuffer())
+        : await response.text(),
+      headers: responseHeaders,
+    };
   }
 
   protected async api(
