@@ -72,7 +72,6 @@ export default defineConfig([
       // Rules that became stricter in typescript-eslint v8
       "@typescript-eslint/no-require-imports": "off",
       "@typescript-eslint/prefer-promise-reject-errors": "off",
-      "@typescript-eslint/no-duplicate-type-constituents": "off",
     },
   },
 ]);
