@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.5](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.7.4...v0.7.5) (2026-01-31)
+
+
+### Bug Fixes
+
+* Add HTTP proxy for webview-to-server communication ([#41](https://github.com/meridianlabs-ai/inspect_vscode/issues/41)) ([bec8833](https://github.com/meridianlabs-ai/inspect_vscode/commit/bec883340e38ce05555aaa62537c12009056417b))
+
 ## [0.7.4](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.7.3...v0.7.4) (2026-01-05)
 
 
