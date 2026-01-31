@@ -22,7 +22,9 @@ export function activateWorkspaceEnv(): [Command[], WorkspaceEnvManager] {
 }
 
 // Fired when the active task changes
-export interface EnvironmentChangedEvent {}
+export interface EnvironmentChangedEvent {
+  mtime: number;
+}
 
 // Manages the workspace environment
 export class WorkspaceEnvManager implements Disposable {
@@ -43,7 +45,7 @@ export class WorkspaceEnvManager implements Disposable {
           if (!isEqual(this.env, newEnv)) {
             log.appendLine(`${envRelativePath} changed`);
             this.env = newEnv;
-            this.onEnvironmentChanged_.fire({});
+            this.onEnvironmentChanged_.fire({ mtime: envUpdated });
           }
         }
       }
