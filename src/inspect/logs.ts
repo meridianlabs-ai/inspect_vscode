@@ -75,7 +75,7 @@ export function inspectLogInfo(file: Uri): Promise<InspectLogInfo> {
   return new Promise((resolve, reject) => {
     // Create a read stream
     const fileStream = createReadStream(file.fsPath);
-    fileStream.on("error", err => {
+    fileStream.on("error", (err: Error) => {
       reject(err);
     });
 
@@ -128,7 +128,7 @@ export function inspectLogInfo(file: Uri): Promise<InspectLogInfo> {
       resolve(state);
     });
 
-    rl.on("error", err => {
+    rl.on("error", (err: Error) => {
       reject(err);
     });
   });

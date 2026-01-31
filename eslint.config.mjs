@@ -69,8 +69,6 @@ export default defineConfig([
           caughtErrorsIgnorePattern: "^_",
         },
       ],
-      // Rules that became stricter in typescript-eslint v8
-      "@typescript-eslint/prefer-promise-reject-errors": "off",
     },
   },
 ]);
