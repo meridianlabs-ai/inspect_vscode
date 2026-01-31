@@ -7,7 +7,7 @@ export function resolveToUri(pathOrUri: string): Uri {
   if (uriPattern.test(pathOrUri)) {
     try {
       return Uri.parse(pathOrUri);
-    } catch (error) {
+    } catch (_error) {
       throw new Error(`Invalid URI format: ${pathOrUri}`);
     }
   } else {
@@ -16,7 +16,7 @@ export function resolveToUri(pathOrUri: string): Uri {
         ? pathOrUri
         : path.resolve(pathOrUri);
       return Uri.file(absolutePath);
-    } catch (error) {
+    } catch (_error) {
       throw new Error(`Invalid file path: ${pathOrUri}`);
     }
   }

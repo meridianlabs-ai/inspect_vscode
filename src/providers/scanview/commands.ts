@@ -48,7 +48,7 @@ class ShowOpenScanCommand implements Command {
       if (uri) {
         await commands.executeCommand("inspect.openScanViewer", uri);
       }
-    } catch (err: unknown) {
+    } catch (_err: unknown) {
       // pass
     }
   }

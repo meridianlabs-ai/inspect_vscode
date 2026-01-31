@@ -153,7 +153,7 @@ export async function selectRemoteURL(
       try {
         Uri.parse(value, true);
         return null;
-      } catch (e) {
+      } catch (_e) {
         return `Specified location is not a valid URI (e.g. s3://my-bucket/${dirname})`;
       }
     },

@@ -53,7 +53,7 @@ class ShowOpenLogCommand implements Command {
       if (uri) {
         await commands.executeCommand("inspect.openLogViewer", uri);
       }
-    } catch (err: unknown) {
+    } catch (_err: unknown) {
       // pass
     }
   }

@@ -125,7 +125,7 @@ interface PythonExtension {
      * * If no folder is present, it returns the global setting.
      * @returns {({ execCommand: string[] | undefined })}
      */
-    getExecutionDetails(resource?: Uri | undefined): {
+    getExecutionDetails(resource?: Uri  ): {
       /**
        * E.g of execution commands returned could be,
        * * `['<path to the interpreter set in settings>']`

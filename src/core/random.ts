@@ -1,3 +1,5 @@
+import * as crypto from "crypto";
+
 export function randomInt(min: number, max: number) {
   min = Math.ceil(min);
   max = Math.floor(max);
@@ -7,11 +9,6 @@ export function randomInt(min: number, max: number) {
 // version of Math.random() that uses web crypto
 // https://stackoverflow.com/questions/13694626/generating-random-numbers-0-to-1-with-crypto-generatevalues
 export function cryptoRandom() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const crypto = require("crypto") as {
-    getRandomValues: (arr: Uint32Array) => void;
-  };
-
   const arr = new Uint32Array(2);
   crypto.getRandomValues(arr);
 

@@ -104,7 +104,7 @@ export class InspectWebviewManager<
     return !!this.activeView_ && this.activeView_.webviewPanel().active;
   }
 
-  protected onViewStateChanged() {}
+  protected onViewStateChanged(): void | Promise<void> {}
 
   protected getWorkspaceState(): S | undefined {
     return undefined;
@@ -207,7 +207,7 @@ export class InspectWebviewManager<
     view.onDispose(() => {
       if (this.activeView_ === view) {
         this.activeView_ = undefined;
-        this.onViewStateChanged();
+        void this.onViewStateChanged();
         if (this.onClose_) {
           this.onClose_();
           this.onClose_ = undefined;
@@ -215,7 +215,7 @@ export class InspectWebviewManager<
       }
     });
     view.webviewPanel().onDidChangeViewState(() => {
-      this.onViewStateChanged();
+      void this.onViewStateChanged();
     });
   }
 
