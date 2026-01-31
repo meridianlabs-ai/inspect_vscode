@@ -102,7 +102,7 @@ export class OutputWatcher implements Disposable {
                     externalWorkspace,
                   });
                 }
-              } catch (error) {
+              } catch (_error) {
                 log.appendLine(`Unexpected error parsing URI ${evalLogPath}`);
               }
             }
