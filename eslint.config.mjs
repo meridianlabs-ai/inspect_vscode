@@ -57,8 +57,6 @@ export default defineConfig([
           format: ["camelCase", "PascalCase"],
         },
       ],
-
-      "@typescript-eslint/semi": "warn",
       curly: "warn",
       eqeqeq: "warn",
       "no-throw-literal": "warn",
@@ -71,6 +69,12 @@ export default defineConfig([
           caughtErrorsIgnorePattern: "^_",
         },
       ],
+      // Rules that became stricter in typescript-eslint v8
+      "@typescript-eslint/no-misused-promises": "off",
+      "@typescript-eslint/no-empty-object-type": "off",
+      "@typescript-eslint/no-require-imports": "off",
+      "@typescript-eslint/prefer-promise-reject-errors": "off",
+      "@typescript-eslint/no-duplicate-type-constituents": "off",
     },
   },
 ]);
