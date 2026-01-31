@@ -70,7 +70,6 @@ export default defineConfig([
         },
       ],
       // Rules that became stricter in typescript-eslint v8
-      "@typescript-eslint/no-misused-promises": "off",
       "@typescript-eslint/no-empty-object-type": "off",
       "@typescript-eslint/no-require-imports": "off",
       "@typescript-eslint/prefer-promise-reject-errors": "off",

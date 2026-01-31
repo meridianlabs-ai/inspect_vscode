@@ -3,7 +3,7 @@ import { Disposable, commands } from "vscode";
 export interface Command {
   readonly id: string;
 
-  execute(...args: unknown[]): void;
+  execute(...args: unknown[]): void | Promise<void>;
 }
 
 export class CommandManager {
@@ -24,7 +24,7 @@ export class CommandManager {
 
   private registerCommand(
     id: string,
-    impl: (...args: unknown[]) => void,
+    impl: (...args: unknown[]) => void | Promise<void>,
     thisArg?: unknown
   ) {
     if (this.commands.has(id)) {

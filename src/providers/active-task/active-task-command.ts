@@ -12,7 +12,11 @@ export class RunActiveTaskCommand implements Command {
     const taskInfo = this.manager_.getActiveTaskInfo();
     if (taskInfo) {
       const docPath = toAbsolutePath(taskInfo.document.fsPath);
-      await this.inspectMgr_.start(docPath, taskInfo.activeTask?.name, false);
+      void (await this.inspectMgr_.start(
+        docPath,
+        taskInfo.activeTask?.name,
+        false
+      ));
     }
   }
 
