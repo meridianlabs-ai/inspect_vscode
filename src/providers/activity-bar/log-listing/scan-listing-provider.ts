@@ -9,10 +9,7 @@ import { getRelativeUri, prettyUriPath } from "../../../core/uri";
 import { Uri } from "vscode";
 import { ScansTreeDataProvider } from "./scan-listing-data";
 import { ScoutViewServer } from "../../scout/scout-view-server";
-import {
-  ScanResultsListingMRU,
-  selectScanResultsDirectory,
-} from "../../scanview/scanview-view";
+import { ScanResultsListingMRU } from "../../scanview/scanview-view";
 import { stringify } from "yaml";
 import { OutputWatcher } from "../../../core/package/output-watcher";
 
@@ -81,29 +78,6 @@ export async function activateScanListing(
     envManager.onEnvironmentChanged(() => {
       if (context.workspaceState.get<string>(kScanResultsDir) === undefined) {
         updateTree();
-      }
-    })
-  );
-
-  // Register select scan dir command
-  disposables.push(
-    vscode.commands.registerCommand("inspect.scanListing", async () => {
-      const scanResultsDir = await selectScanResultsDirectory(
-        context,
-        envManager
-      );
-      if (scanResultsDir !== undefined) {
-        // store state ('null' means use workspace default so pass 'undefined' to clear for that)
-        await context.workspaceState.update(
-          kScanResultsDir,
-          scanResultsDir === null ? undefined : scanResultsDir.toString()
-        );
-
-        // trigger update
-        updateTree();
-
-        // reveal
-        await revealScanListing();
       }
     })
   );

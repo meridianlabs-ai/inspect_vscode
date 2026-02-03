@@ -256,13 +256,6 @@
         "enablement": "workspaceFolderCount != 0"
       },
       {
-        "command": "inspect.scanListing",
-        "title": "Scan Listing...",
-        "icon": "$(root-folder-opened)",
-        "category": "Scout",
-        "enablement": "workspaceFolderCount != 0 && inspect_ai.inspect_scout.installed == true"
-      },
-      {
         "command": "inspect.scanListingReveal",
         "title": "Reveal Scan Listing",
         "category": "Scout",
@@ -457,11 +450,6 @@
         {
           "command": "inspect.runConfigTask",
           "when": "view == inspect_ai.task-configuration && inspect_ai.activeTask",
-          "group": "navigation"
-        },
-        {
-          "command": "inspect.scanListing",
-          "when": "view == inspect_ai.scans-view",
           "group": "navigation"
         },
         {
