@@ -40,7 +40,7 @@ suite("Random Utilities Test Suite", () => {
       for (let i = 0; i < buckets.length; i++) {
         const percentage = buckets[i] / sampleSize;
         assert.ok(
-          percentage > 0.10 && percentage < 0.30,
+          percentage > 0.1 && percentage < 0.3,
           `Bucket ${i} has ${percentage * 100}% of values, expected roughly 20%`
         );
       }
@@ -51,7 +51,10 @@ suite("Random Utilities Test Suite", () => {
     test("should return integer within specified range", () => {
       for (let i = 0; i < 100; i++) {
         const value = randomInt(0, 10);
-        assert.ok(Number.isInteger(value), `Value ${value} should be an integer`);
+        assert.ok(
+          Number.isInteger(value),
+          `Value ${value} should be an integer`
+        );
         assert.ok(value >= 0, `Value ${value} should be >= 0`);
         assert.ok(value < 10, `Value ${value} should be < 10`);
       }
@@ -78,7 +81,10 @@ suite("Random Utilities Test Suite", () => {
       // randomInt(0.5, 10.9) should behave like randomInt(1, 10)
       for (let i = 0; i < 100; i++) {
         const value = randomInt(0.5, 10.9);
-        assert.ok(Number.isInteger(value), `Value ${value} should be an integer`);
+        assert.ok(
+          Number.isInteger(value),
+          `Value ${value} should be an integer`
+        );
         assert.ok(value >= 1, `Value ${value} should be >= 1 (ceil of 0.5)`);
         assert.ok(value < 10, `Value ${value} should be < 10 (floor of 10.9)`);
       }
@@ -87,7 +93,11 @@ suite("Random Utilities Test Suite", () => {
     test("should return min when range is 1", () => {
       for (let i = 0; i < 10; i++) {
         const value = randomInt(5, 6);
-        assert.strictEqual(value, 5, "Should always return 5 when range is [5,6)");
+        assert.strictEqual(
+          value,
+          5,
+          "Should always return 5 when range is [5,6)"
+        );
       }
     });
 
@@ -124,7 +134,7 @@ suite("Random Utilities Test Suite", () => {
       }
 
       const expectedCount = iterations / (max - min);
-      const tolerance = 0.20; // Allow 20% deviation
+      const tolerance = 0.2; // Allow 20% deviation
 
       for (let value = min; value < max; value++) {
         const count = counts.get(value) || 0;

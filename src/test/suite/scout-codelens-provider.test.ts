@@ -284,10 +284,14 @@ def my_scan():
     };
 
     const lenses = provider.provideCodeLenses(document, cancelledToken);
-    assert.strictEqual(lenses.length, 0, "Should return empty array when cancelled");
+    assert.strictEqual(
+      lenses.length,
+      0,
+      "Should return empty array when cancelled"
+    );
   });
 
-  test('should return code lenses for scanjob decorator', () => {
+  test("should return code lenses for scanjob decorator", () => {
     const document = createDocument(`
 from inspect_scout import scanjob
 
@@ -316,7 +320,11 @@ def job_func():
     pass`);
 
     const lenses = provider.provideCodeLenses(document, cancellationToken);
-    assert.strictEqual(lenses.length, 4, "Should return lenses for both decorators");
+    assert.strictEqual(
+      lenses.length,
+      4,
+      "Should return lenses for both decorators"
+    );
   });
 
   test("should handle inspect_scout.scanjob decorator", () => {

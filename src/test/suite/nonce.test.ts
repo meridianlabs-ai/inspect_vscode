@@ -11,13 +11,20 @@ suite("Nonce Utilities Test Suite", () => {
     test("should only contain alphanumeric characters", () => {
       const nonce = getNonce();
       const validPattern = /^[A-Za-z0-9]+$/;
-      assert.ok(validPattern.test(nonce), "Nonce should only contain alphanumeric characters");
+      assert.ok(
+        validPattern.test(nonce),
+        "Nonce should only contain alphanumeric characters"
+      );
     });
 
     test("should generate different nonces on successive calls", () => {
       const nonce1 = getNonce();
       const nonce2 = getNonce();
-      assert.notStrictEqual(nonce1, nonce2, "Consecutive nonces should be different");
+      assert.notStrictEqual(
+        nonce1,
+        nonce2,
+        "Consecutive nonces should be different"
+      );
     });
 
     test("should generate many unique nonces", () => {
@@ -28,11 +35,16 @@ suite("Nonce Utilities Test Suite", () => {
         nonces.add(getNonce());
       }
 
-      assert.strictEqual(nonces.size, iterations, "All generated nonces should be unique");
+      assert.strictEqual(
+        nonces.size,
+        iterations,
+        "All generated nonces should be unique"
+      );
     });
 
     test("should contain characters from the expected character set", () => {
-      const expectedChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+      const expectedChars =
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
       const nonce = getNonce();
 
       for (const char of nonce) {

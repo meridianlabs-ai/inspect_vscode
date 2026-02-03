@@ -24,8 +24,9 @@ class MockMemento {
     return value as T;
   }
 
-  async update(key: string, value: unknown): Promise<void> {
+  update(key: string, value: unknown): Promise<void> {
     this.storage.set(key, value);
+    return Promise.resolve();
   }
 
   keys(): readonly string[] {
@@ -73,7 +74,10 @@ suite("WorkspaceStateManager Test Suite", () => {
       await stateManager.initializeWorkspaceId();
       const id = stateManager.getWorkspaceInstance();
       assert.ok(id, "Workspace ID should be set");
-      assert.ok(id.includes("-"), "Workspace ID should contain timestamp-random format");
+      assert.ok(
+        id.includes("-"),
+        "Workspace ID should contain timestamp-random format"
+      );
     });
 
     test("should not overwrite existing workspace ID", async () => {
@@ -107,7 +111,11 @@ suite("WorkspaceStateManager Test Suite", () => {
 
       // IDs should be different (with high probability)
       // Note: This could theoretically fail if generated at exact same millisecond with same random
-      assert.notStrictEqual(id1, id2, "Different workspaces should have different IDs");
+      assert.notStrictEqual(
+        id1,
+        id2,
+        "Different workspaces should have different IDs"
+      );
     });
   });
 
@@ -145,7 +153,10 @@ suite("WorkspaceStateManager Test Suite", () => {
       };
 
       await stateManager.setTaskState("/path/to/file.py", taskState, "my_task");
-      const retrieved = stateManager.getTaskState("/path/to/file.py", "my_task");
+      const retrieved = stateManager.getTaskState(
+        "/path/to/file.py",
+        "my_task"
+      );
 
       assert.deepStrictEqual(retrieved, taskState);
     });
@@ -183,8 +194,14 @@ suite("WorkspaceStateManager Test Suite", () => {
       await stateManager.setTaskState("/path/to/file1.py", state1, "my_task");
       await stateManager.setTaskState("/path/to/file2.py", state2, "my_task");
 
-      const retrieved1 = stateManager.getTaskState("/path/to/file1.py", "my_task");
-      const retrieved2 = stateManager.getTaskState("/path/to/file2.py", "my_task");
+      const retrieved1 = stateManager.getTaskState(
+        "/path/to/file1.py",
+        "my_task"
+      );
+      const retrieved2 = stateManager.getTaskState(
+        "/path/to/file2.py",
+        "my_task"
+      );
 
       assert.deepStrictEqual(retrieved1, state1);
       assert.deepStrictEqual(retrieved2, state2);
@@ -202,8 +219,15 @@ suite("WorkspaceStateManager Test Suite", () => {
         sampleIds: "1,2,3",
       };
 
-      await stateManager.setTaskState("/path/to/file.py", fullState, "full_task");
-      const retrieved = stateManager.getTaskState("/path/to/file.py", "full_task");
+      await stateManager.setTaskState(
+        "/path/to/file.py",
+        fullState,
+        "full_task"
+      );
+      const retrieved = stateManager.getTaskState(
+        "/path/to/file.py",
+        "full_task"
+      );
 
       assert.deepStrictEqual(retrieved, fullState);
     });
@@ -215,7 +239,11 @@ suite("WorkspaceStateManager Test Suite", () => {
         temperature: "0.7",
       };
 
-      await stateManager.setTaskState("/path/to/file.py", initialState, "my_task");
+      await stateManager.setTaskState(
+        "/path/to/file.py",
+        initialState,
+        "my_task"
+      );
 
       // Update with new state (this replaces the whole state)
       const updatedState: DocumentState = {
@@ -223,8 +251,15 @@ suite("WorkspaceStateManager Test Suite", () => {
         limit: "20",
       };
 
-      await stateManager.setTaskState("/path/to/file.py", updatedState, "my_task");
-      const retrieved = stateManager.getTaskState("/path/to/file.py", "my_task");
+      await stateManager.setTaskState(
+        "/path/to/file.py",
+        updatedState,
+        "my_task"
+      );
+      const retrieved = stateManager.getTaskState(
+        "/path/to/file.py",
+        "my_task"
+      );
 
       assert.strictEqual(retrieved.limit, "20");
       assert.strictEqual(retrieved.epochs, "2");
@@ -264,7 +299,9 @@ suite("WorkspaceStateManager Test Suite", () => {
     });
 
     test("should update model state", async () => {
-      await stateManager.setModelState("openai", { lastModel: "gpt-3.5-turbo" });
+      await stateManager.setModelState("openai", {
+        lastModel: "gpt-3.5-turbo",
+      });
       await stateManager.setModelState("openai", { lastModel: "gpt-4" });
 
       const retrieved = stateManager.getModelState("openai");
@@ -284,7 +321,11 @@ suite("WorkspaceStateManager Test Suite", () => {
   suite("State Isolation", () => {
     test("should not conflict between task state and model state", async () => {
       // Use similar-looking keys
-      await stateManager.setTaskState("provider-openai", { limit: "10" }, "task");
+      await stateManager.setTaskState(
+        "provider-openai",
+        { limit: "10" },
+        "task"
+      );
       await stateManager.setModelState("openai", { lastModel: "gpt-4" });
 
       const taskState = stateManager.getTaskState("provider-openai", "task");
@@ -298,10 +339,17 @@ suite("WorkspaceStateManager Test Suite", () => {
       // Note: Task state without task name uses the file path as key directly,
       // so we need to use different keys or include a task name to avoid conflicts
       await stateManager.setState("generic-key", "generic-value");
-      await stateManager.setTaskState("/path/to/file.py", { limit: "10" }, "my_task");
+      await stateManager.setTaskState(
+        "/path/to/file.py",
+        { limit: "10" },
+        "my_task"
+      );
 
       const genericState = stateManager.getState("generic-key");
-      const taskState = stateManager.getTaskState("/path/to/file.py", "my_task");
+      const taskState = stateManager.getTaskState(
+        "/path/to/file.py",
+        "my_task"
+      );
 
       assert.strictEqual(genericState, "generic-value");
       assert.deepStrictEqual(taskState, { limit: "10" });

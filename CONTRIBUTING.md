@@ -20,12 +20,14 @@ The Inspect Log Viewer and Scout Viewer web applications displayed within the ex
 ## Getting Started
 
 1. Clone the repository:
+
    ```bash
    git clone https://github.com/meridianlabs-ai/inspect_vscode.git
    cd inspect_vscode
    ```
 
 2. Install dependencies:
+
    ```bash
    yarn install
    ```
@@ -39,16 +41,16 @@ The Inspect Log Viewer and Scout Viewer web applications displayed within the ex
 
 ### Available Commands
 
-| Command | Description |
-|---------|-------------|
-| `yarn compile` | Build the extension with webpack |
-| `yarn watch` | Build and watch for changes |
-| `yarn test` | Run tests (compiles first) |
-| `yarn lint` | Run ESLint |
-| `yarn lint:fix` | Run ESLint with auto-fix |
-| `yarn prettier` | Format code with Prettier |
+| Command          | Description                                |
+| ---------------- | ------------------------------------------ |
+| `yarn compile`   | Build the extension with webpack           |
+| `yarn watch`     | Build and watch for changes                |
+| `yarn test`      | Run tests (compiles first)                 |
+| `yarn lint`      | Run ESLint                                 |
+| `yarn lint:fix`  | Run ESLint with auto-fix                   |
+| `yarn prettier`  | Format code with Prettier                  |
 | `yarn check-all` | Run lint + prettier + test (CI equivalent) |
-| `yarn package` | Create production VSIX package |
+| `yarn package`   | Create production VSIX package             |
 
 ### Running the Extension
 
@@ -119,16 +121,16 @@ This project uses [Conventional Commits](https://www.conventionalcommits.org/). 
 
 ### Types
 
-| Type | Description |
-|------|-------------|
-| `feat` | A new feature |
-| `fix` | A bug fix |
-| `docs` | Documentation changes |
-| `style` | Code style changes (formatting, whitespace) |
+| Type       | Description                                         |
+| ---------- | --------------------------------------------------- |
+| `feat`     | A new feature                                       |
+| `fix`      | A bug fix                                           |
+| `docs`     | Documentation changes                               |
+| `style`    | Code style changes (formatting, whitespace)         |
 | `refactor` | Code changes that neither fix bugs nor add features |
-| `perf` | Performance improvements |
-| `test` | Adding or updating tests |
-| `chore` | Maintenance tasks, dependency updates |
+| `perf`     | Performance improvements                            |
+| `test`     | Adding or updating tests                            |
+| `chore`    | Maintenance tasks, dependency updates               |
 
 ### Examples
 
@@ -150,10 +152,12 @@ This creates a `.vsix` file that can be installed locally or published to the ma
 ## Troubleshooting
 
 ### Extension doesn't activate
+
 - Ensure you have a workspace folder open (not just a file)
 - Check the Output panel (View > Output) and select "Inspect AI" from the dropdown
 
 ### Python/Inspect issues
+
 - The extension requires Inspect AI >= 0.3.8
 - Verify your active Python environment has both packages installed:
   ```bash
@@ -162,6 +166,7 @@ This creates a `.vsix` file that can be installed locally or published to the ma
 - The extension uses whichever Python interpreter is selected in VS Code
 
 ### Viewer not loading
+
 - The log viewer and scan viewer are served by the installed Python packages
 - Ensure `inspect_ai` and `inspect_scout` are properly installed in your active environment
 

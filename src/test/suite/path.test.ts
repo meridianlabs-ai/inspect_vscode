@@ -104,7 +104,9 @@ suite("Path Utilities Test Suite", () => {
       // On non-Windows, this might return the whole path or just the filename
       // depending on path.basename behavior
       const filename = absPath.filename();
-      assert.ok(filename.includes("file.py") || filename === "C:\\Users\\user\\file.py");
+      assert.ok(
+        filename.includes("file.py") || filename === "C:\\Users\\user\\file.py"
+      );
     });
   });
 
@@ -160,7 +162,11 @@ suite("Path Utilities Test Suite", () => {
 
     test("should support child then dirname then filename", () => {
       const absPath = toAbsolutePath("/home/user");
-      const result = absPath.child("project").child("file.py").dirname().filename();
+      const result = absPath
+        .child("project")
+        .child("file.py")
+        .dirname()
+        .filename();
       assert.strictEqual(result, "project");
     });
 
