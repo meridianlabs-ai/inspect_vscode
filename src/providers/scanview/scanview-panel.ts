@@ -65,12 +65,9 @@ export class ScanviewPanel extends Disposable {
       transcript_id: state.scan?.transcript_id,
       extensionProtocolVersion: 2,
     };
-    const stateScript = state.scan_dir
-      ? `<script id="scanview-state" type="application/json">${JSON.stringify(
-          stateMsg
-        )}</script>`
-      : "";
-
+    const stateScript = `<script id="scanview-state" type="application/json">${JSON.stringify(
+      stateMsg
+    )}</script>`;
     return getWebviewPanelHtml(
       scoutViewPath(),
       this.panel_,
