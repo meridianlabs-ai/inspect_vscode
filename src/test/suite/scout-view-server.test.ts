@@ -26,7 +26,10 @@ suite("ScoutViewServer Test Suite", () => {
     mockFetchResponse = null;
 
     // Mock global fetch
-    global.fetch = (url: string | URL | Request, options?: RequestInit): Promise<Response> => {
+    global.fetch = (
+      url: string | URL | Request,
+      options?: RequestInit
+    ): Promise<Response> => {
       const urlString = typeof url === "string" ? url : (url as URL).toString();
       fetchCallLog.push({ url: urlString, options: options || {} });
 
@@ -105,7 +108,9 @@ suite("ScoutViewServer Test Suite", () => {
 
       // Verify both parameters are encoded
       assert.ok(expectedPath.includes(encodeURIComponent(scanLocation)));
-      assert.ok(expectedPath.includes(`scanner=${encodeURIComponent(scanner)}`));
+      assert.ok(
+        expectedPath.includes(`scanner=${encodeURIComponent(scanner)}`)
+      );
     });
 
     test("getScannerDataframeInput should encode all three parameters", () => {
@@ -116,7 +121,9 @@ suite("ScoutViewServer Test Suite", () => {
 
       // Verify all parameters are present and encoded
       assert.ok(expectedPath.includes(encodeURIComponent(scanLocation)));
-      assert.ok(expectedPath.includes(`scanner=${encodeURIComponent(scanner)}`));
+      assert.ok(
+        expectedPath.includes(`scanner=${encodeURIComponent(scanner)}`)
+      );
       assert.ok(expectedPath.includes(`uuid=${encodeURIComponent(uuid)}`));
     });
 

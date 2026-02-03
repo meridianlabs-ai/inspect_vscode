@@ -91,7 +91,9 @@ export async function activateYamlSchemaProvider(
 
         // Check for scout.yaml (project config)
         if (fileName === "scout.yaml") {
-          log.info(`YAML schema: matched scout.yaml, returning ${PROJECT_SCHEMA_URI}`);
+          log.info(
+            `YAML schema: matched scout.yaml, returning ${PROJECT_SCHEMA_URI}`
+          );
           return PROJECT_SCHEMA_URI;
         }
 
@@ -114,20 +116,28 @@ export async function activateYamlSchemaProvider(
      */
     const onRequestSchemaContent = (schemaUri: string): string | undefined => {
       try {
-        log.info(`YAML schema: onRequestSchemaContent called with ${schemaUri}`);
+        log.info(
+          `YAML schema: onRequestSchemaContent called with ${schemaUri}`
+        );
         const uri = Uri.parse(schemaUri);
 
         if (uri.scheme !== SCHEMA_ID) {
-          log.info(`YAML schema: scheme ${uri.scheme} doesn't match ${SCHEMA_ID}`);
+          log.info(
+            `YAML schema: scheme ${uri.scheme} doesn't match ${SCHEMA_ID}`
+          );
           return undefined;
         }
 
         switch (uri.path) {
           case "/project":
-            log.info(`YAML schema: returning project schema (${schemas.project.length} bytes)`);
+            log.info(
+              `YAML schema: returning project schema (${schemas.project.length} bytes)`
+            );
             return schemas.project;
           case "/scanjob":
-            log.info(`YAML schema: returning scanjob schema (${schemas.scanjob.length} bytes)`);
+            log.info(
+              `YAML schema: returning scanjob schema (${schemas.scanjob.length} bytes)`
+            );
             return schemas.scanjob;
           default:
             log.info(`YAML schema: unknown path ${uri.path}`);

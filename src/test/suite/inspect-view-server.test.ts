@@ -122,7 +122,9 @@ suite("InspectViewServer Test Suite", () => {
       const params = new URLSearchParams();
       params.append("after-attachment-id", String(lastAttachment));
 
-      assert.ok(params.toString().includes(`after-attachment-id=${lastAttachment}`));
+      assert.ok(
+        params.toString().includes(`after-attachment-id=${lastAttachment}`)
+      );
     });
 
     test("logMessage should encode both log_file and message", () => {
@@ -500,7 +502,7 @@ suite("InspectViewServer Test Suite", () => {
       ];
 
       assert.ok(jsonEndpoints.length > 0);
-      jsonEndpoints.forEach((endpoint) => {
+      jsonEndpoints.forEach(endpoint => {
         assert.ok(typeof endpoint === "string");
       });
     });
@@ -509,7 +511,7 @@ suite("InspectViewServer Test Suite", () => {
       const binaryEndpoints = ["evalLogBytes"];
 
       assert.ok(binaryEndpoints.length > 0);
-      binaryEndpoints.forEach((endpoint) => {
+      binaryEndpoints.forEach(endpoint => {
         assert.ok(typeof endpoint === "string");
       });
     });

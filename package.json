@@ -38,7 +38,6 @@
     "onWebviewPanel:inspect_ai.logs-view",
     "onWebviewPanel:inspect_ai.scans-view",
     "onWebviewPanel:inspect_ai.env-configuration-view",
-    "onWebviewPanel:inspect_ai.scout-env-configuration-view",
     "onWebviewPanel:inspect_ai.task-outline-view",
     "onLanguage:eval",
     "workspaceContains:**/*.eval",
@@ -103,7 +102,7 @@
       {
         "command": "inspect.scoutView",
         "title": "Scout View...",
-        "icon": "$(code-oss)",
+        "icon": "$(project)",
         "category": "Scout",
         "enablement": "workspaceFolderCount != 0 && inspect_ai.inspect_scout.installed == true"
       },
@@ -256,13 +255,6 @@
         "enablement": "workspaceFolderCount != 0"
       },
       {
-        "command": "inspect.scanListing",
-        "title": "Scan Listing...",
-        "icon": "$(root-folder-opened)",
-        "category": "Scout",
-        "enablement": "workspaceFolderCount != 0 && inspect_ai.inspect_scout.installed == true"
-      },
-      {
         "command": "inspect.scanListingReveal",
         "title": "Reveal Scan Listing",
         "category": "Scout",
@@ -405,12 +397,6 @@
       ],
       "inspect_ai-activity-bar-scout": [
         {
-          "type": "webview",
-          "id": "inspect_ai.scout-env-configuration-view",
-          "name": "Configuration (.env)",
-          "when": "workspaceFolderCount != 0 && inspect_ai.task-outline-view.noInspect == false && inspect_ai.inspect_scout.installed == true"
-        },
-        {
           "id": "inspect_ai.scans-view",
           "name": "Scans",
           "when": "workspaceFolderCount != 0 && inspect_ai.inspect_scout.installed == true"
@@ -460,14 +446,14 @@
           "group": "navigation"
         },
         {
-          "command": "inspect.scanListing",
+          "command": "inspect.logListingRefresh",
           "when": "view == inspect_ai.scans-view",
           "group": "navigation"
         },
         {
-          "command": "inspect.logListingRefresh",
+          "command": "inspect.scoutView",
           "when": "view == inspect_ai.scans-view",
-          "group": "navigation"
+          "group": "navigation@1"
         }
       ],
       "explorer/context": [

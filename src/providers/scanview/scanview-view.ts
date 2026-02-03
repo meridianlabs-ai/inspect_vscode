@@ -16,26 +16,17 @@ import { ScanviewPanel } from "./scanview-panel";
 import { scoutViewPath } from "../../scout/props";
 import { ScoutViewServer } from "../scout/scout-view-server";
 import { ListingMRU } from "../../core/listing-mru";
-import { selectDirectory } from "../../core/select";
 
 const kScanViewId = "inspect.scanview";
 
 export class ScoutViewManager {
   constructor(
-    private readonly context_: ExtensionContext,
     private readonly webViewManager_: ScoutViewWebviewManager,
     private readonly envMgr_: WorkspaceEnvManager
   ) {}
 
   public async showScoutView() {
-    // pick a directory
-    let results_dir = await selectScanResultsDirectory(
-      this.context_,
-      this.envMgr_
-    );
-    if (results_dir === null) {
-      results_dir = this.envMgr_.getDefaultScanResultsDir();
-    }
+    const results_dir = this.envMgr_.getDefaultScanResultsDir();
     if (results_dir) {
       // Show the log view for the log dir (or the workspace)
       await this.webViewManager_.showScanview({ results_dir }, "activate");
@@ -330,16 +321,4 @@ export class ScanResultsListingMRU extends ListingMRU {
   constructor(context_: ExtensionContext) {
     super(kScanResultsMruKey, context_);
   }
-}
-
-export async function selectScanResultsDirectory(
-  context: ExtensionContext,
-  envManager: WorkspaceEnvManager
-) {
-  return await selectDirectory(
-    "Scan Results Directory",
-    "scans",
-    envManager.getDefaultScanResultsDir(),
-    new ScanResultsListingMRU(context)
-  );
 }

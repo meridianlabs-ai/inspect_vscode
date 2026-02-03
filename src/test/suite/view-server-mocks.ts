@@ -57,7 +57,7 @@ export class MockPackageManager {
   }
 
   triggerChange() {
-    this.changeCallbacks.forEach((cb) => cb());
+    this.changeCallbacks.forEach(cb => cb());
   }
 }
 
@@ -257,7 +257,7 @@ export class FetchMockManager {
    * Get calls matching a URL pattern
    */
   getCallsMatching(pattern: string): FetchCallLog[] {
-    return this.callLog.filter((call) => call.url.includes(pattern));
+    return this.callLog.filter(call => call.url.includes(pattern));
   }
 
   /**
@@ -299,7 +299,7 @@ export class MockChildProcess {
   kill(signal?: string): boolean {
     this.killed = true;
     this.exitCode = signal === "SIGKILL" ? 137 : 0;
-    this.killCallbacks.forEach((cb) => cb());
+    this.killCallbacks.forEach(cb => cb());
     return true;
   }
 
@@ -312,7 +312,7 @@ export class MockChildProcess {
   }
 
   triggerError(error: Error) {
-    this.errorCallbacks.forEach((cb) => cb(error));
+    this.errorCallbacks.forEach(cb => cb(error));
   }
 
   simulateExit(code: number) {
@@ -387,7 +387,7 @@ export async function waitFor(
     if (Date.now() - start > timeout) {
       throw new Error("Timeout waiting for condition");
     }
-    await new Promise<void>((resolve) => setTimeout(resolve, interval));
+    await new Promise<void>(resolve => setTimeout(resolve, interval));
   }
 }
 

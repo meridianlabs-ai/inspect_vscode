@@ -190,11 +190,7 @@
         "effort": {
           "anyOf": [
             {
-              "enum": [
-                "low",
-                "medium",
-                "high"
-              ],
+              "enum": ["low", "medium", "high"],
               "type": "string"
             },
             {
@@ -353,14 +349,7 @@
         "reasoning_effort": {
           "anyOf": [
             {
-              "enum": [
-                "none",
-                "minimal",
-                "low",
-                "medium",
-                "high",
-                "xhigh"
-              ],
+              "enum": ["none", "minimal", "low", "medium", "high", "xhigh"],
               "type": "string"
             },
             {
@@ -373,12 +362,7 @@
         "reasoning_history": {
           "anyOf": [
             {
-              "enum": [
-                "none",
-                "all",
-                "last",
-                "auto"
-              ],
+              "enum": ["none", "all", "last", "auto"],
               "type": "string"
             },
             {
@@ -391,12 +375,7 @@
         "reasoning_summary": {
           "anyOf": [
             {
-              "enum": [
-                "none",
-                "concise",
-                "detailed",
-                "auto"
-              ],
+              "enum": ["none", "concise", "detailed", "auto"],
               "type": "string"
             },
             {
@@ -531,11 +510,7 @@
         "verbosity": {
           "anyOf": [
             {
-              "enum": [
-                "low",
-                "medium",
-                "high"
-              ],
+              "enum": ["low", "medium", "high"],
               "type": "string"
             },
             {
@@ -719,9 +694,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "model"
-      ],
+      "required": ["model"],
       "title": "ModelConfig",
       "type": "object"
     },
@@ -761,10 +734,7 @@
           "title": "Strict"
         }
       },
-      "required": [
-        "name",
-        "json_schema"
-      ],
+      "required": ["name", "json_schema"],
       "title": "ResponseSchema",
       "type": "object"
     },
@@ -811,9 +781,7 @@
           "type": "integer"
         }
       },
-      "required": [
-        "name"
-      ],
+      "required": ["name"],
       "title": "ScannerSpec",
       "type": "object"
     },
@@ -860,9 +828,7 @@
           "default": null
         }
       },
-      "required": [
-        "id"
-      ],
+      "required": ["id"],
       "title": "ValidationCase",
       "type": "object"
     },
@@ -903,9 +869,7 @@
           "title": "Predicate"
         }
       },
-      "required": [
-        "cases"
-      ],
+      "required": ["cases"],
       "title": "ValidationSet",
       "type": "object"
     },
@@ -925,10 +889,7 @@
           "type": "array"
         }
       },
-      "required": [
-        "scanner",
-        "transcripts"
-      ],
+      "required": ["scanner", "transcripts"],
       "title": "Worklist",
       "type": "object"
     }

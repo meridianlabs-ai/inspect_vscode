@@ -250,9 +250,7 @@ export async function activateScout(
   // Activate the Activity Bar
   start("Scout Activity Bar");
   const activityBarCommands = await activateScoutActivityBar(
-    scoutManager,
     workspaceEnvManager,
-    workspaceStateManager,
     server,
     outputWatcher,
     context
