@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.0](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.7.5...v0.8.0) (2026-02-03)
+
+
+### Features
+
+* Improved Scout Support ([#44](https://github.com/meridianlabs-ai/inspect_vscode/issues/44)) ([c9d00f5](https://github.com/meridianlabs-ai/inspect_vscode/commit/c9d00f595402e7c9392a06345281439da3336a00))
+
 ## [0.7.5](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.7.4...v0.7.5) (2026-01-31)
 
 
