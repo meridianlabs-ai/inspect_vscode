@@ -23,7 +23,10 @@ suite("URI Utilities Test Suite", () => {
     });
 
     test("should convert absolute path to file URI", () => {
-      const testPath = os.platform() === "win32" ? "C:\\Users\\test.txt" : "/home/user/test.txt";
+      const testPath =
+        os.platform() === "win32"
+          ? "C:\\Users\\test.txt"
+          : "/home/user/test.txt";
       const uri = resolveToUri(testPath);
       assert.strictEqual(uri.scheme, "file");
     });
@@ -73,7 +76,8 @@ suite("URI Utilities Test Suite", () => {
       const parent = dirname(uri);
       assert.strictEqual(parent.scheme, "file");
       assert.ok(
-        parent.fsPath.endsWith("documents") || parent.fsPath.includes("documents"),
+        parent.fsPath.endsWith("documents") ||
+          parent.fsPath.includes("documents"),
         `Expected path to include 'documents', got: ${parent.fsPath}`
       );
     });
@@ -90,7 +94,9 @@ suite("URI Utilities Test Suite", () => {
       const uri = Uri.parse("https://example.com/path/to/file");
       const parent = dirname(uri);
       assert.strictEqual(parent.scheme, "https");
-      assert.ok(parent.path.includes("/path/to") || parent.path.includes("/path"));
+      assert.ok(
+        parent.path.includes("/path/to") || parent.path.includes("/path")
+      );
     });
 
     test("should handle nested directories", () => {
@@ -105,7 +111,10 @@ suite("URI Utilities Test Suite", () => {
       const homedir = os.homedir();
       const uri = Uri.file(`${homedir}/documents/test.txt`);
       const pretty = prettyUriPath(uri);
-      assert.ok(pretty.startsWith("~"), `Expected path to start with ~, got: ${pretty}`);
+      assert.ok(
+        pretty.startsWith("~"),
+        `Expected path to start with ~, got: ${pretty}`
+      );
       assert.ok(pretty.includes("documents"));
     });
 
