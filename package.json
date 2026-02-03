@@ -102,7 +102,7 @@
       {
         "command": "inspect.scoutView",
         "title": "Scout View...",
-        "icon": "$(code-oss)",
+        "icon": "$(project)",
         "category": "Scout",
         "enablement": "workspaceFolderCount != 0 && inspect_ai.inspect_scout.installed == true"
       },
@@ -449,6 +449,11 @@
           "command": "inspect.logListingRefresh",
           "when": "view == inspect_ai.scans-view",
           "group": "navigation"
+        },
+        {
+          "command": "inspect.scoutView",
+          "when": "view == inspect_ai.scans-view",
+          "group": "navigation@1"
         }
       ],
       "explorer/context": [
