@@ -58,7 +58,7 @@ export class ScoutCodeLensProvider implements CodeLensProvider {
 
     const fromImportMatch = normalizedText.match(fromImportPattern);
     if (fromImportMatch) {
-      return { hasImport: true, alias: fromImportMatch[1] };
+      return { hasImport: true, alias: fromImportMatch[2] };
     }
     if (hasImportPattern.test(normalizedText)) {
       return { hasImport: true };
