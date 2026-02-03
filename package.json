@@ -38,7 +38,6 @@
     "onWebviewPanel:inspect_ai.logs-view",
     "onWebviewPanel:inspect_ai.scans-view",
     "onWebviewPanel:inspect_ai.env-configuration-view",
-    "onWebviewPanel:inspect_ai.scout-env-configuration-view",
     "onWebviewPanel:inspect_ai.task-outline-view",
     "onLanguage:eval",
     "workspaceContains:**/*.eval",
@@ -397,12 +396,6 @@
         }
       ],
       "inspect_ai-activity-bar-scout": [
-        {
-          "type": "webview",
-          "id": "inspect_ai.scout-env-configuration-view",
-          "name": "Configuration (.env)",
-          "when": "workspaceFolderCount != 0 && inspect_ai.task-outline-view.noInspect == false && inspect_ai.inspect_scout.installed == true"
-        },
         {
           "id": "inspect_ai.scans-view",
           "name": "Scans",
