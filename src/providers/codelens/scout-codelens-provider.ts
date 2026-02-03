@@ -58,7 +58,7 @@ export class ScoutCodeLensProvider implements CodeLensProvider {
 
     const fromImportMatch = normalizedText.match(fromImportPattern);
     if (fromImportMatch) {
-      return { hasImport: true, alias: fromImportMatch[1] };
+      return { hasImport: true, alias: fromImportMatch[2] };
     }
     if (hasImportPattern.test(normalizedText)) {
       return { hasImport: true };
@@ -94,7 +94,7 @@ export class ScoutCodeLensProvider implements CodeLensProvider {
           decoratorMatch[1] !== undefined || // @inspect.scanner
           decoratorMatch[0] === "@scanner" || // @scanner (when e.g. from inspect_scout import scanner)
           decoratorMatch[0] === "@scanjob" ||
-          (importInfo.alias && decoratorMatch[2] === importInfo.alias); // @t (when from inspect_scout import scanner as s)
+          (importInfo.alias && decoratorMatch[3] === importInfo.alias); // @s (when from inspect_scout import scanner as s)
 
         if (!isScoutScan) {
           continue;
