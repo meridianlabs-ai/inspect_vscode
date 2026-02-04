@@ -58,9 +58,20 @@ export class ScoutPanelProvider implements WebviewViewProvider {
             await this.sendInitialize();
             break;
           case "navigate":
-            // All navigation currently opens Scout View
-            // Future: add tab-specific commands
-            await commands.executeCommand("inspect.scoutView");
+            switch (data.target) {
+              case "project":
+                await commands.executeCommand("inspect.scoutViewProject");
+                break;
+              case "transcripts":
+                await commands.executeCommand("inspect.scoutViewTranscripts");
+                break;
+              case "scans":
+                await commands.executeCommand("inspect.scoutViewScans");
+                break;
+              case "validations":
+                await commands.executeCommand("inspect.scoutViewValidations");
+                break;
+            }
             break;
         }
       }

@@ -115,6 +115,34 @@
         "enablement": "workspaceFolderCount != 0 && inspect_ai.inspect_scout.installed == true"
       },
       {
+        "command": "inspect.scoutViewProject",
+        "title": "Project Config",
+        "icon": "$(settings-gear)",
+        "category": "Scout",
+        "enablement": "workspaceFolderCount != 0 && inspect_ai.inspect_scout.installed == true"
+      },
+      {
+        "command": "inspect.scoutViewTranscripts",
+        "title": "Transcripts",
+        "icon": "$(file-text)",
+        "category": "Scout",
+        "enablement": "workspaceFolderCount != 0 && inspect_ai.inspect_scout.installed == true"
+      },
+      {
+        "command": "inspect.scoutViewScans",
+        "title": "Scans",
+        "icon": "$(graph)",
+        "category": "Scout",
+        "enablement": "workspaceFolderCount != 0 && inspect_ai.inspect_scout.installed == true"
+      },
+      {
+        "command": "inspect.scoutViewValidations",
+        "title": "Validations",
+        "icon": "$(checklist)",
+        "category": "Scout",
+        "enablement": "workspaceFolderCount != 0 && inspect_ai.inspect_scout.installed == true"
+      },
+      {
         "command": "inspect.createTask",
         "title": "Create Task",
         "category": "Inspect",

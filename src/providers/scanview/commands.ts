@@ -17,6 +17,10 @@ export function scanviewCommands(
   return [
     new ShowScanviewCommand(manager),
     new ShowOpenScanCommand(context, envManager),
+    new ShowScoutViewProjectCommand(manager),
+    new ShowScoutViewTranscriptsCommand(manager),
+    new ShowScoutViewScansCommand(manager),
+    new ShowScoutViewValidationsCommand(manager),
   ];
 }
 
@@ -79,4 +83,67 @@ export async function selectScanDirectory(
     new ScanDirListingMRU(context),
     false
   );
+}
+
+// Tab-specific Scout View commands
+// These currently all open Scout View - tab navigation can be added later
+
+class ShowScoutViewProjectCommand implements Command {
+  constructor(private readonly manager_: ScoutViewManager) {}
+  async execute(): Promise<void> {
+    try {
+      await this.manager_.showScoutView();
+    } catch (err: unknown) {
+      await showError(
+        "An error occurred while attempting to start Scout View",
+        err instanceof Error ? err : Error(String(err))
+      );
+    }
+  }
+  public readonly id = "inspect.scoutViewProject";
+}
+
+class ShowScoutViewTranscriptsCommand implements Command {
+  constructor(private readonly manager_: ScoutViewManager) {}
+  async execute(): Promise<void> {
+    try {
+      await this.manager_.showScoutView();
+    } catch (err: unknown) {
+      await showError(
+        "An error occurred while attempting to start Scout View",
+        err instanceof Error ? err : Error(String(err))
+      );
+    }
+  }
+  public readonly id = "inspect.scoutViewTranscripts";
+}
+
+class ShowScoutViewScansCommand implements Command {
+  constructor(private readonly manager_: ScoutViewManager) {}
+  async execute(): Promise<void> {
+    try {
+      await this.manager_.showScoutView();
+    } catch (err: unknown) {
+      await showError(
+        "An error occurred while attempting to start Scout View",
+        err instanceof Error ? err : Error(String(err))
+      );
+    }
+  }
+  public readonly id = "inspect.scoutViewScans";
+}
+
+class ShowScoutViewValidationsCommand implements Command {
+  constructor(private readonly manager_: ScoutViewManager) {}
+  async execute(): Promise<void> {
+    try {
+      await this.manager_.showScoutView();
+    } catch (err: unknown) {
+      await showError(
+        "An error occurred while attempting to start Scout View",
+        err instanceof Error ? err : Error(String(err))
+      );
+    }
+  }
+  public readonly id = "inspect.scoutViewValidations";
 }
