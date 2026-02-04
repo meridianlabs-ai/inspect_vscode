@@ -1,0 +1,73 @@
+/* Scout Panel Webview Styles */
+
+.component-container {
+  width: 100%;
+}
+
+#scout-panel {
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 0.5em;
+}
+
+.nav-links {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4em;
+  width: 100%;
+}
+
+.nav-link {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 0.5em;
+  padding: 0.5em;
+  border-radius: 4px;
+  cursor: pointer;
+  text-decoration: none;
+  color: var(--vscode-foreground);
+  transition: background-color 0.1s ease;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.nav-link:hover {
+  background-color: var(--vscode-list-hoverBackground);
+}
+
+.nav-link:active {
+  background-color: var(--vscode-list-activeSelectionBackground);
+}
+
+.nav-link i {
+  font-size: 16px;
+  width: 16px;
+  margin-top: 2px;
+  color: var(--vscode-icon-foreground);
+  flex-shrink: 0;
+}
+
+.nav-link .nav-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1em;
+}
+
+.nav-link .nav-title {
+  font-size: var(--type-ramp-base-font-size);
+}
+
+.nav-link .nav-description {
+  font-size: var(--type-ramp-minus1-font-size);
+  color: var(--vscode-descriptionForeground);
+}
+
+#no-package {
+  padding: 1em 0;
+  color: var(--vscode-descriptionForeground);
+}
+
+#no-package p {
+  margin: 0;
+}

@@ -400,7 +400,7 @@
         {
           "type": "webview",
           "id": "inspect_ai.scout-env-configuration-view",
-          "name": "Configuration (.env)",
+          "name": "Inspect Scout",
           "when": "workspaceFolderCount != 0 && inspect_ai.task-outline-view.noInspect == false && inspect_ai.inspect_scout.installed == true"
         },
         {

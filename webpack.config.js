@@ -78,16 +78,16 @@ const envWebviewConfig = {
   },
 };
 
-// Config for webview source code (to be run in a web-based context)
+// Config for Scout panel webview
 /** @type WebpackConfig */
-const scoutEnvWebviewConfig = {
+const scoutPanelWebviewConfig = {
   ...baseConfig,
   target: ["web", "es2020"],
-  entry: "./src/providers/activity-bar/webview/scout-env-config-webview.ts",
+  entry: "./src/providers/activity-bar/webview/scout-panel-webview.ts",
   experiments: { outputModule: true },
   output: {
     path: path.resolve(__dirname, "out"),
-    filename: "scout-env-config-webview.js",
+    filename: "scout-panel-webview.js",
     libraryTarget: "module",
     chunkFormat: "module",
   },
@@ -119,6 +119,6 @@ const taskHyperparamWebviewConfig = {
 module.exports = [
   extensionConfig,
   envWebviewConfig,
-  scoutEnvWebviewConfig,
+  scoutPanelWebviewConfig,
   taskHyperparamWebviewConfig,
 ];
