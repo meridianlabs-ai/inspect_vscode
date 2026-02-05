@@ -31,6 +31,21 @@ export interface HttpProxyRpcResponse {
 }
 
 export class ScoutViewServer extends PackageViewServer {
+  public readonly legacy: {
+    getScans: (results_dir?: Uri) => Promise<string>;
+    getScan: (scanLocation: string) => Promise<string>;
+    getScannerDataframe: (
+      scanLocation: string,
+      scanner: string
+    ) => Promise<Uint8Array>;
+    getScannerDataframeInput: (
+      scanLocation: string,
+      scanner: string,
+      uuid: string
+    ) => Promise<[string, string]>;
+    deleteScan: (scanLocation: Uri) => Promise<string>;
+  };
+
   constructor(context: ExtensionContext, scoutManager: PackageManager) {
     super(
       context,
@@ -43,62 +58,64 @@ export class ScoutViewServer extends PackageViewServer {
       ["--display", "rich"],
       "http"
     );
-  }
 
-  async getScans(results_dir?: Uri): Promise<string> {
-    await this.ensureRunning();
-    let uri = "/api/scans";
-    if (results_dir) {
-      uri = `${uri}?results_dir=${results_dir.toString()}`;
-    }
-    return (await this.api_json(uri)).data;
-  }
+    this.legacy = {
+      getScans: async (results_dir?: Uri): Promise<string> => {
+        await this.ensureRunning();
+        let uri = "/api/scans";
+        if (results_dir) {
+          uri = `${uri}?results_dir=${results_dir.toString()}`;
+        }
+        return (await this.api_json(uri)).data;
+      },
 
-  async getScan(scanLocation: string): Promise<string> {
-    await this.ensureRunning();
-    return (
-      await this.api_json(
-        `/api/scan/${encodeURIComponent(scanLocation)}?status_only=true`
-      )
-    ).data;
-  }
+      getScan: async (scanLocation: string): Promise<string> => {
+        await this.ensureRunning();
+        return (
+          await this.api_json(
+            `/api/scan/${encodeURIComponent(scanLocation)}?status_only=true`
+          )
+        ).data;
+      },
 
-  async getScannerDataframe(
-    scanLocation: string,
-    scanner: string
-  ): Promise<Uint8Array> {
-    const uri = `/api/scanner_df/${encodeURIComponent(
-      scanLocation
-    )}?scanner=${encodeURIComponent(scanner)}`;
-    return (await this.api_bytes(uri)).data;
-  }
+      getScannerDataframe: async (
+        scanLocation: string,
+        scanner: string
+      ): Promise<Uint8Array> => {
+        const uri = `/api/scanner_df/${encodeURIComponent(
+          scanLocation
+        )}?scanner=${encodeURIComponent(scanner)}`;
+        return (await this.api_bytes(uri)).data;
+      },
 
-  async getScannerDataframeInput(
-    scanLocation: string,
-    scanner: string,
-    uuid: string
-  ): Promise<[string, string]> {
-    const uri = `/api/scanner_df_input/${encodeURIComponent(
-      scanLocation
-    )}?scanner=${encodeURIComponent(scanner)}&uuid=${encodeURIComponent(uuid)}`;
-    const results = await this.api_json(uri);
-    const input = results.data;
-    const inputType = results.headers.get("X-Input-Type");
+      getScannerDataframeInput: async (
+        scanLocation: string,
+        scanner: string,
+        uuid: string
+      ): Promise<[string, string]> => {
+        const uri = `/api/scanner_df_input/${encodeURIComponent(
+          scanLocation
+        )}?scanner=${encodeURIComponent(scanner)}&uuid=${encodeURIComponent(uuid)}`;
+        const results = await this.api_json(uri);
+        const input = results.data;
+        const inputType = results.headers.get("X-Input-Type");
 
-    if (inputType === null) {
-      throw new Error("Missing X-Input-Type header");
-    }
+        if (inputType === null) {
+          throw new Error("Missing X-Input-Type header");
+        }
 
-    return [input, inputType];
-  }
+        return [input, inputType];
+      },
 
-  async deleteScan(scanLocation: Uri): Promise<string> {
-    await this.ensureRunning();
-    return (
-      await this.api_json(
-        `/api/scan-delete/${encodeURIComponent(scanLocation.toString(true))}`
-      )
-    ).data;
+      deleteScan: async (scanLocation: Uri): Promise<string> => {
+        await this.ensureRunning();
+        return (
+          await this.api_json(
+            `/api/scan-delete/${encodeURIComponent(scanLocation.toString(true))}`
+          )
+        ).data;
+      },
+    };
   }
 
   /**

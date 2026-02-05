@@ -41,7 +41,7 @@ export async function activateScanListing(
 
     // create a logs fetcher
     const logsFetcher = async (uri: Uri): Promise<Logs | undefined> => {
-      const scansJSON = await viewServer.getScans(uri);
+      const scansJSON = await viewServer.legacy.getScans(uri);
       if (scansJSON) {
         const scans = JSON.parse(scansJSON) as {
           results_dir: string;
@@ -129,7 +129,7 @@ export async function activateScanListing(
           );
 
           if (result?.title === "Delete") {
-            await viewServer.deleteScan(logUri);
+            await viewServer.legacy.deleteScan(logUri);
             treeDataProvider.refresh();
           }
         }

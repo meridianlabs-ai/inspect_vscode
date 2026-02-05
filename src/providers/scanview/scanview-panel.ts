@@ -33,13 +33,16 @@ export class ScanviewPanel extends Disposable {
 
     // serve eval log api to webview
     this._rpcDisconnect = webviewPanelJsonRpcServer(panel_, {
-      [kMethodGetScans]: async () => server.getScans(),
+      [kMethodGetScans]: async () => server.legacy.getScans(),
       [kMethodGetScan]: async (params: unknown[]) =>
-        server.getScan(params[0] as string),
+        server.legacy.getScan(params[0] as string),
       [kMethodGetScannerDataframe]: async (params: unknown[]) =>
-        server.getScannerDataframe(params[0] as string, params[1] as string),
+        server.legacy.getScannerDataframe(
+          params[0] as string,
+          params[1] as string
+        ),
       [kMethodGetScannerDataframeInput]: async (params: unknown[]) =>
-        server.getScannerDataframeInput(
+        server.legacy.getScannerDataframeInput(
           params[0] as string,
           params[1] as string,
           params[2] as string
