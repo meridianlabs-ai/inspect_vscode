@@ -481,7 +481,7 @@
           "group": "navigation"
         },
         {
-          "command": "inspect.logListingRefresh",
+          "command": "inspect.scanListingRefresh",
           "when": "view == inspect_ai.scans-view",
           "group": "navigation"
         },
