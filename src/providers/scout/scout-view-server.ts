@@ -3,6 +3,7 @@ import { ExtensionContext, Uri } from "vscode";
 import { PackageManager } from "../../core/package/manager";
 import { PackageViewServer } from "../../core/package/view-server";
 import { scoutBinPath } from "../../scout/props";
+import { basename, dirname } from "../../core/uri";
 
 // Custom request/response types for JSON-RPC proxy communication.
 // We can't use fetch's Request/Response/Headers because:
@@ -116,6 +117,29 @@ export class ScoutViewServer extends PackageViewServer {
         ).data;
       },
     };
+  }
+
+  async getScans(scans_dir: Uri): Promise<string> {
+    await this.ensureRunning();
+    const base64Dir = encodeURIComponent(
+      Buffer.from(scans_dir.toString()).toString("base64")
+    );
+    const uri = `/api/v2/scans/${base64Dir}`;
+    return (await this.api_json(uri, "POST")).data;
+  }
+
+  async deleteScan(scanLocation: Uri): Promise<string> {
+    await this.ensureRunning();
+    const dir = dirname(scanLocation);
+    const file = basename(scanLocation);
+    const base64Dir = encodeURIComponent(
+      Buffer.from(dir.toString()).toString("base64")
+    );
+    const scanFile = encodeURIComponent(Buffer.from(file).toString("base64"));
+    return (
+      await this.api_json(`/api/v2/scans/${base64Dir}/${scanFile}`),
+      "DELETE"
+    );
   }
 
   /**

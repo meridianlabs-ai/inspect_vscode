@@ -41,15 +41,14 @@ export async function activateScanListing(
 
     // create a logs fetcher
     const logsFetcher = async (uri: Uri): Promise<Logs | undefined> => {
-      const scansJSON = await viewServer.legacy.getScans(uri);
+      const scansJSON = await viewServer.getScans(uri);
       if (scansJSON) {
         const scans = JSON.parse(scansJSON) as {
-          results_dir: string;
-          scans: Array<Status>;
+          items: Array<ScanRow>;
         };
         return {
-          log_dir: scans.results_dir,
-          items: scans.scans.map(scanToLogItem),
+          log_dir: logDir.toString(),
+          items: scans.items.map(scanToLogItem),
         };
       } else {
         return undefined;
@@ -129,7 +128,7 @@ export async function activateScanListing(
           );
 
           if (result?.title === "Delete") {
-            await viewServer.legacy.deleteScan(logUri);
+            await viewServer.deleteScan(logUri);
             treeDataProvider.refresh();
           }
         }
@@ -180,71 +179,73 @@ export async function revealScanListing() {
   );
 }
 
-interface ModelConfig {
-  model: string;
-  config: Record<string, unknown>;
-  base_url?: string;
-  args: Record<string, unknown>;
-}
-
-interface ScanOptions {
-  max_transcripts: number;
-  max_processes: number;
-  limit?: number;
-  shuffle?: boolean | number;
-}
-
-interface ScanSpec {
-  scan_id: string;
-  scan_name: string;
-  scan_file?: string;
-  scan_args?: Record<string, unknown>;
-  timestamp: string;
-  tags?: string[];
-  metadata?: Record<string, unknown>;
-  model?: ModelConfig;
-  options: ScanOptions;
-}
-
-interface ScannerSummary {
-  scans: number;
-  results: number;
-  errors: number;
-  tokens: number;
-  model_usage: Record<string, unknown>;
-}
-
-interface Summary {
-  scanners: Record<string, ScannerSummary>;
-}
-
-interface Error {
-  transcript_id: string;
-  scanner: string;
-  error: string;
-  traceback: string;
-}
-
-interface Status {
-  complete: boolean;
-  spec: ScanSpec;
+// TODO: This belongs as reead from api-types in mono repo
+interface ScanRow {
+  /** Active Completion Pct */
+  active_completion_pct?: number | null;
+  /** Location */
   location: string;
-  summary: Summary;
-  errors: Array<Error>;
+  /** Metadata */
+  metadata?: {
+    [key: string]: unknown;
+  } | null;
+  /** Model */
+  model?: string | null;
+  /** Packages */
+  packages: {
+    [key: string]: string;
+  };
+  /** Revision Commit */
+  revision_commit?: string | null;
+  /** Revision Origin */
+  revision_origin?: string | null;
+  /** Revision Version */
+  revision_version?: string | null;
+  /** Scan Args */
+  scan_args?: {
+    [key: string]: unknown;
+  } | null;
+  /** Scan File */
+  scan_file?: string | null;
+  /** Scan Id */
+  scan_id: string;
+  /** Scan Name */
+  scan_name: string;
+  /** Scanners */
+  scanners: string;
+  /**
+   * Status
+   * @enum {string}
+   */
+  status: "active" | "error" | "complete" | "incomplete";
+  /** Tags */
+  tags: string;
+  /**
+   * Timestamp
+   * Format: date-time
+   */
+  timestamp: string;
+  /** Total Errors */
+  total_errors: number;
+  /** Total Results */
+  total_results: number;
+  /** Total Tokens */
+  total_tokens: number;
+  /** Transcript Count */
+  transcript_count: number;
 }
 
-function scanToLogItem(scan: Status): LogItem {
+function scanToLogItem(scan: ScanRow): LogItem {
   // display name
-  let display_name = scan.spec.scan_name;
+  let display_name = scan.scan_name;
 
   // if the name is generic and there is a scan file then use that
-  if (["scan", "job"].includes(display_name) && scan.spec.scan_file) {
-    display_name = scan.spec.scan_file.split(/[\\/]/).pop() || display_name;
+  if (["scan", "job"].includes(display_name) && scan.scan_file) {
+    display_name = scan.scan_file.split(/[\\/]/).pop() || display_name;
   }
 
   // compute stats
-  const firstScanner = Object.values(scan.summary.scanners)[0];
-  const transcripts = firstScanner?.scans || 0;
+  const transcripts = scan.transcript_count;
 
   // build tooltip
   const tooltip = [
@@ -252,22 +253,10 @@ function scanToLogItem(scan: Status): LogItem {
     "",
     "",
     `${transcripts} transcripts  `,
-    `scan_id=${scan.spec.scan_id}  `,
+    `scan_id=${scan.scan_id}  `,
     "",
     "",
   ];
-
-  const scannerTable = [
-    "| scanner | results | errors | tokens |",
-    "|:--------|:-------:|:------:|-------:|",
-  ];
-  const formatValue = (val: number) => (val ? val.toLocaleString() : "-");
-  for (const [key, value] of Object.entries(scan.summary.scanners)) {
-    scannerTable.push(
-      `| ${key}      | ${formatValue(value.results)}       | ${formatValue(value.errors)}     | ${formatValue(value.tokens)}      |`
-    );
-  }
-  tooltip.push(scannerTable.join("\n"));
 
   const config = scanConfig(scan);
   if (config) {
@@ -276,23 +265,20 @@ function scanToLogItem(scan: Status): LogItem {
 
   return {
     name: scan.location,
-    mtime: new Date(scan.spec.timestamp).getTime(),
+    mtime: new Date(scan.timestamp).getTime(),
     display_name,
-    item_id: scan.spec.scan_id,
+    item_id: scan.scan_id,
     tooltip: new vscode.MarkdownString(tooltip.join("\n"), true),
   };
 }
 
-function scanConfig(scan: Status): string[] | undefined {
+function scanConfig(scan: ScanRow): string[] | undefined {
   let config: Record<string, unknown> = {};
 
   // model
-  if (scan.spec.model) {
-    config["model"] = scan.spec.model.model;
-    config = { ...config, ...scan.spec.model.config };
+  if (scan.model) {
+    config["model"] = scan.model;
   }
-
-  config = { ...config, ...scan.spec.options };
 
   if (Object.keys(config).length > 0) {
     return ["```", `\n${stringify(config)}`, "```"];

@@ -39,10 +39,11 @@ export class PackageViewServer implements Disposable {
 
   protected async api_json(
     path: string,
+    method: "GET" | "POST" | "PUT" | "DELETE" = "GET",
     headers?: Record<string, string>,
     handleError?: (status: number) => string | undefined
   ): Promise<{ data: string; headers: Headers }> {
-    const result = await this.api(path, false, headers, handleError);
+    const result = await this.api(path, method, headers, false, handleError);
     return {
       data: result.data as string,
       headers: result.headers,
@@ -50,9 +51,10 @@ export class PackageViewServer implements Disposable {
   }
 
   protected async api_bytes(
-    path: string
+    path: string,
+    method: "GET" | "POST" | "PUT" | "DELETE" = "GET"
   ): Promise<{ data: Uint8Array; headers: Headers }> {
-    const result = await this.api(path, true);
+    const result = await this.api(path, method, {}, true);
     return {
       data: result.data as Uint8Array,
       headers: result.headers,
@@ -102,8 +104,9 @@ export class PackageViewServer implements Disposable {
 
   protected async api(
     path: string,
-    binary: boolean = false,
+    method: "GET" | "POST" | "PUT" | "DELETE" = "GET",
     headers: Record<string, string> = {},
+    binary: boolean = false,
     handleError?: (status: number) => string | undefined
   ): Promise<{ data: string | Uint8Array; headers: Headers }> {
     // ensure the server is started and ready
@@ -122,7 +125,7 @@ export class PackageViewServer implements Disposable {
     // make request
     const response = await fetch(
       `http://localhost:${this.serverPort_}${path}`,
-      { method: "GET", headers }
+      { method: method, headers }
     );
     if (response.ok) {
       if (binary) {

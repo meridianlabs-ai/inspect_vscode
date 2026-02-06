@@ -35,6 +35,15 @@ export function dirname(uri: Uri): Uri {
   }
 }
 
+export function basename(uri: Uri): string {
+  if (uri.scheme === "file") {
+    return path.basename(uri.fsPath);
+  } else {
+    const parsedUrl = new URL(uri.toString());
+    return path.basename(parsedUrl.pathname);
+  }
+}
+
 export function prettyUriPath(uri: Uri): string {
   if (uri.scheme === "file") {
     const path = uri.fsPath;
