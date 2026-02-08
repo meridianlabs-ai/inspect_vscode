@@ -1,11 +1,11 @@
 import * as vscode from "vscode";
 import { Uri } from "vscode";
 import { HostWebviewPanel } from "../../hooks";
-import { dirname } from "../../core/uri";
 import { ScoutViewServer } from "../scout/scout-view-server";
 import { ScanviewPanel } from "./scanview-panel";
-import { ScanviewState } from "./scanview-state";
+import { RouteMessage, viewScanRouteMessage } from "./scanview-message";
 import { scoutViewPath } from "../../scout/props";
+import { basename, dirname } from "../../core/uri";
 
 export const kScoutScanViewType = "inspect-ai.scout-scan-editor";
 
@@ -58,24 +58,17 @@ class ScoutScanReadonlyEditor implements vscode.CustomReadonlyEditorProvider {
     webviewPanel: vscode.WebviewPanel,
     _token: vscode.CancellationToken
   ): Promise<void> {
-    const doc = document as vscode.CustomDocument & {
-      scanner?: string;
-      transcript_id?: string;
-    };
-    let scanner = doc.scanner;
-    const transcript_id = doc.transcript_id;
-
-    let docUriNoParams = document.uri.with({ query: "", fragment: "" });
+    const doc = document as vscode.CustomDocument;
+    let scanDir = dirname(doc.uri);
+    let scanJob = basename(doc.uri);
+    let scannerName = undefined;
 
     // If the uri ends with a parquet file, clip it off and use the
     // name of the parquet file as scanner
-    if (docUriNoParams.path.endsWith(".parquet")) {
-      const pathParts = docUriNoParams.path.split("/");
-      const parquetFile = pathParts.pop();
-      if (parquetFile && !scanner) {
-        scanner = parquetFile.replace(/\.parquet$/, "");
-      }
-      docUriNoParams = docUriNoParams.with({ path: pathParts.join("/") });
+    if (scanJob.endsWith(".parquet")) {
+      scannerName = scanJob.replace(/\.parquet$/, "");
+      scanJob = basename(scanDir);
+      scanDir = dirname(scanDir);
     }
 
     // local resource roots
@@ -97,23 +90,17 @@ class ScoutScanReadonlyEditor implements vscode.CustomReadonlyEditorProvider {
     this.scanviewPanel_ = new ScanviewPanel(
       webviewPanel as HostWebviewPanel,
       this.context_,
-      this.server_,
-      "scan",
-      docUriNoParams
+      this.server_
     );
 
     // set html
-    const logViewState: ScanviewState = {
-      scan_dir: docUriNoParams,
-      results_dir: dirname(docUriNoParams),
-      scan: scanner
-        ? {
-            scanner: scanner,
-            transcript_id: transcript_id,
-          }
-        : undefined,
-    };
-    webviewPanel.webview.html = this.scanviewPanel_.getHtml(logViewState);
+    const initialRouteMessage: RouteMessage = viewScanRouteMessage(
+      scanDir,
+      scanJob,
+      scannerName
+    );
+    webviewPanel.webview.html =
+      this.scanviewPanel_.getHtml(initialRouteMessage);
     return Promise.resolve();
   }
 

@@ -24,7 +24,7 @@ export function activateScanview(
     server,
     context
   );
-  const scanviewManager = new ScoutViewManager(scanviewWebManager, envMgr);
+  const scanviewManager = new ScoutViewManager(scanviewWebManager);
 
   // scanview commands
   return [scanviewCommands(context, scanviewManager, envMgr), scanviewManager];

@@ -92,7 +92,7 @@ class ShowScoutViewProjectCommand implements Command {
   constructor(private readonly manager_: ScoutViewManager) {}
   async execute(): Promise<void> {
     try {
-      await this.manager_.showScoutView();
+      await this.manager_.showScoutView("project");
     } catch (err: unknown) {
       await showError(
         "An error occurred while attempting to start Scout View",
@@ -107,7 +107,7 @@ class ShowScoutViewTranscriptsCommand implements Command {
   constructor(private readonly manager_: ScoutViewManager) {}
   async execute(): Promise<void> {
     try {
-      await this.manager_.showScoutView();
+      await this.manager_.showScoutView("transcripts");
     } catch (err: unknown) {
       await showError(
         "An error occurred while attempting to start Scout View",
@@ -122,7 +122,7 @@ class ShowScoutViewScansCommand implements Command {
   constructor(private readonly manager_: ScoutViewManager) {}
   async execute(): Promise<void> {
     try {
-      await this.manager_.showScoutView();
+      await this.manager_.showScoutView("scans");
     } catch (err: unknown) {
       await showError(
         "An error occurred while attempting to start Scout View",
@@ -137,7 +137,7 @@ class ShowScoutViewValidationsCommand implements Command {
   constructor(private readonly manager_: ScoutViewManager) {}
   async execute(): Promise<void> {
     try {
-      await this.manager_.showScoutView();
+      await this.manager_.showScoutView("validation");
     } catch (err: unknown) {
       await showError(
         "An error occurred while attempting to start Scout View",
