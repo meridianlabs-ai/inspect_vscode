@@ -58,9 +58,8 @@ class ScoutScanReadonlyEditor implements vscode.CustomReadonlyEditorProvider {
     webviewPanel: vscode.WebviewPanel,
     _token: vscode.CancellationToken
   ): Promise<void> {
-    const doc = document as vscode.CustomDocument;
-    let scanDir = dirname(doc.uri);
-    let scanJob = basename(doc.uri);
+    let scanDir = dirname(document.uri);
+    let scanJob = basename(document.uri);
     let scannerName = undefined;
 
     // If the uri ends with a parquet file, clip it off and use the

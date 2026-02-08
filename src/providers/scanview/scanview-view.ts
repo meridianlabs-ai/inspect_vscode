@@ -76,11 +76,11 @@ export class ScoutViewWebviewManager extends InspectWebviewManager<
   ) {
     switch (activation) {
       case "open":
-        await this.showViewAndGotoRoute(route, activation);
+        this.showViewAndGotoRoute(route, activation);
         break;
       case "activate":
         if (!this.isVisible()) {
-          await this.showViewAndGotoRoute(route, activation);
+          this.showViewAndGotoRoute(route, activation);
         } else {
           this.updateViewRouteState(route);
           await this.activeView_?.update(route);
@@ -105,7 +105,7 @@ export class ScoutViewWebviewManager extends InspectWebviewManager<
     }
   }
 
-  public async showViewAndGotoRoute(
+  public showViewAndGotoRoute(
     route: RouteMessage,
     activation?: "open" | "activate"
   ) {

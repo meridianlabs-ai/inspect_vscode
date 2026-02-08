@@ -273,7 +273,7 @@ function scanToLogItem(scan: ScanRow): LogItem {
 }
 
 function scanConfig(scan: ScanRow): string[] | undefined {
-  let config: Record<string, unknown> = {};
+  const config: Record<string, unknown> = {};
 
   // model
   if (scan.model) {
