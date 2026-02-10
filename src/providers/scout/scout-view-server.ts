@@ -137,9 +137,8 @@ export class ScoutViewServer extends PackageViewServer {
     );
     const scanFile = encodeURIComponent(Buffer.from(file).toString("base64"));
     return (
-      await this.api_json(`/api/v2/scans/${base64Dir}/${scanFile}`),
-      "DELETE"
-    );
+      await this.api_json(`/api/v2/scans/${base64Dir}/${scanFile}`, "DELETE")
+    ).data;
   }
 
   /**

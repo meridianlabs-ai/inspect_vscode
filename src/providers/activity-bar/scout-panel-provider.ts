@@ -89,9 +89,11 @@ export class ScoutPanelProvider implements WebviewViewProvider {
     );
 
     // Cleanup on dispose
-    webviewView.onDidDispose(() => {
-      this.dispose();
-    });
+    this.disposables_.push(
+      webviewView.onDidDispose(() => {
+        this.dispose();
+      })
+    );
   }
 
   private async sendInitialize() {

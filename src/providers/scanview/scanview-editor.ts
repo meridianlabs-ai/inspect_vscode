@@ -39,17 +39,10 @@ class ScoutScanReadonlyEditor implements vscode.CustomReadonlyEditorProvider {
     _openContext: vscode.CustomDocumentOpenContext,
     _token: vscode.CancellationToken
   ): Promise<vscode.CustomDocument> {
-    // Parse any params from the Uri
-    const queryParams = new URLSearchParams(uri.query);
-    const scanner = queryParams.get("scanner");
-    const transcript_id = queryParams.get("transcript_id");
-
     // Return the document with additional info attached to payload
     return {
       uri: uri,
       dispose: () => {},
-      scanner: scanner,
-      transcript_id: transcript_id,
     } as vscode.CustomDocument & { scanner?: string; transcript_id?: string };
   }
 
