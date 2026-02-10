@@ -24,9 +24,9 @@ import projectSchema from "../../../assets/schemas/project.schema.json";
  * Represents the parsed content of scout.yml/scout.yaml files.
  */
 export interface ScoutProjectConfig {
-  name: string;
-  results: string; // scans output directory (default: "./scans")
-  transcripts: string | string[]; // transcript sources (default: "./logs")
+  name?: string | null;
+  results?: string | null;
+  transcripts?: string | null;
   model?: string | null;
   model_args?: Record<string, unknown> | string | null;
   model_base_url?: string | null;
@@ -39,6 +39,8 @@ export interface ScoutProjectConfig {
   metadata?: Record<string, unknown> | null;
   tags?: string[] | null;
   scanners?: unknown[] | Record<string, unknown> | null;
+  scans?: string | null;
+  filter?: string | string[];
   validation?: Record<string, unknown> | null;
   worklist?: unknown[] | null;
   generate_config?: Record<string, unknown> | null;
@@ -57,8 +59,7 @@ export interface ScoutProjectChangedEvent {
  * Default configuration used when no scout.yml/yaml file exists.
  */
 const DEFAULT_CONFIG: ScoutProjectConfig = {
-  name: "job",
-  results: "./scans",
+  scans: "./scans",
   transcripts: "./logs",
 };
 
@@ -102,7 +103,7 @@ export class ScoutProjectManager implements Disposable {
         await this.refresh();
       },
       500,
-      { leading: true, trailing: true }
+      { leading: false, trailing: true }
     );
 
     this.watcher_.onDidCreate(throttledRefresh);
@@ -191,11 +192,6 @@ export class ScoutProjectManager implements Disposable {
         const config: ScoutProjectConfig = {
           ...DEFAULT_CONFIG,
           ...parsed,
-          name: (parsed.name as string) || DEFAULT_CONFIG.name,
-          results: (parsed.results as string) || DEFAULT_CONFIG.results,
-          transcripts:
-            (parsed.transcripts as string | string[]) ||
-            DEFAULT_CONFIG.transcripts,
         };
 
         log.info(`Loaded scout project config from ${filename}`);

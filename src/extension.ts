@@ -224,7 +224,7 @@ export async function activateScout(
 ): Promise<[PackageManager, Command[]]> {
   // Scout Project watches for scout.yml/yaml config files
   start("Setup Scout Project");
-  const [projectCommands, _scoutProjectManager] = activateScoutProject(context);
+  const [projectCommands, scoutProjectManager] = activateScoutProject(context);
   end("Setup Scout Project");
 
   // Scout Manager watches for changes to scout binary
@@ -257,7 +257,7 @@ export async function activateScout(
   start("Scout Activity Bar");
   const activityBarCommands = await activateScoutActivityBar(
     scoutManager,
-    workspaceEnvManager,
+    scoutProjectManager,
     server,
     outputWatcher,
     context

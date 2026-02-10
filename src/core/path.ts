@@ -1,6 +1,7 @@
 import path, { basename, dirname, join } from "path";
 import { activeWorkspaceFolder } from "./workspace";
 import { existsSync } from "fs";
+import { Uri } from "vscode";
 
 export type UnknownPath = string;
 
@@ -29,6 +30,11 @@ export const workspacePath = (unknownPath?: UnknownPath) => {
     const absolutePath = path.resolve(workspaceRoot.fsPath, unknownPath);
     return toAbsolutePath(absolutePath);
   }
+};
+
+export const workspaceUri = (unknownPath?: UnknownPath): Uri => {
+  const absPath = workspacePath(unknownPath);
+  return Uri.file(absPath.path);
 };
 
 export const workspaceRelativePath = (absPath: AbsolutePath) => {

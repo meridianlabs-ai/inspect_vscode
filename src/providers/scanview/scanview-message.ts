@@ -32,7 +32,7 @@ export function viewScanRouteMessage(
 export function viewRouteMessage(
   route: "scans" | "transcripts" | "validation" | "project"
 ) {
-  return routeStateMessage(route, "full");
+  return routeStateMessage(`/${route}`, "full");
 }
 
 const routeStateMessage = (

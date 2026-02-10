@@ -1,5 +1,4 @@
 import { ExtensionContext, window } from "vscode";
-import { WorkspaceEnvManager } from "../workspace/workspace-env-provider";
 import { activateScanListing } from "./log-listing/scan-listing-provider";
 import { end, start } from "../../core/log";
 import { PackageManager } from "../../core/package/manager";
@@ -7,10 +6,11 @@ import { ScoutPanelProvider } from "./scout-panel-provider";
 import { Command } from "../../core/command";
 import { ScoutViewServer } from "../scout/scout-view-server";
 import { OutputWatcher } from "../../core/package/output-watcher";
+import { ScoutProjectManager } from "../scout/scout-project";
 
 export async function activateScoutActivityBar(
   scoutManager: PackageManager,
-  workspaceEnvMgr: WorkspaceEnvManager,
+  scoutProjectManager: ScoutProjectManager,
   scoutViewServer: ScoutViewServer,
   outputWatcher: OutputWatcher,
   context: ExtensionContext
@@ -18,7 +18,7 @@ export async function activateScoutActivityBar(
   start("Scan Listing");
   const [scansCommands, scansDispose] = await activateScanListing(
     context,
-    workspaceEnvMgr,
+    scoutProjectManager,
     scoutViewServer,
     outputWatcher
   );

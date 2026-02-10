@@ -3,8 +3,7 @@ import * as os from "os";
 import { Uri } from "vscode";
 
 export function resolveToUri(pathOrUri: string): Uri {
-  const uriPattern = /^[a-zA-Z][a-zA-Z0-9+.-]*:/;
-  if (uriPattern.test(pathOrUri)) {
+  if (isUri(pathOrUri)) {
     try {
       return Uri.parse(pathOrUri);
     } catch (_error) {
@@ -92,4 +91,9 @@ export function normalizeWindowsUri(uri: string) {
   } else {
     return uri;
   }
+}
+
+export function isUri(str: string): boolean {
+  const uriPattern = /^[a-zA-Z][a-zA-Z0-9+.-]*:/;
+  return uriPattern.test(str);
 }

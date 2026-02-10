@@ -2,24 +2,29 @@ import * as vscode from "vscode";
 
 import { Command } from "../../../core/command";
 
-import { WorkspaceEnvManager } from "../../workspace/workspace-env-provider";
 import { LogItem, LogListing, LogNode, Logs } from "./log-listing";
 import { activeWorkspaceFolder } from "../../../core/workspace";
-import { getRelativeUri, prettyUriPath } from "../../../core/uri";
+import {
+  getRelativeUri,
+  isUri,
+  prettyUriPath,
+  resolveToUri,
+} from "../../../core/uri";
 import { Uri } from "vscode";
 import { ScansTreeDataProvider } from "./scan-listing-data";
 import { ScoutViewServer } from "../../scout/scout-view-server";
 import { ScanResultsListingMRU } from "../../scanview/scanview-view";
 import { stringify } from "yaml";
 import { OutputWatcher } from "../../../core/package/output-watcher";
+import { ScoutProjectManager } from "../../scout/scout-project";
+import { workspaceUri } from "../../../core/path";
 
 export async function activateScanListing(
   context: vscode.ExtensionContext,
-  envManager: WorkspaceEnvManager,
+  scoutProjectManager: ScoutProjectManager,
   viewServer: ScoutViewServer,
   outputWatcher: OutputWatcher
 ): Promise<[Command[], vscode.Disposable[]]> {
-  const kScanResultsDir = "inspect_ai.scanResultsDir";
   const disposables: vscode.Disposable[] = [];
 
   // create tree data provider and tree
@@ -34,20 +39,22 @@ export async function activateScanListing(
   // update the tree based on the current preferred log dir
   const updateTree = () => {
     // see what the active scan dir is
-    const preferredLogDir = context.workspaceState.get<string>(kScanResultsDir);
-    const logDir = preferredLogDir
-      ? Uri.parse(preferredLogDir)
-      : envManager.getDefaultScanResultsDir();
+    const scanResultsDir = scoutProjectManager.getConfig().scans ?? "./scans";
 
-    // create a logs fetcher
-    const logsFetcher = async (uri: Uri): Promise<Logs | undefined> => {
+    // Resolve the scan dir
+    const scanDir = isUri(scanResultsDir)
+      ? resolveToUri(scanResultsDir)
+      : workspaceUri(scanResultsDir);
+
+    // create a scans fetcher
+    const scansFetcher = async (uri: Uri): Promise<Logs | undefined> => {
       const scansJSON = await viewServer.getScans(uri);
       if (scansJSON) {
         const scans = JSON.parse(scansJSON) as {
           items: Array<ScanRow>;
         };
         return {
-          log_dir: logDir.toString(),
+          log_dir: scanDir.toString(),
           items: scans.items.map(scanToLogItem),
         };
       } else {
@@ -57,15 +64,15 @@ export async function activateScanListing(
 
     // set it
     treeDataProvider.setLogListing(
-      new LogListing(logDir, new ScanResultsListingMRU(context), logsFetcher)
+      new LogListing(scanDir, new ScanResultsListingMRU(context), scansFetcher)
     );
     // show a workspace relative path if this is in the workspace,
     // otherwise show the protocol then the last two bits of the path
-    const relativePath = getRelativeUri(activeWorkspaceFolder().uri, logDir);
+    const relativePath = getRelativeUri(activeWorkspaceFolder().uri, scanDir);
     if (relativePath) {
       tree.description = `./${relativePath}`;
     } else {
-      tree.description = prettyUriPath(logDir);
+      tree.description = prettyUriPath(scanDir);
     }
   };
 
@@ -74,10 +81,8 @@ export async function activateScanListing(
 
   // update tree if the environment changes and we are tracking the workspace log dir
   disposables.push(
-    envManager.onEnvironmentChanged(() => {
-      if (context.workspaceState.get<string>(kScanResultsDir) === undefined) {
-        updateTree();
-      }
+    scoutProjectManager.onConfigChanged(() => {
+      updateTree();
     })
   );
 
