@@ -434,8 +434,9 @@ def my_task():
         }
       };
 
-      setActiveTaskInfo({ name: "task1" });
-      setActiveTaskInfo({ name: "task1" }); // Same reference won't trigger
+      const task1 = { name: "task1" };
+      setActiveTaskInfo(task1);
+      setActiveTaskInfo(task1); // Same reference won't trigger
       setActiveTaskInfo({ name: "task2" });
       setActiveTaskInfo(undefined);
 

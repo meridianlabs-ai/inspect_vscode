@@ -222,18 +222,19 @@ suite("PackageManager Test Suite", () => {
     });
 
     test("should include bin path in event", () => {
-      const expectedPath = "/custom/path/inspect";
       const events: MockPackageChangedEvent[] = [];
+      let currentPath = "/initial/path/inspect";
 
       const manager = new TestPackageManager("inspect-ai", () => ({
-        path: expectedPath,
+        path: currentPath,
       }));
 
       manager.onPackageChanged(event => {
         events.push(event);
       });
 
-      // Trigger by changing path
+      // Change the path to trigger an event
+      currentPath = "/custom/path/inspect";
       manager.simulateInterpreterChange();
 
       // Should have received at least one event
