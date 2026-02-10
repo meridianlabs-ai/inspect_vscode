@@ -96,7 +96,8 @@ export class ScoutViewServer extends PackageViewServer {
     await this.ensureRunning();
     return (
       await this.api_json(
-        `/api/scan-delete/${encodeURIComponent(scanLocation.toString(true))}`
+        `/api/scan-delete/${encodeURIComponent(scanLocation.toString(true))}`,
+        "DELETE"
       )
     ).data;
   }

@@ -69,7 +69,11 @@ export class InspectViewServer extends PackageViewServer {
       params.append("log_dir", log_dir);
 
       return (
-        await this.api_json(`/api/log-files?${params.toString()}`, headers)
+        await this.api_json(
+          `/api/log-files?${params.toString()}`,
+          "GET",
+          headers
+        )
       ).data;
     } else {
       throw new Error("evalLogFile not implemented");
@@ -188,6 +192,7 @@ export class InspectViewServer extends PackageViewServer {
     return (
       await this.api_json(
         `/api/pending-samples?${params.toString()}`,
+        "GET",
         headers,
         handleError
       )
@@ -225,6 +230,7 @@ export class InspectViewServer extends PackageViewServer {
     return (
       await this.api_json(
         `/api/pending-sample-data?${params.toString()}`,
+        "GET",
         {},
         handleError
       )
