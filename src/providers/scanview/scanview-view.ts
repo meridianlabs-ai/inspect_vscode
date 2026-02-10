@@ -5,13 +5,11 @@ import {
   InspectWebviewManager,
 } from "../../components/webview";
 import { HostWebviewPanel } from "../../hooks";
-import { WorkspaceEnvManager } from "../workspace/workspace-env-provider";
-import { dirname, getRelativeUri } from "../../core/uri";
 import {
   PackageChangedEvent,
   PackageManager,
 } from "../../core/package/manager";
-import { ScanviewState } from "./scanview-state";
+import { RouteMessage, viewRouteMessage } from "./scanview-message";
 import { ScanviewPanel } from "./scanview-panel";
 import { scoutViewPath } from "../../scout/props";
 import { ScoutViewServer } from "../scout/scout-view-server";
@@ -20,27 +18,15 @@ import { ListingMRU } from "../../core/listing-mru";
 const kScanViewId = "inspect.scanview";
 
 export class ScoutViewManager {
-  constructor(
-    private readonly webViewManager_: ScoutViewWebviewManager,
-    private readonly envMgr_: WorkspaceEnvManager
-  ) {}
+  constructor(private readonly webViewManager_: ScoutViewWebviewManager) {}
 
-  public async showScoutView() {
-    const results_dir = this.envMgr_.getDefaultScanResultsDir();
-    if (results_dir) {
-      // Show the log view for the log dir (or the workspace)
-      await this.webViewManager_.showScanview({ results_dir }, "activate");
-    }
-  }
-
-  public async showScanDir(uri: Uri, activation?: "open" | "activate") {
-    await this.webViewManager_.showScanDir(uri, activation);
-  }
-
-  public scanDirWillVisiblyUpdate(uri: Uri): boolean {
-    return (
-      this.webViewManager_.isVisible() &&
-      this.webViewManager_.scanDirIsWithinResultsDir(uri)
+  public async showScoutView(
+    route?: "scans" | "transcripts" | "validation" | "project"
+  ) {
+    // Show the log view for the log dir (or the workspace)
+    await this.webViewManager_.showScoutRoute(
+      viewRouteMessage(route ?? "scans"),
+      "activate"
     );
   }
 
@@ -52,7 +38,7 @@ export class ScoutViewManager {
 export class ScoutViewWebviewManager extends InspectWebviewManager<
   ScoutViewWebview,
   ScoutViewServer,
-  ScanviewState
+  RouteMessage
 > {
   constructor(
     scoutManager: PackageManager,
@@ -83,62 +69,27 @@ export class ScoutViewWebviewManager extends InspectWebviewManager<
       ScoutViewWebview
     );
   }
-  private activeResultsDir_: Uri | null = null;
 
-  public async showScanDir(uri: Uri, activation?: "open" | "activate") {
-    // Get the directory name using posix path methods
-    const results_dir = dirname(uri);
-
-    await this.showScanview({ scan_dir: uri, results_dir }, activation);
-  }
-
-  public scanDirIsWithinResultsDir(scan_dir: Uri) {
-    const state = this.getWorkspaceState();
-    return (
-      state?.results_dir !== undefined &&
-      getRelativeUri(state?.results_dir, scan_dir) !== null
-    );
-  }
-
-  public async showScanDirIfWithinResultsDir(scan_dir: Uri) {
-    const state = this.getWorkspaceState();
-    if (state?.results_dir) {
-      if (getRelativeUri(state?.results_dir, scan_dir) !== null) {
-        await this.displayScanDir({
-          scan_dir: scan_dir,
-          results_dir: state?.results_dir,
-          background_refresh: true,
-        });
-      }
-    }
-  }
-
-  public async showScanview(
-    state: ScanviewState,
+  public async showScoutRoute(
+    route: RouteMessage,
     activation?: "open" | "activate"
   ) {
-    // update state for restoring the workspace
-    this.setWorkspaceState(state);
-
     switch (activation) {
       case "open":
-        await this.displayScanDir(state, activation);
+        this.showViewAndGotoRoute(route, activation);
         break;
       case "activate":
-        await this.displayScanDir(state, activation);
+        if (!this.isVisible()) {
+          this.showViewAndGotoRoute(route, activation);
+        } else {
+          this.updateViewRouteState(route);
+          await this.activeView_?.update(route);
+        }
         break;
       default:
         // No activation, just refresh this in the background
-        if (this.isVisible() && state.scan_dir) {
-          this.updateViewState(state);
-
-          // Signal the viewer to either perform a background refresh
-          // or to check whether the view is focused and call us back to
-          // display a log file
-          await this.activeView_?.backgroundUpdate(
-            state.scan_dir.path,
-            state.results_dir.toString()
-          );
+        if (this.isVisible()) {
+          this.updateViewRouteState(route);
         }
         return;
     }
@@ -154,26 +105,12 @@ export class ScoutViewWebviewManager extends InspectWebviewManager<
     }
   }
 
-  public async displayScanDir(
-    state: ScanviewState,
+  public showViewAndGotoRoute(
+    route: RouteMessage,
     activation?: "open" | "activate"
   ) {
-    // Determine whether we are showing a scan viewer for this directory
-    // If we aren't close the log viewer so a fresh one can be opened.
-    if (
-      this.activeResultsDir_ !== null &&
-      state.results_dir.toString() !== this.activeResultsDir_.toString()
-    ) {
-      // Close it
-      this.activeView_?.dispose();
-      this.activeView_ = undefined;
-    }
-
-    // Note the results dir that we are showing
-    this.activeResultsDir_ = state.results_dir || null;
-
     // Update the view state
-    this.updateViewState(state);
+    this.updateViewRouteState(route);
 
     // Ensure that we send the state once the view is loaded
     this.setOnShow(() => {
@@ -182,23 +119,19 @@ export class ScoutViewWebviewManager extends InspectWebviewManager<
 
     // If the view is closed, clear the state
     this.setOnClose(() => {
-      this.lastState_ = undefined;
-      this.activeResultsDir_ = null;
+      this.lastRouteMessage_ = undefined;
     });
 
     // Actually reveal or show the webview
     if (this.activeView_) {
       if (activation === "activate") {
         this.revealWebview(activation !== "activate");
-      } else if (state.scan_dir) {
-        await this.activeView_?.backgroundUpdate(
-          state.scan_dir.path,
-          state.results_dir.toString()
-        );
+      } else {
+        this.updateViewRouteState(route);
       }
     } else {
       if (activation) {
-        this.showWebview(state, {
+        this.showWebview(route, {
           preserveFocus: activation !== "activate",
           viewColumn: ViewColumn.One,
         });
@@ -210,82 +143,38 @@ export class ScoutViewWebviewManager extends InspectWebviewManager<
   }
 
   private async updateVisibleView() {
-    if (this.activeView_ && this.isVisible() && this.lastState_) {
-      await this.activeView_.update(this.lastState_);
+    if (this.activeView_ && this.isVisible() && this.lastRouteMessage_) {
+      await this.activeView_.update(this.lastRouteMessage_);
     }
   }
 
-  private updateViewState(state: ScanviewState) {
-    if (!this.lastState_ || !scanStateEquals(state, this.lastState_)) {
-      this.lastState_ = state;
+  private updateViewRouteState(route: RouteMessage) {
+    if (
+      !this.lastRouteMessage_ ||
+      this.lastRouteMessage_.route !== route.route
+    ) {
+      this.lastRouteMessage_ = route;
     }
   }
 
-  protected override getWorkspaceState(): ScanviewState | undefined {
-    const data: Record<string, string> = this.context_.workspaceState.get(
-      this.kScoutViewState,
-      {}
-    );
-    if (data) {
-      return {
-        results_dir: Uri.parse(data["results_dir"]),
-        scan_dir: data["scan_dir"] ? Uri.parse(data["scan_dir"]) : undefined,
-        background_refresh: !!data["background_refresh"],
-      };
-    } else {
-      return this.lastState_;
-    }
-  }
-
-  protected setWorkspaceState(state: ScanviewState) {
-    void this.context_.workspaceState.update(this.kScoutViewState, {
-      results_dir: state.results_dir.toString(),
-      scan_dir: state.scan_dir?.toString(),
-      background_refresh: state.background_refresh,
-    });
-  }
-
-  private kScoutViewState = "scoutViewState";
-
-  private lastState_?: ScanviewState = undefined;
+  private lastRouteMessage_?: RouteMessage = undefined;
 }
 
-const scanStateEquals = (a: ScanviewState, b: ScanviewState) => {
-  if (a.results_dir.toString() !== b.results_dir.toString()) {
-    return false;
-  }
-
-  if (!a.scan_dir && b.scan_dir) {
-    return false;
-  } else if (a.scan_dir && !b.scan_dir) {
-    return false;
-  } else if (a.scan_dir && b.scan_dir) {
-    return a.scan_dir.toString() === b.scan_dir.toString();
-  }
-  return true;
-};
-
-class ScoutViewWebview extends InspectWebview<ScanviewState> {
+class ScoutViewWebview extends InspectWebview<RouteMessage> {
   private readonly scanviewPanel_: ScanviewPanel;
 
   public constructor(
     context: ExtensionContext,
     server: ScoutViewServer,
-    state: ScanviewState,
+    message: RouteMessage,
     webviewPanel: HostWebviewPanel
   ) {
     super(context, webviewPanel);
 
-    this.scanviewPanel_ = new ScanviewPanel(
-      webviewPanel,
-      context,
-      server,
-      "results",
-      state.results_dir
-    );
+    this.scanviewPanel_ = new ScanviewPanel(webviewPanel, context, server);
     this._register(this.scanviewPanel_);
 
-    this.show(state);
+    this.show(message);
   }
 
   public setManager(manager: ScoutViewWebviewManager) {
@@ -295,23 +184,12 @@ class ScoutViewWebview extends InspectWebview<ScanviewState> {
   }
   _manager: ScoutViewWebviewManager | undefined;
 
-  public async update(state: ScanviewState) {
-    await this._webviewPanel.webview.postMessage({
-      type: "updateState",
-      url: state.scan_dir?.toString(),
-    });
+  public async update(message: RouteMessage) {
+    await this._webviewPanel.webview.postMessage(message);
   }
 
-  public async backgroundUpdate(scan_dir: string, results_dir: string) {
-    await this._webviewPanel.webview.postMessage({
-      type: "backgroundUpdate",
-      url: scan_dir,
-      results_dir,
-    });
-  }
-
-  protected getHtml(state: ScanviewState): string {
-    return this.scanviewPanel_.getHtml(state);
+  protected getHtml(message: RouteMessage): string {
+    return this.scanviewPanel_.getHtml(message);
   }
 }
 

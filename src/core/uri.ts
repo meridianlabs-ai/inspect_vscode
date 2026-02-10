@@ -3,8 +3,7 @@ import * as os from "os";
 import { Uri } from "vscode";
 
 export function resolveToUri(pathOrUri: string): Uri {
-  const uriPattern = /^[a-zA-Z][a-zA-Z0-9+.-]*:/;
-  if (uriPattern.test(pathOrUri)) {
+  if (isUri(pathOrUri)) {
     try {
       return Uri.parse(pathOrUri);
     } catch (_error) {
@@ -32,6 +31,15 @@ export function dirname(uri: Uri): Uri {
     const parsedUrl = new URL(uri.toString());
     parsedUrl.pathname = path.dirname(parsedUrl.pathname);
     return Uri.parse(parsedUrl.toString());
+  }
+}
+
+export function basename(uri: Uri): string {
+  if (uri.scheme === "file") {
+    return path.basename(uri.fsPath);
+  } else {
+    const parsedUrl = new URL(uri.toString());
+    return path.basename(parsedUrl.pathname);
   }
 }
 
@@ -83,4 +91,9 @@ export function normalizeWindowsUri(uri: string) {
   } else {
     return uri;
   }
+}
+
+export function isUri(str: string): boolean {
+  const uriPattern = /^[a-zA-Z][a-zA-Z0-9+.-]*:/;
+  return uriPattern.test(str);
 }

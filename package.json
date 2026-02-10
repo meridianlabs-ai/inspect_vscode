@@ -38,6 +38,7 @@
     "onWebviewPanel:inspect_ai.logs-view",
     "onWebviewPanel:inspect_ai.scans-view",
     "onWebviewPanel:inspect_ai.env-configuration-view",
+    "onWebviewPanel:inspect_ai.scout-env-configuration-view",
     "onWebviewPanel:inspect_ai.task-outline-view",
     "onLanguage:eval",
     "workspaceContains:**/*.eval",
@@ -110,6 +111,34 @@
         "command": "inspect.scoutViewScan",
         "title": "Open Scan...",
         "icon": "$(code-oss)",
+        "category": "Scout",
+        "enablement": "workspaceFolderCount != 0 && inspect_ai.inspect_scout.installed == true"
+      },
+      {
+        "command": "inspect.scoutViewProject",
+        "title": "Project Config",
+        "icon": "$(settings-gear)",
+        "category": "Scout",
+        "enablement": "workspaceFolderCount != 0 && inspect_ai.inspect_scout.installed == true"
+      },
+      {
+        "command": "inspect.scoutViewTranscripts",
+        "title": "Transcripts",
+        "icon": "$(file-text)",
+        "category": "Scout",
+        "enablement": "workspaceFolderCount != 0 && inspect_ai.inspect_scout.installed == true"
+      },
+      {
+        "command": "inspect.scoutViewScans",
+        "title": "Scans",
+        "icon": "$(graph)",
+        "category": "Scout",
+        "enablement": "workspaceFolderCount != 0 && inspect_ai.inspect_scout.installed == true"
+      },
+      {
+        "command": "inspect.scoutViewValidations",
+        "title": "Validations",
+        "icon": "$(checklist)",
         "category": "Scout",
         "enablement": "workspaceFolderCount != 0 && inspect_ai.inspect_scout.installed == true"
       },
@@ -397,6 +426,12 @@
       ],
       "inspect_ai-activity-bar-scout": [
         {
+          "type": "webview",
+          "id": "inspect_ai.scout-env-configuration-view",
+          "name": "Inspect Scout",
+          "when": "workspaceFolderCount != 0 && inspect_ai.task-outline-view.noInspect == false && inspect_ai.inspect_scout.installed == true"
+        },
+        {
           "id": "inspect_ai.scans-view",
           "name": "Scans",
           "when": "workspaceFolderCount != 0 && inspect_ai.inspect_scout.installed == true"
@@ -446,7 +481,7 @@
           "group": "navigation"
         },
         {
-          "command": "inspect.logListingRefresh",
+          "command": "inspect.scanListingRefresh",
           "when": "view == inspect_ai.scans-view",
           "group": "navigation"
         },
@@ -641,6 +676,7 @@
     "async-lock": "^1.4.1",
     "date-fns": "^4.1.0",
     "lodash": "^4.17.21",
+    "ajv": "^8.17.1",
     "semver": "^7.7.0",
     "yaml": "^2.8.0"
   }

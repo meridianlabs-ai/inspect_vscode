@@ -39,6 +39,7 @@ import { activateScanview } from "./providers/scanview/scanview";
 import { activateScoutActivityBar } from "./providers/activity-bar/scout-activity-bar-provider";
 import { activateScoutCodeLens } from "./providers/codelens/scout-codelens-provider";
 import { activateScoutScanManager } from "./providers/scout/scout-scan";
+import { activateScoutProject } from "./providers/scout/scout-project";
 import { activateWorkspaceEnvironment } from "./providers/environment";
 import { activateOpenScan } from "./providers/openscan";
 import { activateYamlSchemaProvider } from "./providers/yaml/yaml-schema-provider";
@@ -221,6 +222,11 @@ export async function activateScout(
   outputWatcher: OutputWatcher,
   _settingsMgr: InspectSettingsManager
 ): Promise<[PackageManager, Command[]]> {
+  // Scout Project watches for scout.yml/yaml config files
+  start("Setup Scout Project");
+  const [projectCommands, scoutProjectManager] = activateScoutProject(context);
+  end("Setup Scout Project");
+
   // Scout Manager watches for changes to scout binary
   start("Monitor Scout Binary");
   const scoutManager = activateScoutManager(context);
@@ -250,7 +256,8 @@ export async function activateScout(
   // Activate the Activity Bar
   start("Scout Activity Bar");
   const activityBarCommands = await activateScoutActivityBar(
-    workspaceEnvManager,
+    scoutManager,
+    scoutProjectManager,
     server,
     outputWatcher,
     context
@@ -279,7 +286,12 @@ export async function activateScout(
 
   return Promise.resolve([
     scoutManager,
-    [...scoutViewCommands, ...activityBarCommands, ...scanManagerCommands],
+    [
+      ...projectCommands,
+      ...scoutViewCommands,
+      ...activityBarCommands,
+      ...scanManagerCommands,
+    ],
   ]);
 }
 

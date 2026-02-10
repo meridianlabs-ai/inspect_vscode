@@ -190,7 +190,7 @@
         "effort": {
           "anyOf": [
             {
-              "enum": ["low", "medium", "high"],
+              "enum": ["low", "medium", "high", "max"],
               "type": "string"
             },
             {
@@ -212,6 +212,19 @@
           ],
           "default": null,
           "title": "Extra Body"
+        },
+        "extra_headers": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Extra Headers"
         },
         "frequency_penalty": {
           "anyOf": [
@@ -816,6 +829,43 @@
           "default": null,
           "title": "Labels"
         },
+        "predicate": {
+          "anyOf": [
+            {
+              "enum": [
+                "gt",
+                "gte",
+                "lt",
+                "lte",
+                "eq",
+                "ne",
+                "contains",
+                "startswith",
+                "endswith",
+                "icontains",
+                "iequals"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Predicate"
+        },
+        "split": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Split"
+        },
         "target": {
           "anyOf": [
             {
@@ -867,6 +917,24 @@
           ],
           "default": "eq",
           "title": "Predicate"
+        },
+        "split": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Split"
         }
       },
       "required": ["cases"],
@@ -897,6 +965,20 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "additionalProperties": true,
   "properties": {
+    "filter": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      ],
+      "title": "Filter"
+    },
     "generate_config": {
       "anyOf": [
         {
@@ -1033,9 +1115,16 @@
       "title": "Model Roles"
     },
     "name": {
-      "default": "job",
-      "title": "Name",
-      "type": "string"
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Name"
     },
     "results": {
       "anyOf": [
@@ -1067,6 +1156,18 @@
       ],
       "default": null,
       "title": "Scanners"
+    },
+    "scans": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Scans"
     },
     "shuffle": {
       "anyOf": [
@@ -1102,12 +1203,6 @@
       "anyOf": [
         {
           "type": "string"
-        },
-        {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
         },
         {
           "type": "null"

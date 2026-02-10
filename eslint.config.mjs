@@ -20,6 +20,7 @@ export default defineConfig([
     "**/dist",
     "**/*.d.ts",
     "src/providers/activity-bar/webview/env-config-webview.ts",
+    "src/providers/activity-bar/webview/scout-panel-webview.ts",
     "src/providers/activity-bar/webview/env-utils.ts",
     "src/providers/activity-bar/webview/env-utils-model.ts",
     "src/providers/activity-bar/webview/task-config-webview.ts",
