@@ -195,9 +195,11 @@ export class EnvConfigurationProvider<T extends EnvConfig>
     );
 
     // Attach a listener to clean up resources when the webview is disposed
-    webviewView.onDidDispose(() => {
-      this.dispose();
-    });
+    this.disposables_.push(
+      webviewView.onDidDispose(() => {
+        this.dispose();
+      })
+    );
   }
 
   protected htmlForWebview(_webview: Webview): string {

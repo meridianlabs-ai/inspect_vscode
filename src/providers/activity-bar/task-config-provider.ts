@@ -231,9 +231,11 @@ export class TaskConfigurationProvider implements WebviewViewProvider {
     );
 
     // Attach a listener to clean up resources when the webview is disposed
-    webviewView.onDidDispose(() => {
-      this.dispose();
-    });
+    this.disposables_.push(
+      webviewView.onDidDispose(() => {
+        this.dispose();
+      })
+    );
   }
   private disposables_: Disposable[] = [];
   private dispose() {
