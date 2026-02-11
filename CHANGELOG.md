@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.0](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.8.0...v0.9.0) (2026-02-11)
+
+
+### Features
+
+* Scout Activity Panel and other Scout improvements ([#53](https://github.com/meridianlabs-ai/inspect_vscode/issues/53)) ([de27d4d](https://github.com/meridianlabs-ai/inspect_vscode/commit/de27d4d920d4b7098011b7076af042cf4c7dea2a))
+
 ## [0.8.0](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.7.5...v0.8.0) (2026-02-03)
 
 
