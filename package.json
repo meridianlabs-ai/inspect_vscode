@@ -143,6 +143,53 @@
         "enablement": "workspaceFolderCount != 0 && inspect_ai.inspect_scout.installed == true"
       },
       {
+        "command": "inspect.openLogViewer",
+        "title": "Open in Inspect Log Viewer",
+        "enablement": "workspaceFolderCount != 0"
+      },
+      {
+        "command": "inspect.openScanViewer",
+        "title": "Open in Scout Scan Viewer",
+        "enablement": "workspaceFolderCount != 0 && inspect_ai.inspect_scout.installed == true"
+      },
+      {
+        "command": "inspect.scanListingReveal",
+        "title": "Reveal Scan Listing",
+        "category": "Scout",
+        "enablement": "workspaceFolderCount != 0 && inspect_ai.inspect_scout.installed == true"
+      },
+      {
+        "command": "inspect.scanListingRefresh",
+        "title": "Refresh Scan Listing",
+        "icon": "$(refresh)",
+        "category": "Scout",
+        "enablement": "workspaceFolderCount != 0 && inspect_ai.inspect_scout.installed == true"
+      },
+      {
+        "command": "inspect.scanListingRevealInExplorer",
+        "title": "Reveal in Explorer",
+        "enablement": "workspaceFolderCount != 0"
+      },
+      {
+        "command": "inspect.scanListingDeleteScan",
+        "title": "Delete Scan...",
+        "enablement": "workspaceFolderCount != 0 && inspect_ai.inspect_scout.installed == true"
+      },
+      {
+        "command": "inspect.runScoutScan",
+        "title": "Run Scan",
+        "icon": "$(play)",
+        "category": "Scout",
+        "enablement": "workspaceFolderCount != 0 && inspect_ai.inspect_scout.installed == true"
+      },
+      {
+        "command": "inspect.debugScoutScan",
+        "title": "Debug Scan",
+        "icon": "$(debug-alt)",
+        "category": "Scout",
+        "enablement": "workspaceFolderCount != 0 && inspect_ai.inspect_scout.installed == true"
+      },
+      {
         "command": "inspect.createTask",
         "title": "Create Task",
         "category": "Inspect",
@@ -272,53 +319,6 @@
         "icon": "$(debug-alt)",
         "title": "Debug Task",
         "enablement": "workspaceFolderCount != 0"
-      },
-      {
-        "command": "inspect.openLogViewer",
-        "title": "Open in Inspect Log Viewer",
-        "enablement": "workspaceFolderCount != 0"
-      },
-      {
-        "command": "inspect.openScanViewer",
-        "title": "Open in Scout Scan Viewer",
-        "enablement": "workspaceFolderCount != 0"
-      },
-      {
-        "command": "inspect.scanListingReveal",
-        "title": "Reveal Scan Listing",
-        "category": "Scout",
-        "enablement": "workspaceFolderCount != 0"
-      },
-      {
-        "command": "inspect.scanListingRefresh",
-        "title": "Refresh Scan Listing",
-        "icon": "$(refresh)",
-        "category": "Scout",
-        "enablement": "workspaceFolderCount != 0"
-      },
-      {
-        "command": "inspect.scanListingRevealInExplorer",
-        "title": "Reveal in Explorer",
-        "enablement": "workspaceFolderCount != 0"
-      },
-      {
-        "command": "inspect.scanListingDeleteScan",
-        "title": "Delete Scan...",
-        "enablement": "workspaceFolderCount != 0"
-      },
-      {
-        "command": "inspect.runScoutScan",
-        "title": "Run Scan",
-        "icon": "$(play)",
-        "category": "Scout",
-        "enablement": "workspaceFolderCount != 0"
-      },
-      {
-        "command": "inspect.debugScoutScan",
-        "title": "Debug Scan",
-        "icon": "$(debug-alt)",
-        "category": "Scout",
-        "enablement": "workspaceFolderCount != 0"
       }
     ],
     "keybindings": [
@@ -429,7 +429,7 @@
           "type": "webview",
           "id": "inspect_ai.scout-env-configuration-view",
           "name": "Inspect Scout",
-          "when": "workspaceFolderCount != 0 && inspect_ai.task-outline-view.noInspect == false && inspect_ai.inspect_scout.installed == true"
+          "when": "workspaceFolderCount != 0 && inspect_ai.inspect_scout.installed == true"
         },
         {
           "id": "inspect_ai.scans-view",
