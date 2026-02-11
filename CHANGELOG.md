@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.1](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.9.0...v0.9.1) (2026-02-11)
+
+
+### Bug Fixes
+
+* Require Scout 0.4.13 ([#56](https://github.com/meridianlabs-ai/inspect_vscode/issues/56)) ([65e4a81](https://github.com/meridianlabs-ai/inspect_vscode/commit/65e4a8158d74a0782fc76fa5c86c45269aa09496))
+
 ## [0.9.0](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.8.0...v0.9.0) (2026-02-11)
 
 
