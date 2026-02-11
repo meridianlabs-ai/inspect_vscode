@@ -18,7 +18,8 @@ export class PackageManager implements Disposable {
   constructor(
     context: ExtensionContext,
     private packageName_: string,
-    private checkForPackage_: () => AbsolutePath | null
+    private checkForPackage_: () => AbsolutePath | null,
+    private checkIsEnabled_: () => boolean = () => true
   ) {
     // If the interpreter changes, refresh the tasks
     context.subscriptions.push(
@@ -44,11 +45,15 @@ export class PackageManager implements Disposable {
         available: !!this.packageBinPath_,
         binPath,
       });
-      void commands.executeCommand(
-        "setContext",
-        `inspect_ai.${this.packageName_}.installed`,
-        this.available
-      );
+
+      // Notify listeners that the package is available
+      if (!this.checkIsEnabled_ || this.checkIsEnabled_()) {
+        void commands.executeCommand(
+          "setContext",
+          `inspect_ai.${this.packageName_}.installed`,
+          this.available
+        );
+      }
     }
     if (!available) {
       this.watchForPackage();
