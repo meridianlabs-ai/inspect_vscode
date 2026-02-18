@@ -12,9 +12,10 @@ import { TerminalLink, TerminalLinkContext } from "vscode";
 import { existsSync } from "fs";
 import { basename } from "path";
 import { OutputWatcher } from "../../core/package/output-watcher";
+import { isUri } from "../../core/uri";
 
 const kLogFilePattern = /^.*Log: (\S*?\.json|\S*?\.eval)\s*/g;
-const kEvalJsonPattern = /^(S*?\.json|\S*?\.eval)\s*/g;
+const kEvalJsonPattern = /(?:^|\s)(\S*?\.json|\S*?\.eval)\s*/g;
 
 interface LogViewTerminalLink extends TerminalLink {
   data: string;
@@ -73,10 +74,13 @@ export const logviewTerminalLinkProvider = (
         .map(match => {
           // The path from the terminal.
           const path = match[1];
-          // If this is a recently created log, we can use it
-          const fullPath = [...recentlyCreatedLogs].find(logPath =>
-            logPath.path.endsWith(path)
-          );
+
+          // If this is a recently created log or a full uri, we can use it
+          const fullPath = isUri(path)
+            ? path
+            : [...recentlyCreatedLogs].find(logPath =>
+                logPath.path.endsWith(path)
+              );
 
           if (fullPath) {
             // Sort out the decoration range for the link
