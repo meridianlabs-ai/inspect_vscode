@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.9.2](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.9.1...v0.9.2) (2026-02-18)
+
+
+### Bug Fixes
+
+* Improve Eval Link Detection ([#59](https://github.com/meridianlabs-ai/inspect_vscode/issues/59)) ([70281ea](https://github.com/meridianlabs-ai/inspect_vscode/commit/70281eac5198942d962279196f221aba4494347c))
+* Inherit process env for things like credentials ([#60](https://github.com/meridianlabs-ai/inspect_vscode/issues/60)) ([c0aa181](https://github.com/meridianlabs-ai/inspect_vscode/commit/c0aa18186e645118e8f03fb56c145d79675d5bd2))
+
 ## [0.9.1](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.9.0...v0.9.1) (2026-02-11)
 
 
