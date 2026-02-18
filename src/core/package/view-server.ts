@@ -177,6 +177,7 @@ export class PackageViewServer implements Disposable {
             const options: SpawnOptions = {
               cwd: activeWorkspacePath().path,
               env: {
+                ...process.env,
                 COLUMNS: "150",
                 INSPECT_VIEW_AUTHORIZATION_TOKEN: this.serverAuthToken_,
               },
