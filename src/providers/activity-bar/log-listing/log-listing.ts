@@ -161,7 +161,21 @@ export class LogListing {
   private nodes_: LogNode[] | undefined;
 }
 
+function deduplicateByName(logs: LogItem[]): LogItem[] {
+  const seen = new Set<string>();
+  return logs.filter(item => {
+    if (seen.has(item.name)) {
+      return false;
+    }
+    seen.add(item.name);
+    return true;
+  });
+}
+
 function buildLogTree(logs: LogItem[]): LogNode[] {
+  // With S3 logs, we've see duplicates be returned, but we need each tree item
+  // to be unique. This guarantees that.
+  const dedupedLogs = deduplicateByName(logs);
   const root: LogNode[] = [];
   const dirCache: Map<string, LogNode> = new Map();
 
@@ -196,7 +210,7 @@ function buildLogTree(logs: LogItem[]): LogNode[] {
   }
 
   // Process each log file
-  for (const log of logs) {
+  for (const log of dedupedLogs) {
     const parts = log.name.split("/");
     parts.pop()!; // remove the filename
     let currentParent: LogNode | undefined;
