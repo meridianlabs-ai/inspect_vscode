@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.3](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.9.2...v0.9.3) (2026-03-06)
+
+
+### Bug Fixes
+
+* Fix issue displaying S3 log directories with duplicated eval files ([#62](https://github.com/meridianlabs-ai/inspect_vscode/issues/62)) ([0763c08](https://github.com/meridianlabs-ai/inspect_vscode/commit/0763c0807cbdebee46b9b072798e839d0b2e657f))
+
 ## [0.9.2](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.9.1...v0.9.2) (2026-02-18)
 
 
