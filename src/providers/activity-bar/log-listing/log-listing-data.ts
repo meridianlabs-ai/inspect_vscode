@@ -36,7 +36,7 @@ export class LogTreeDataProvider extends LogListingTreeDataProvider {
 
     // base tree item
     const treeItem: TreeItem = {
-      id: element.name,
+      id: uri?.toString() ?? element.name,
       iconPath:
         element.iconPath ||
         (element.type === "file"
