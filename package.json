@@ -79,7 +79,7 @@
         "displayName": "Scout Scan Viewer",
         "selector": [
           {
-            "filenamePattern": "**/scan_id=*/*.parquet"
+            "filenamePattern": "**/scan_id=??????????????????????/*.parquet"
           }
         ],
         "priority": "default"
