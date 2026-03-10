@@ -70,11 +70,13 @@ class ScoutScanReadonlyEditor implements vscode.CustomReadonlyEditorProvider {
     // If not, this parquet file isn't a scan result — fall back to the
     // default editor instead of showing an empty scan viewer.
     if (!kScanIdPattern.test(scanJob)) {
+      const viewColumn = webviewPanel.viewColumn;
       webviewPanel.dispose();
       await vscode.commands.executeCommand(
         "vscode.openWith",
         document.uri,
-        "default"
+        "default",
+        viewColumn
       );
       return;
     }
