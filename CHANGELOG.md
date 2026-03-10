@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.4](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.9.3...v0.9.4) (2026-03-10)
+
+
+### Bug Fixes
+
+* Improve behavior when clicking on non-scan parquet files ([#64](https://github.com/meridianlabs-ai/inspect_vscode/issues/64)) ([db4ab98](https://github.com/meridianlabs-ai/inspect_vscode/commit/db4ab98065b48d8978c35edec62c5c3d79c75254))
+
 ## [0.9.3](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.9.2...v0.9.3) (2026-03-06)
 
 
