@@ -9,6 +9,9 @@ import { basename, dirname } from "../../core/uri";
 
 export const kScoutScanViewType = "inspect-ai.scout-scan-editor";
 
+const kScanIdPattern =
+  /^scan_id=[23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]{22}$/;
+
 class ScoutScanReadonlyEditor implements vscode.CustomReadonlyEditorProvider {
   static register(
     context: vscode.ExtensionContext,
@@ -61,6 +64,21 @@ class ScoutScanReadonlyEditor implements vscode.CustomReadonlyEditorProvider {
       scannerName = scanJob.replace(/\.parquet$/, "");
       scanJob = basename(scanDir);
       scanDir = dirname(scanDir);
+    }
+
+    // Validate that the parent directory is actually a scan_id directory.
+    // If not, this parquet file isn't a scan result — fall back to the
+    // default editor instead of showing an empty scan viewer.
+    if (!kScanIdPattern.test(scanJob)) {
+      const viewColumn = webviewPanel.viewColumn;
+      webviewPanel.dispose();
+      await vscode.commands.executeCommand(
+        "vscode.openWith",
+        document.uri,
+        "default",
+        viewColumn
+      );
+      return;
     }
 
     // local resource roots
