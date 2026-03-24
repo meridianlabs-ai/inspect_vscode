@@ -153,6 +153,12 @@ export function packageViewPath(
           // backwards compatibility only
           viewPath = toAbsolutePath(version.path).child("_view").child("www");
         }
+
+        if (!existsSync(viewPath.path)) {
+          // The dist folder moved in newer versions, so now check this newer location
+          viewPath = toAbsolutePath(version.path).child("_view").child("dist");
+        }
+
         packagePropsCache.setViewPath(viewPath);
         return viewPath;
       } catch (error) {

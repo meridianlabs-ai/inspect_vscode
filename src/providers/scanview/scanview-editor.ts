@@ -110,8 +110,7 @@ class ScoutScanReadonlyEditor implements vscode.CustomReadonlyEditorProvider {
       scannerName
     );
     webviewPanel.webview.html =
-      this.scanviewPanel_.getHtml(initialRouteMessage);
-    return Promise.resolve();
+      await this.scanviewPanel_.getHtml(initialRouteMessage);
   }
 
   dispose() {

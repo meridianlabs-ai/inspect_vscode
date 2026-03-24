@@ -2,6 +2,7 @@ import { ExtensionContext, Uri } from "vscode";
 
 import { PackageManager } from "../../core/package/manager";
 import { PackageViewServer } from "../../core/package/view-server";
+import { AbsolutePath, toAbsolutePath } from "../../core/path";
 import { scoutBinPath } from "../../scout/props";
 import { basename, dirname } from "../../core/uri";
 
@@ -117,6 +118,20 @@ export class ScoutViewServer extends PackageViewServer {
         ).data;
       },
     };
+  }
+
+  async getDistPath(): Promise<AbsolutePath | null> {
+    const result = await this.api_json(
+      "/api/v2/dist",
+      "GET",
+      undefined,
+      (status: number) => (status === 404 ? "null" : undefined)
+    );
+    if (result.data === "null") {
+      return null;
+    }
+    const { path } = JSON.parse(result.data) as { path: string };
+    return toAbsolutePath(path);
   }
 
   async getScans(scans_dir: Uri): Promise<string> {

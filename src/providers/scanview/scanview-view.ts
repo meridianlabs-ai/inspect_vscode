@@ -174,7 +174,7 @@ class ScoutViewWebview extends InspectWebview<RouteMessage> {
     this.scanviewPanel_ = new ScanviewPanel(webviewPanel, context, server);
     this._register(this.scanviewPanel_);
 
-    this.show(message);
+    void this.show(message);
   }
 
   public setManager(manager: ScoutViewWebviewManager) {
@@ -188,8 +188,8 @@ class ScoutViewWebview extends InspectWebview<RouteMessage> {
     await this._webviewPanel.webview.postMessage(message);
   }
 
-  protected getHtml(message: RouteMessage): string {
-    return this.scanviewPanel_.getHtml(message);
+  protected async getHtml(message: RouteMessage): Promise<string> {
+    return await this.scanviewPanel_.getHtml(message);
   }
 }
 

@@ -69,7 +69,7 @@ export class InspectWebviewManager<
 
   public showWebview(state: S, options?: ShowOptions): void {
     if (this.activeView_) {
-      this.activeView_.show(state, options);
+      void this.activeView_.show(state, options);
     } else {
       const view = this.createWebview(this.context_, state, options);
       this.registerWebviewListeners(view);
@@ -261,8 +261,8 @@ export abstract class InspectWebview<T> extends Disposable {
     super.dispose();
   }
 
-  public show(state: T, options?: ShowOptions) {
-    this._webviewPanel.webview.html = this.getHtml(state);
+  public async show(state: T, options?: ShowOptions) {
+    this._webviewPanel.webview.html = await this.getHtml(state);
     this._webviewPanel.reveal(options?.viewColumn, options?.preserveFocus);
   }
 
@@ -274,7 +274,7 @@ export abstract class InspectWebview<T> extends Disposable {
     return this._webviewPanel;
   }
 
-  protected abstract getHtml(state: T): string;
+  protected abstract getHtml(state: T): Promise<string> | string;
 
   protected getExtensionVersion(): string {
     return (this._context.extension.packageJSON as Record<string, unknown>)

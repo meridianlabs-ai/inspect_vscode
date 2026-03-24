@@ -10,7 +10,8 @@ export function getWebviewPanelHtml(
   panel: HostWebviewPanel,
   extensionVersion: string,
   unbundledCssOverride: Uri | null = null,
-  extraHead: string = ""
+  extraHead: string = "",
+  packageName: string = "the package"
 ): string {
   // read the index.html from the log view directory
   if (viewDir) {
@@ -22,6 +23,23 @@ export function getWebviewPanelHtml(
 
     // get base html
     let indexHtml = readFileSync(viewDir.child("index.html").path, "utf-8");
+
+    // If the index.html doesn't contain HTML looking text, then it is likely
+    // a git lfs pointer file. This can happen if the user is running 0.4.22, which
+    // will not have the 'dist' server endpoint but may have lfs files where the
+    // view assets are stored. In this case, show a message about updating the version.
+    const isHtml = indexHtml.includes("<html");
+    if (!isHtml) {
+      return `<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="Content-type" content="text/html;charset=UTF-8">
+</head>
+<body>
+Please update to a newer version of ${packageName} to view this content.
+</body>
+</html>`;
+    }
 
     // Determine whether this is the old unbundled version of the html or the new
     // bundled version

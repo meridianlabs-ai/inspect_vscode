@@ -327,7 +327,7 @@ class InspectViewWebview extends InspectWebview<LogviewState> {
       )
     );
 
-    this.show(state);
+    void this.show(state);
   }
 
   public setManager(manager: InspectViewWebviewManager) {
