@@ -125,7 +125,8 @@ export class LogviewPanel extends Disposable {
       this.panel_,
       this.getExtensionVersion(),
       overrideCssPath,
-      stateScript
+      stateScript,
+      "Inspect AI"
     );
   }
 
