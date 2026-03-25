@@ -55,4 +55,8 @@ const kInspectPackageIndexDepth = [
     name: "inspect_flow",
     depth: 2,
   },
+  {
+    name: "petri",
+    depth: 2,
+  },
 ];
