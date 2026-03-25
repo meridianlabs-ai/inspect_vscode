@@ -323,6 +323,29 @@
           "default": null,
           "title": "Max Tool Output"
         },
+        "modalities": {
+          "anyOf": [
+            {
+              "items": {
+                "anyOf": [
+                  {
+                    "const": "image",
+                    "type": "string"
+                  },
+                  {
+                    "$ref": "#/$defs/ImageOutput"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Modalities"
+        },
         "num_choices": {
           "anyOf": [
             {
@@ -535,6 +558,30 @@
         }
       },
       "title": "GenerateConfig",
+      "type": "object"
+    },
+    "ImageOutput": {
+      "additionalProperties": true,
+      "description": "Image output configuration.\n\nUse the `options` field to pass provider-specific options directly\nto the underlying API (e.g. OpenAI image_generation tool parameters).",
+      "properties": {
+        "options": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "propertyNames": {
+                "const": "openai"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Options"
+        }
+      },
+      "title": "ImageOutput",
       "type": "object"
     },
     "JSONSchema": {
