@@ -123,7 +123,8 @@ class InspectLogReadonlyEditor implements vscode.CustomReadonlyEditorProvider {
               }
             : undefined,
       };
-      webviewPanel.webview.html = this.logviewPanel_.getHtml(logViewState);
+      webviewPanel.webview.html =
+        await this.logviewPanel_.getHtml(logViewState);
     } else {
       const viewColumn = webviewPanel.viewColumn;
       await vscode.commands.executeCommand(

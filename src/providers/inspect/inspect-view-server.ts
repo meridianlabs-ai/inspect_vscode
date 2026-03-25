@@ -14,7 +14,11 @@ import {
   inspectEvalLogHeaders,
   inspectEvalLogs,
 } from "../../inspect/logs";
-import { activeWorkspacePath } from "../../core/path";
+import {
+  AbsolutePath,
+  activeWorkspacePath,
+  toAbsolutePath,
+} from "../../core/path";
 import { activeWorkspaceFolder } from "../../core/workspace";
 import { PackageManager } from "../../core/package/manager";
 import { PackageViewServer } from "../../core/package/view-server";
@@ -250,6 +254,20 @@ export class InspectViewServer extends PackageViewServer {
       console.log(`[CLIENT MESSAGE] (${log_file}): ${message}`);
       return Promise.resolve(undefined);
     }
+  }
+
+  async getDistPath(): Promise<AbsolutePath | null> {
+    const result = await this.api_json(
+      "/api/dist",
+      "GET",
+      undefined,
+      (status: number) => (status === 404 ? "null" : undefined)
+    );
+    if (result.data === "null") {
+      return null;
+    }
+    const { path } = JSON.parse(result.data) as { path: string };
+    return toAbsolutePath(path);
   }
 
   override async ensureRunning(): Promise<void> {
