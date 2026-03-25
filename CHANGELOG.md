@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.9.4](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.9.3...v0.9.4) (2026-03-25)
+
+
+### Bug Fixes
+
+* add petri package index depth ([#68](https://github.com/meridianlabs-ai/inspect_vscode/issues/68)) ([8e2b4ac](https://github.com/meridianlabs-ai/inspect_vscode/commit/8e2b4acf8f5f65a4c56c4db3a72b8c3ec4d54249))
+* Improve behavior when clicking on non-scan parquet files ([#64](https://github.com/meridianlabs-ai/inspect_vscode/issues/64)) ([db4ab98](https://github.com/meridianlabs-ai/inspect_vscode/commit/db4ab98065b48d8978c35edec62c5c3d79c75254))
+* Resolve Inspect view dist path from server to handle LFS stubs ([#69](https://github.com/meridianlabs-ai/inspect_vscode/issues/69)) ([ed1e199](https://github.com/meridianlabs-ai/inspect_vscode/commit/ed1e1992648885e586638807b8cf4a4fefcbf1a9))
+* Resolve Scout view dist path from server to handle LFS stubs ([#66](https://github.com/meridianlabs-ai/inspect_vscode/issues/66)) ([d364c2e](https://github.com/meridianlabs-ai/inspect_vscode/commit/d364c2e4844be3febfb757b66283ebc9beeeea6a))
+* update scout yaml schemas ([#67](https://github.com/meridianlabs-ai/inspect_vscode/issues/67)) ([04f2868](https://github.com/meridianlabs-ai/inspect_vscode/commit/04f28683b851cd8c74ec1f133fa257a458ad160d))
+
 ## [0.9.3](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.9.2...v0.9.3) (2026-03-06)
 
 
