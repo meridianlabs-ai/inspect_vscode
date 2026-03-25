@@ -352,7 +352,7 @@ class InspectViewWebview extends InspectWebview<LogviewState> {
     });
   }
 
-  protected getHtml(state: LogviewState): string {
-    return this.logviewPanel_.getHtml(state);
+  protected async getHtml(state: LogviewState): Promise<string> {
+    return await this.logviewPanel_.getHtml(state);
   }
 }

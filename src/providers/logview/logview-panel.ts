@@ -28,7 +28,7 @@ export class LogviewPanel extends Disposable {
   constructor(
     private panel_: HostWebviewPanel,
     private context_: ExtensionContext,
-    server: InspectViewServer,
+    private server_: InspectViewServer,
     type: "file" | "dir",
     uri: Uri
   ) {
@@ -40,38 +40,38 @@ export class LogviewPanel extends Disposable {
         if (type === "dir") {
           return JSON.stringify({ log_dir: uri.toString() });
         }
-        const result = await server.evalLogDir();
+        const result = await server_.evalLogDir();
         return result;
       },
       [kMethodEvalLogFiles]: async (params: unknown[]) =>
         type === "dir"
-          ? server.evalLogFiles(
+          ? server_.evalLogFiles(
               uri.toString(),
               params[0] as number,
               params[1] as number
             )
           : Promise.resolve(undefined),
       [kMethodEvalLogs]: async () =>
-        type === "dir" ? server.evalLogs(uri) : server.evalLogsSolo(uri),
+        type === "dir" ? server_.evalLogs(uri) : server_.evalLogsSolo(uri),
       [kMethodEvalLog]: (params: unknown[]) =>
-        server.evalLog(params[0] as string, params[1] as number | boolean),
+        server_.evalLog(params[0] as string, params[1] as number | boolean),
       [kMethodEvalLogSize]: (params: unknown[]) =>
-        server.evalLogSize(params[0] as string),
+        server_.evalLogSize(params[0] as string),
       [kMethodEvalLogBytes]: (params: unknown[]) =>
-        server.evalLogBytes(
+        server_.evalLogBytes(
           params[0] as string,
           params[1] as number,
           params[2] as number
         ),
       [kMethodEvalLogHeaders]: (params: unknown[]) =>
-        server.evalLogHeaders(params[0] as string[]),
+        server_.evalLogHeaders(params[0] as string[]),
       [kMethodPendingSamples]: (params: unknown[]) =>
-        server.evalLogPendingSamples(
+        server_.evalLogPendingSamples(
           params[0] as string,
           params[1] as string | undefined
         ),
       [kMethodSampleData]: (params: unknown[]) =>
-        server.evalLogSampleData(
+        server_.evalLogSampleData(
           params[0] as string,
           params[1] as string | number,
           params[2] as number,
@@ -82,7 +82,7 @@ export class LogviewPanel extends Disposable {
         const log_file = params[0] as string;
         const message = params[1] as string | undefined;
         log.info(`[CLIENT LOG] (${log_file}): ${message}`);
-        await server.logMessage(log_file, message);
+        await server_.logMessage(log_file, message);
       },
     });
 
@@ -95,7 +95,12 @@ export class LogviewPanel extends Disposable {
     this._pmUnsubcribe.dispose();
   }
 
-  public getHtml(state: LogviewState): string {
+  public async getHtml(state: LogviewState): Promise<string> {
+    // Try to resolve the dist path from the server (handles LFS resolution),
+    // falling back to the local scoutViewPath() if the endpoint isn't available.
+    const distDir = await this.server_.getDistPath();
+    const viewDir = distDir ?? inspectViewPath();
+
     // get override css path (used for older unbundled version of view)
     const overrideCssPath = this.extensionResourceUrl([
       "assets",
@@ -121,7 +126,7 @@ export class LogviewPanel extends Disposable {
       : "";
 
     return getWebviewPanelHtml(
-      inspectViewPath(),
+      viewDir,
       this.panel_,
       this.getExtensionVersion(),
       overrideCssPath,
