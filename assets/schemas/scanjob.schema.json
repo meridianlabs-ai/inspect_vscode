@@ -190,7 +190,12 @@
         "effort": {
           "anyOf": [
             {
-              "enum": ["low", "medium", "high", "max"],
+              "enum": [
+                "low",
+                "medium",
+                "high",
+                "max"
+              ],
               "type": "string"
             },
             {
@@ -323,6 +328,29 @@
           "default": null,
           "title": "Max Tool Output"
         },
+        "modalities": {
+          "anyOf": [
+            {
+              "items": {
+                "anyOf": [
+                  {
+                    "const": "image",
+                    "type": "string"
+                  },
+                  {
+                    "$ref": "#/$defs/ImageOutput"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Modalities"
+        },
         "num_choices": {
           "anyOf": [
             {
@@ -362,7 +390,14 @@
         "reasoning_effort": {
           "anyOf": [
             {
-              "enum": ["none", "minimal", "low", "medium", "high", "xhigh"],
+              "enum": [
+                "none",
+                "minimal",
+                "low",
+                "medium",
+                "high",
+                "xhigh"
+              ],
               "type": "string"
             },
             {
@@ -375,7 +410,12 @@
         "reasoning_history": {
           "anyOf": [
             {
-              "enum": ["none", "all", "last", "auto"],
+              "enum": [
+                "none",
+                "all",
+                "last",
+                "auto"
+              ],
               "type": "string"
             },
             {
@@ -388,7 +428,12 @@
         "reasoning_summary": {
           "anyOf": [
             {
-              "enum": ["none", "concise", "detailed", "auto"],
+              "enum": [
+                "none",
+                "concise",
+                "detailed",
+                "auto"
+              ],
               "type": "string"
             },
             {
@@ -523,7 +568,11 @@
         "verbosity": {
           "anyOf": [
             {
-              "enum": ["low", "medium", "high"],
+              "enum": [
+                "low",
+                "medium",
+                "high"
+              ],
               "type": "string"
             },
             {
@@ -535,6 +584,30 @@
         }
       },
       "title": "GenerateConfig",
+      "type": "object"
+    },
+    "ImageOutput": {
+      "additionalProperties": true,
+      "description": "Image output configuration.\n\nUse the `options` field to pass provider-specific options directly\nto the underlying API (e.g. OpenAI image_generation tool parameters).",
+      "properties": {
+        "options": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "propertyNames": {
+                "const": "openai"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Options"
+        }
+      },
+      "title": "ImageOutput",
       "type": "object"
     },
     "JSONSchema": {
@@ -707,7 +780,9 @@
           "type": "string"
         }
       },
-      "required": ["model"],
+      "required": [
+        "model"
+      ],
       "title": "ModelConfig",
       "type": "object"
     },
@@ -747,7 +822,10 @@
           "title": "Strict"
         }
       },
-      "required": ["name", "json_schema"],
+      "required": [
+        "name",
+        "json_schema"
+      ],
       "title": "ResponseSchema",
       "type": "object"
     },
@@ -794,7 +872,9 @@
           "type": "integer"
         }
       },
-      "required": ["name"],
+      "required": [
+        "name"
+      ],
       "title": "ScannerSpec",
       "type": "object"
     },
@@ -878,7 +958,9 @@
           "default": null
         }
       },
-      "required": ["id"],
+      "required": [
+        "id"
+      ],
       "title": "ValidationCase",
       "type": "object"
     },
@@ -937,7 +1019,9 @@
           "title": "Split"
         }
       },
-      "required": ["cases"],
+      "required": [
+        "cases"
+      ],
       "title": "ValidationSet",
       "type": "object"
     },
@@ -957,7 +1041,10 @@
           "type": "array"
         }
       },
-      "required": ["scanner", "transcripts"],
+      "required": [
+        "scanner",
+        "transcripts"
+      ],
       "title": "Worklist",
       "type": "object"
     }
