@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.5](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.9.4...v0.9.5) (2026-04-11)
+
+
+### Bug Fixes
+
+* Improve viewer file resolution ([#70](https://github.com/meridianlabs-ai/inspect_vscode/issues/70)) ([e2cb27e](https://github.com/meridianlabs-ai/inspect_vscode/commit/e2cb27e2eddb0b8ed01c63ab26919ee88059a8f6))
+
 ## [0.9.4](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.9.3...v0.9.4) (2026-03-25)
 
 
