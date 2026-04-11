@@ -143,20 +143,23 @@ export function packageViewPath(
           version: string;
           path: string;
         };
+
+        // First, check the preferred / new location
         let viewPath = toAbsolutePath(version.path)
           .child("_view")
-          .child("www")
           .child("dist");
 
         if (!existsSync(viewPath.path)) {
-          // The dist folder is only available on newer versions, this is for
-          // backwards compatibility only
-          viewPath = toAbsolutePath(version.path).child("_view").child("www");
+          // The dist folder moved in newer versions, so now check the previous location
+          viewPath = toAbsolutePath(version.path)
+            .child("_view")
+            .child("www")
+            .child("dist");
         }
 
         if (!existsSync(viewPath.path)) {
-          // The dist folder moved in newer versions, so now check this newer location
-          viewPath = toAbsolutePath(version.path).child("_view").child("dist");
+          // Now check for _super_ old locations (before there was even dist)
+          viewPath = toAbsolutePath(version.path).child("_view").child("www");
         }
 
         packagePropsCache.setViewPath(viewPath);
