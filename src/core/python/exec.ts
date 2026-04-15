@@ -47,7 +47,7 @@ const platformPaths = (interpreter: PythonInterpreter, binary: string) => {
   // find the folder that contained the python bin
   const binDir =
     interpreter.execCommand && interpreter.execCommand.length > 0
-      ? dirname(interpreter.execCommand[0])
+      ? dirname(interpreter.execCommand[0]!)
       : "";
 
   // Check in the bin dir next to the python interpreter (on all platforms)
@@ -69,7 +69,7 @@ export function runPython(args: string[], cwd?: AbsolutePath) {
   const execCommand = pythonInterpreter().execCommand;
   if (execCommand) {
     args = [...execCommand.slice(1), ...args];
-    return runProcess(execCommand[0], args, cwd);
+    return runProcess(execCommand[0]!, args, cwd);
   } else {
     throw new Error("No active Python interpreter available.");
   }
@@ -89,7 +89,7 @@ export function spawnPython(
 ) {
   const execCommand = pythonInterpreter().execCommand;
   if (execCommand) {
-    const cmd = execCommand[0];
+    const cmd = execCommand[0]!;
     args = [...execCommand.slice(1), ...args];
     return spawnProcess(cmd, args, { cwd: cwd.path }, io, lifecycle);
   } else {

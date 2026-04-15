@@ -107,7 +107,7 @@ export class LogElementQueueProcessor {
           for (let i = 0; i < evalLogs.length; i++) {
             const evalLog = evalLogs[i];
             const uri = uris[i];
-            const element = elementUris.get(uri);
+            const element = uri ? elementUris.get(uri) : undefined;
             if (element && evalLog?.version === 2) {
               // Populate the server provided props
               element.iconPath = iconForStatus(
@@ -165,7 +165,10 @@ export class LogElementQueueProcessor {
     // the max size
     if (this.elementCache.size > 500) {
       const keys = Array.from(this.elementCache.keys());
-      this.elementCache.delete(keys[0]);
+      const oldestKey = keys[0];
+      if (oldestKey !== undefined) {
+        this.elementCache.delete(oldestKey);
+      }
     }
   }
 
@@ -327,6 +330,9 @@ function evalResults(results: EvalResults): string[] {
   for (const score of results.scores) {
     for (const metricName of Object.keys(score.metrics)) {
       const metricValue = score.metrics[metricName];
+      if (!metricValue) {
+        continue;
+      }
       const value =
         metricValue.value === 1 ? "1.0" : formatNumber(metricValue.value);
       const name =

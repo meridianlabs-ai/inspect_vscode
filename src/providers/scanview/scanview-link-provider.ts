@@ -28,7 +28,7 @@ export const scanviewTerminalLinkProvider = (_context: ExtensionContext) => {
         // Forward matches
         const result = matches.map((match) => {
           // The path from the terminal.
-          const path = match[1];
+          const path = match[1]!;
 
           // Sort out the decoration range for the link
           const line = context.line;
@@ -86,7 +86,7 @@ export const resolveScanDirLink = async (link: string) => {
         if (filesInDir.length > 0) {
           // Found at least one file in a matching scan_id directory
           // Extract the directory path
-          const foundFilePath = filesInDir[0].path;
+          const foundFilePath = filesInDir[0]!.path;
           const scanIdIndex = foundFilePath.lastIndexOf(scanIdDir);
           if (scanIdIndex !== -1) {
             const dirPath = foundFilePath.substring(

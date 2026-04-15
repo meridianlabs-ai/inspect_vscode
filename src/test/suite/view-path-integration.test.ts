@@ -24,7 +24,7 @@ function findBinary(name: string): string | null {
     windowsHide: true,
   });
   if (result.status === 0 && result.stdout.trim()) {
-    return result.stdout.trim().split("\n")[0];
+    return result.stdout.trim().split("\n")[0] ?? null;
   }
   return null;
 }

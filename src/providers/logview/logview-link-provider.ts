@@ -56,7 +56,7 @@ export const logviewTerminalLinkProvider = (
         // Forward matches
         const result = matches.map((match) => {
           // The path from the terminal.
-          const path = match[1];
+          const path = match[1]!;
 
           // Sort out the decoration range for the link
           const line = context.line;
@@ -76,6 +76,9 @@ export const logviewTerminalLinkProvider = (
         .map((match) => {
           // The path from the terminal.
           const path = match[1];
+          if (!path) {
+            return undefined;
+          }
 
           // If this is a recently created log or a full uri, we can use it
           const fullPath = isUri(path)
@@ -143,7 +146,7 @@ export const resolveLogFile = async (link: string) => {
       const filename = basename(link);
       const files = await workspace.findFiles(`**/${filename}`);
       if (files.length === 1) {
-        return Uri.file(files[0].path);
+        return Uri.file(files[0]!.path);
       } else {
         return undefined;
       }

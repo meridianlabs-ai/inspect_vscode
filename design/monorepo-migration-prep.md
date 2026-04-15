@@ -33,16 +33,9 @@ Changed `arrowParens` to `"always"`, added `@ianvs/prettier-plugin-sort-imports`
 
 Rewrote eslint config: dropped `FlatCompat`, using `typescript-eslint` directly, added `eslint-config-prettier`, `eslint-plugin-import`, `eslint-import-resolver-typescript`, switched to `projectService`.
 
-### PR 4: TypeScript strictness alignment
+### ~~PR 4: TypeScript strictness alignment~~ ✅ Done
 
-Enable the two strict options the monorepo has that we don't:
-
-- `noUncheckedIndexedAccess: true`
-- `useUnknownInCatchVariables: true`
-
-Fix all resulting type errors. This is the most valuable prep step — these rules catch real bugs.
-
-**Files:** [tsconfig.json](tsconfig.json), various `.ts` source files
+Enabled `noUncheckedIndexedAccess` and `useUnknownInCatchVariables`. Fixed 127 type errors across 31 files (source + test + webview).
 
 ### PR 5: TypeScript 6 upgrade
 

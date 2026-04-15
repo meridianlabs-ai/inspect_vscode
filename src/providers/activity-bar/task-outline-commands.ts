@@ -103,7 +103,7 @@ export class EditSelectedTaskCommand implements Command {
     }
 
     if (this.tree_.selection.length === 1) {
-      const treeItem = this.tree_.selection[0];
+      const treeItem = this.tree_.selection[0]!;
       const fileUri = Uri.file(treeItem.taskPath.path);
 
       // If this is a folder, there is no edit action
@@ -115,7 +115,7 @@ export class EditSelectedTaskCommand implements Command {
       const task =
         treeItem.taskPath.type === "task"
           ? treeItem.taskPath.name
-          : treeItem.taskPath.children?.[0].name;
+          : treeItem.taskPath.children?.[0]?.name;
 
       // Note if/where the logview is showing
       const logViewColumn = this.inspectLogviewManager_.viewColumn();
@@ -193,7 +193,7 @@ export const findTargetViewColumn = (logViewColumn?: ViewColumn) => {
     // There are no editors with tasks, but if there is any active
     // editor, let's use that
     if (visibleEditors.length > 0) {
-      return visibleEditors[0].viewColumn;
+      return visibleEditors[0]!.viewColumn;
     }
   }
 

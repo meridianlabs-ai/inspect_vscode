@@ -13,7 +13,7 @@ export function cryptoRandom() {
   crypto.getRandomValues(arr);
 
   // keep all 32 bits of the the first, top 20 of the second for 52 random bits
-  const mantissa = arr[0] * Math.pow(2, 20) + (arr[1] >>> 12);
+  const mantissa = arr[0]! * Math.pow(2, 20) + (arr[1]! >>> 12);
 
   // shift all 52 bits to the right of the decimal point
   const result = mantissa * Math.pow(2, -52);

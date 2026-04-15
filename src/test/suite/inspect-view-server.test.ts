@@ -310,7 +310,7 @@ suite("InspectViewServer Test Suite", () => {
 
       assert.strictEqual(result.log_dir, "");
       assert.strictEqual(result.files.length, 1);
-      assert.strictEqual(result.files[0].name, logFile.toString(true));
+      assert.strictEqual(result.files[0]!.name, logFile.toString(true));
     });
 
     test("should use toString(true) for log file path", () => {

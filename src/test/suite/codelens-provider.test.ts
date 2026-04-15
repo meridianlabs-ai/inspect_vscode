@@ -54,7 +54,7 @@ class MockTextDocument implements TextDocument {
 
   lineAt(lineOrPos: number | Position): TextLine {
     const line = typeof lineOrPos === "number" ? lineOrPos : lineOrPos.line;
-    return new MockTextLine(this.lines[line], line);
+    return new MockTextLine(this.lines[line]!, line);
   }
 
   getText(): string {

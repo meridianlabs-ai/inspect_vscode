@@ -71,7 +71,7 @@ export class WorkspaceEnvManager implements Disposable {
     const envUri = this.getEnvUri();
     const keys = Object.keys(env);
     keys.forEach((key) => {
-      const value = env[key];
+      const value = env[key] ?? "";
       if (value === "") {
         // Only actually clear the value if it has changed
         if (this.env[key] && this.env[key] !== value) {
@@ -91,7 +91,7 @@ export class WorkspaceEnvManager implements Disposable {
   public getDefaultLogDir() {
     // See if there is a log dir
     const envVals = this.getValues();
-    const env_log = envVals[kInspectEnvValues.logDir];
+    const env_log = envVals[kInspectEnvValues.logDir] ?? "";
 
     // If there is a log dir, try to parse and use it
     try {
@@ -108,7 +108,7 @@ export class WorkspaceEnvManager implements Disposable {
   public getDefaultScanResultsDir() {
     // See if there is a log dir
     const envVals = this.getValues();
-    const envResults = envVals[kScoutEnvValues.scanResults];
+    const envResults = envVals[kScoutEnvValues.scanResults] ?? "";
 
     // If there is a results dir, try to parse and use it
     try {

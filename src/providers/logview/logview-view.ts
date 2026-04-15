@@ -247,7 +247,7 @@ export class InspectViewWebviewManager extends InspectWebviewManager<
     );
     if (data) {
       return {
-        log_dir: Uri.parse(data["log_dir"]),
+        log_dir: Uri.parse(data["log_dir"] ?? ""),
         log_file: data["log_file"] ? Uri.parse(data["log_file"]) : undefined,
         background_refresh: !!data["background_refresh"],
       };

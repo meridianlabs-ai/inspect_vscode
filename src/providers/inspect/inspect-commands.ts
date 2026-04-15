@@ -61,7 +61,7 @@ export class InspectCommandDispatcher implements Disposable {
     const commandFiles = readdirSync(this.commandsDir_);
     if (commandFiles.length > 0) {
       // read at most a single command and remove all of the others
-      const commandFile = commandFiles[0];
+      const commandFile = commandFiles[0]!;
       const commandContents = readFileSync(
         join(this.commandsDir_, commandFile),
         { encoding: "utf-8" }

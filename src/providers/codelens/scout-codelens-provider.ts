@@ -106,7 +106,7 @@ export class ScoutCodeLensProvider implements CodeLensProvider {
         while (j < document.lineCount) {
           const funcLine = document.lineAt(j);
           const match = funcLine.text.match(kFuncPattern);
-          if (match) {
+          if (match && match[1]) {
             scanCommands(document.uri, match[1]).forEach((cmd) => {
               lenses.push(new CodeLens(line.range, cmd));
             });

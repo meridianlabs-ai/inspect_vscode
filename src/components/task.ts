@@ -45,7 +45,7 @@ export function readTaskData(document: TextDocument): TaskData[] {
         {
           const match = line.match(kFunctionNamePattern);
           if (match) {
-            const fnName = match[1];
+            const fnName = match[1] ?? "";
             const task: TaskData = {
               name: fnName,
               params: [],
@@ -53,7 +53,7 @@ export function readTaskData(document: TextDocument): TaskData[] {
             };
             tasks.push(task);
 
-            const restOfLine = match[2];
+            const restOfLine = match[2] ?? "";
             const keepReading = readParams(restOfLine, task);
             if (keepReading) {
               state = "reading-params";
@@ -66,7 +66,11 @@ export function readTaskData(document: TextDocument): TaskData[] {
         }
         break;
       case "reading-params": {
-        const keepReading = readParams(line, tasks[tasks.length - 1]);
+        const currentTask = tasks[tasks.length - 1];
+        if (!currentTask) {
+          break;
+        }
+        const keepReading = readParams(line, currentTask);
         if (keepReading) {
           state = "reading-params";
         } else {
@@ -102,7 +106,7 @@ const parseParameters = (paramStr: string): string[] => {
   // Accumulate chars, tracking brackets and only
   // pay attention to commas outside brackets
   for (let i = 0; i < paramStr.length; i++) {
-    const char = paramStr[i];
+    const char = paramStr[i]!;
 
     if (["[", "(", "{"].includes(char)) {
       bracketDepth++;
@@ -128,7 +132,7 @@ const parseParameters = (paramStr: string): string[] => {
     .map((param) => {
       // Get everything before the colon (the parameter name)
       const nameMatch = param.match(/^\s*([a-zA-Z_][a-zA-Z0-9_]*)/);
-      return nameMatch ? nameMatch[1] : "";
+      return nameMatch ? (nameMatch[1] ?? "") : "";
     })
     .filter(Boolean);
 };

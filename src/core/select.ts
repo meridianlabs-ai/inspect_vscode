@@ -95,7 +95,7 @@ export async function selectDirectory(
       quickPick.hide();
 
       // process selection
-      const location = quickPick.selectedItems[0].location;
+      const location = quickPick.selectedItems[0]!.location;
       if (location === kWorkspaceLogDirectory) {
         resolve(null);
       } else if (location === kSelectLocalDirectory) {

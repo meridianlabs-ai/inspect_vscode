@@ -129,8 +129,8 @@ def my_task():
 `);
       const tasks = readTaskData(doc);
       assert.strictEqual(tasks.length, 1);
-      assert.strictEqual(tasks[0].name, "my_task");
-      assert.deepStrictEqual(tasks[0].params, []);
+      assert.strictEqual(tasks[0]!.name, "my_task");
+      assert.deepStrictEqual(tasks[0]!.params, []);
     });
 
     test("should detect @task with parentheses", () => {
@@ -141,7 +141,7 @@ def my_task():
 `);
       const tasks = readTaskData(doc);
       assert.strictEqual(tasks.length, 1);
-      assert.strictEqual(tasks[0].name, "my_task");
+      assert.strictEqual(tasks[0]!.name, "my_task");
     });
 
     test("should detect @task with arguments", () => {
@@ -152,7 +152,7 @@ def my_task():
 `);
       const tasks = readTaskData(doc);
       assert.strictEqual(tasks.length, 1);
-      assert.strictEqual(tasks[0].name, "my_task");
+      assert.strictEqual(tasks[0]!.name, "my_task");
     });
 
     test("should detect multiple tasks in a file", () => {
@@ -171,9 +171,9 @@ def task_three():
 `);
       const tasks = readTaskData(doc);
       assert.strictEqual(tasks.length, 3);
-      assert.strictEqual(tasks[0].name, "task_one");
-      assert.strictEqual(tasks[1].name, "task_two");
-      assert.strictEqual(tasks[2].name, "task_three");
+      assert.strictEqual(tasks[0]!.name, "task_one");
+      assert.strictEqual(tasks[1]!.name, "task_two");
+      assert.strictEqual(tasks[2]!.name, "task_three");
     });
 
     test("should extract simple function parameters", () => {
@@ -184,7 +184,7 @@ def my_task(dataset, model):
 `);
       const tasks = readTaskData(doc);
       assert.strictEqual(tasks.length, 1);
-      assert.deepStrictEqual(tasks[0].params, ["dataset", "model"]);
+      assert.deepStrictEqual(tasks[0]!.params, ["dataset", "model"]);
     });
 
     test("should extract typed function parameters", () => {
@@ -195,7 +195,7 @@ def my_task(dataset: str, model: str, limit: int):
 `);
       const tasks = readTaskData(doc);
       assert.strictEqual(tasks.length, 1);
-      assert.deepStrictEqual(tasks[0].params, ["dataset", "model", "limit"]);
+      assert.deepStrictEqual(tasks[0]!.params, ["dataset", "model", "limit"]);
     });
 
     test("should extract parameters with default values", () => {
@@ -206,7 +206,7 @@ def my_task(dataset: str = "default", limit: int = 10):
 `);
       const tasks = readTaskData(doc);
       assert.strictEqual(tasks.length, 1);
-      assert.deepStrictEqual(tasks[0].params, ["dataset", "limit"]);
+      assert.deepStrictEqual(tasks[0]!.params, ["dataset", "limit"]);
     });
 
     test("should handle multi-line function signatures", () => {
@@ -221,7 +221,7 @@ def my_task(
 `);
       const tasks = readTaskData(doc);
       assert.strictEqual(tasks.length, 1);
-      assert.deepStrictEqual(tasks[0].params, ["dataset", "model", "limit"]);
+      assert.deepStrictEqual(tasks[0]!.params, ["dataset", "model", "limit"]);
     });
 
     test("should handle complex default values with brackets", () => {
@@ -236,7 +236,7 @@ def my_task(
 `);
       const tasks = readTaskData(doc);
       assert.strictEqual(tasks.length, 1);
-      assert.deepStrictEqual(tasks[0].params, ["items", "config", "callback"]);
+      assert.deepStrictEqual(tasks[0]!.params, ["items", "config", "callback"]);
     });
 
     test("should handle return type annotations", () => {
@@ -247,8 +247,8 @@ def my_task(dataset: str) -> Task:
 `);
       const tasks = readTaskData(doc);
       assert.strictEqual(tasks.length, 1);
-      assert.strictEqual(tasks[0].name, "my_task");
-      assert.deepStrictEqual(tasks[0].params, ["dataset"]);
+      assert.strictEqual(tasks[0]!.name, "my_task");
+      assert.deepStrictEqual(tasks[0]!.params, ["dataset"]);
     });
 
     test("should handle return type annotations on multiple lines", () => {
@@ -262,7 +262,7 @@ def my_task(
 `);
       const tasks = readTaskData(doc);
       assert.strictEqual(tasks.length, 1);
-      assert.deepStrictEqual(tasks[0].params, ["dataset", "model"]);
+      assert.deepStrictEqual(tasks[0]!.params, ["dataset", "model"]);
     });
 
     test("should record correct line numbers", () => {
@@ -285,8 +285,8 @@ def second_task():
       // Line 2: @task
       // Line 6: # Another comment
       // Line 7: @task
-      assert.strictEqual(tasks[0].line, 2);
-      assert.strictEqual(tasks[1].line, 7);
+      assert.strictEqual(tasks[0]!.line, 2);
+      assert.strictEqual(tasks[1]!.line, 7);
     });
 
     test("should ignore functions without @task decorator", () => {
@@ -303,7 +303,7 @@ def another_regular():
 `);
       const tasks = readTaskData(doc);
       assert.strictEqual(tasks.length, 1);
-      assert.strictEqual(tasks[0].name, "task_function");
+      assert.strictEqual(tasks[0]!.name, "task_function");
     });
 
     test("should handle empty file", () => {
@@ -334,7 +334,7 @@ def my_task():
 `);
       const tasks = readTaskData(doc);
       assert.strictEqual(tasks.length, 1);
-      assert.strictEqual(tasks[0].name, "my_task");
+      assert.strictEqual(tasks[0]!.name, "my_task");
     });
 
     test("should handle function with underscore-prefixed name", () => {
@@ -345,7 +345,7 @@ def _private_task():
 `);
       const tasks = readTaskData(doc);
       assert.strictEqual(tasks.length, 1);
-      assert.strictEqual(tasks[0].name, "_private_task");
+      assert.strictEqual(tasks[0]!.name, "_private_task");
     });
 
     test("should handle function with numbers in name", () => {
@@ -356,7 +356,7 @@ def task_v2_final():
 `);
       const tasks = readTaskData(doc);
       assert.strictEqual(tasks.length, 1);
-      assert.strictEqual(tasks[0].name, "task_v2_final");
+      assert.strictEqual(tasks[0]!.name, "task_v2_final");
     });
 
     test("should handle parameters with complex type annotations", () => {
@@ -371,7 +371,7 @@ def my_task(
 `);
       const tasks = readTaskData(doc);
       assert.strictEqual(tasks.length, 1);
-      assert.deepStrictEqual(tasks[0].params, ["solver", "dataset", "scorer"]);
+      assert.deepStrictEqual(tasks[0]!.params, ["solver", "dataset", "scorer"]);
     });
 
     test("should handle async task functions", () => {
@@ -396,7 +396,7 @@ def my_task():
 `);
       const tasks = readTaskData(doc);
       assert.strictEqual(tasks.length, 1);
-      assert.strictEqual(tasks[0].name, "my_task");
+      assert.strictEqual(tasks[0]!.name, "my_task");
     });
 
     test("should handle whitespace variations in parameters", () => {
@@ -407,7 +407,7 @@ def my_task(   dataset:str   ,   model : str   ):
 `);
       const tasks = readTaskData(doc);
       assert.strictEqual(tasks.length, 1);
-      assert.deepStrictEqual(tasks[0].params, ["dataset", "model"]);
+      assert.deepStrictEqual(tasks[0]!.params, ["dataset", "model"]);
     });
 
     test("should handle parameters with nested generics", () => {
@@ -421,7 +421,7 @@ def my_task(
 `);
       const tasks = readTaskData(doc);
       assert.strictEqual(tasks.length, 1);
-      assert.deepStrictEqual(tasks[0].params, ["data", "callback"]);
+      assert.deepStrictEqual(tasks[0]!.params, ["data", "callback"]);
     });
   });
 });

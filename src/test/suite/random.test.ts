@@ -34,12 +34,12 @@ suite("Random Utilities Test Suite", () => {
       for (let i = 0; i < sampleSize; i++) {
         const value = cryptoRandom();
         const bucketIndex = Math.min(Math.floor(value * 5), 4);
-        buckets[bucketIndex]++;
+        buckets[bucketIndex]!++;
       }
 
       // Each bucket should have roughly 20% of values (allow 10-30%)
       for (let i = 0; i < buckets.length; i++) {
-        const percentage = buckets[i] / sampleSize;
+        const percentage = buckets[i]! / sampleSize;
         assert.ok(
           percentage > 0.1 && percentage < 0.3,
           `Bucket ${i} has ${percentage * 100}% of values, expected roughly 20%`
