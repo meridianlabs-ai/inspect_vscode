@@ -27,13 +27,13 @@ jobs:
         run: yarn lint
 
       - name: Check formatting
-        run: yarn prettier --check .
+        run: yarn format:check
 
       - name: Run TypeScript compiler
-        run: yarn compile
+        run: yarn build
 
       - name: Build extension
-        run: yarn package
+        run: yarn build:production
 
       - name: Setup virtual display
         run: |

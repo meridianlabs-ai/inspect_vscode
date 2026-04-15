@@ -41,29 +41,9 @@ Enabled `noUncheckedIndexedAccess` and `useUnknownInCatchVariables`. Fixed 127 t
 
 Upgraded TypeScript from ^5.7.0 to ^6.0.2. Only fix needed: added `src/@types/css.d.ts` for TS 6's stricter CSS side-effect import checking (TS2882) in webview files.
 
-### PR 6: Script renaming + `type: module`
+### ~~PR 6: Script renaming~~ ✅ Done
 
-Rename scripts to match monorepo conventions:
-
-| Old         | New                                   |
-| ----------- | ------------------------------------- |
-| `compile`   | `build`                               |
-| `watch`     | `dev`                                 |
-| `package`   | `build:production`                    |
-| `prettier`  | `format`                              |
-| (new)       | `format:check` (`prettier --check .`) |
-| (new)       | `typecheck` (`tsc --noEmit`)          |
-| `check-all` | `check`                               |
-
-Also:
-
-- Add `"type": "module"` to package.json
-- Convert [webpack.config.js](webpack.config.js) from `require`/`module.exports` to `import`/`export default`
-- Rename [eslint.config.mjs](eslint.config.mjs) to `eslint.config.js` (`.js` is ESM with `type: module`)
-- Update `vscode:prepublish` to reference new names
-- Update CI workflow references
-
-**Files:** [package.json](package.json), [webpack.config.js](webpack.config.js), [eslint.config.mjs](eslint.config.mjs), [.github/workflows/ci.yml](.github/workflows/ci.yml)
+Renamed scripts to monorepo conventions (`build`, `dev`, `build:production`, `format`, `format:check`, `typecheck`, `check-all`). Updated CI, CLAUDE.md, and .vscode/tasks.json. Note: `type: module` was dropped — VS Code extension host + tsc CommonJS output conflicts with ESM package type. Will be handled during monorepo move (extension workspace can stay CJS while root is ESM).
 
 ### PR 7: Package manager migration (yarn -> pnpm)
 

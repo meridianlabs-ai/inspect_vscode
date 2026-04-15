@@ -626,18 +626,20 @@
     }
   },
   "scripts": {
-    "vscode:prepublish": "yarn run package",
-    "compile": "webpack",
-    "watch": "webpack --watch",
-    "package": "webpack --mode production --devtool hidden-source-map",
+    "vscode:prepublish": "yarn run build:production",
+    "build": "webpack",
+    "build:production": "webpack --mode production --devtool hidden-source-map",
+    "dev": "webpack --watch",
     "compile-tests": "tsc -p . --outDir out",
     "watch-tests": "tsc -p . -w --outDir out",
-    "pretest": "yarn run compile-tests && yarn run compile",
+    "pretest": "yarn run compile-tests && yarn run build",
+    "typecheck": "tsc --noEmit",
     "lint": "eslint src --ext ts",
     "lint:fix": "eslint src --ext ts --fix",
-    "prettier": "prettier --write .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "test": "node ./out/test/runTest.js",
-    "check-all": "yarn lint && yarn prettier && yarn test"
+    "check-all": "yarn lint && yarn format:check && yarn typecheck && yarn test"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.3",
