@@ -37,13 +37,9 @@ Rewrote eslint config: dropped `FlatCompat`, using `typescript-eslint` directly,
 
 Enabled `noUncheckedIndexedAccess` and `useUnknownInCatchVariables`. Fixed 127 type errors across 31 files (source + test + webview).
 
-### PR 5: TypeScript 6 upgrade
+### ~~PR 5: TypeScript 6 upgrade~~ ✅ Done
 
-- Bump `typescript` from `^5.7.0` to `^6.0.2`
-- Fix any breaking changes (TS 6 changes may require code adjustments)
-- This is the highest-risk prep item — budget time for this
-
-**Files:** [package.json](package.json), potentially many `.ts` files
+Upgraded TypeScript from ^5.7.0 to ^6.0.2. Only fix needed: added `src/@types/css.d.ts` for TS 6's stricter CSS side-effect import checking (TS2882) in webview files.
 
 ### PR 6: Script renaming + `type: module`
 
