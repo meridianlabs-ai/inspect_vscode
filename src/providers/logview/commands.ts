@@ -1,13 +1,15 @@
-import { Command } from "../../core/command";
-import { InspectViewManager } from "./logview-view";
-import { showError } from "../../components/error";
 import { commands } from "vscode";
+
+import { showError } from "../../components/error";
+import { Command } from "../../core/command";
+import { inspectVersionDescriptor } from "../../inspect/props";
 import {
   kInspectEvalLogFormatVersion,
   kInspectOpenInspectViewVersion,
 } from "../inspect/inspect-constants";
-import { inspectVersionDescriptor } from "../../inspect/props";
+
 import { selectFileUri } from "./log-file-selector";
+import { InspectViewManager } from "./logview-view";
 
 export async function logviewCommands(
   manager: InspectViewManager

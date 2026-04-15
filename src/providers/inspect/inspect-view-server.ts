@@ -1,28 +1,29 @@
 import { ExtensionContext, Uri } from "vscode";
 
-import {
-  hasMinimumInspectVersion,
-  withMinimumInspectVersion,
-} from "../../inspect/version";
-import {
-  kInspectEvalLogFormatVersion,
-  kInspectLogMessageVersion,
-  kInspectOpenInspectViewVersion,
-} from "./inspect-constants";
-import {
-  inspectEvalLog,
-  inspectEvalLogHeaders,
-  inspectEvalLogs,
-} from "../../inspect/logs";
+import { PackageManager } from "../../core/package/manager";
+import { PackageViewServer } from "../../core/package/view-server";
 import {
   AbsolutePath,
   activeWorkspacePath,
   toAbsolutePath,
 } from "../../core/path";
 import { activeWorkspaceFolder } from "../../core/workspace";
-import { PackageManager } from "../../core/package/manager";
-import { PackageViewServer } from "../../core/package/view-server";
+import {
+  inspectEvalLog,
+  inspectEvalLogHeaders,
+  inspectEvalLogs,
+} from "../../inspect/logs";
 import { inspectBinPath } from "../../inspect/props";
+import {
+  hasMinimumInspectVersion,
+  withMinimumInspectVersion,
+} from "../../inspect/version";
+
+import {
+  kInspectEvalLogFormatVersion,
+  kInspectLogMessageVersion,
+  kInspectOpenInspectViewVersion,
+} from "./inspect-constants";
 
 const kNotFoundSignal = "NotFound";
 const kNotModifiedSignal = "NotModified";
@@ -304,7 +305,7 @@ function evalLogs(log_dir: Uri): Promise<string | undefined> {
       }>;
       return JSON.stringify({
         log_dir: log_dir.toString(true),
-        files: logsJson.map(log => ({
+        files: logsJson.map((log) => ({
           ...log,
           name: Uri.joinPath(workspaceRoot, log.name).toString(true),
         })),

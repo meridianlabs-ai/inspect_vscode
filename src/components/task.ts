@@ -1,4 +1,5 @@
 import { TextDocument, Uri } from "vscode";
+
 import { lines } from "../core/text";
 
 // Task information for a document
@@ -85,7 +86,7 @@ const readParams = (line: string, task: TaskData) => {
     const paramsStr = paramsMatch[1];
     if (paramsStr) {
       const params = parseParameters(paramsStr);
-      params.forEach(param => {
+      params.forEach((param) => {
         task.params.push(param.trim());
       });
     }
@@ -124,7 +125,7 @@ const parseParameters = (paramStr: string): string[] => {
 
   // Extract parameter names
   return params
-    .map(param => {
+    .map((param) => {
       // Get everything before the colon (the parameter name)
       const nameMatch = param.match(/^\s*([a-zA-Z_][a-zA-Z0-9_]*)/);
       return nameMatch ? nameMatch[1] : "";

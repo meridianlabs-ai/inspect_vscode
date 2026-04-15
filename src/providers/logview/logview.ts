@@ -1,14 +1,14 @@
 import { ExtensionContext } from "vscode";
 
 import { Command } from "../../core/command";
-import { logviewCommands } from "./commands";
-import { InspectViewWebviewManager } from "./logview-view";
-import { InspectViewManager } from "./logview-view";
-import { WorkspaceEnvManager } from "../workspace/workspace-env-provider";
-import { InspectViewServer } from "../inspect/inspect-view-server";
-import { activateLogviewEditor } from "./logview-editor";
-import { OutputWatcher } from "../../core/package/output-watcher";
 import { PackageManager } from "../../core/package/manager";
+import { OutputWatcher } from "../../core/package/output-watcher";
+import { InspectViewServer } from "../inspect/inspect-view-server";
+import { WorkspaceEnvManager } from "../workspace/workspace-env-provider";
+
+import { logviewCommands } from "./commands";
+import { activateLogviewEditor } from "./logview-editor";
+import { InspectViewManager, InspectViewWebviewManager } from "./logview-view";
 
 export async function activateLogview(
   inspectManager: PackageManager,

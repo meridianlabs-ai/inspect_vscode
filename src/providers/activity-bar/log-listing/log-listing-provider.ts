@@ -1,18 +1,18 @@
 import * as vscode from "vscode";
+import { Uri } from "vscode";
 
 import { Command } from "../../../core/command";
-import { LogTreeDataProvider } from "./log-listing-data";
-
-import { WorkspaceEnvManager } from "../../workspace/workspace-env-provider";
-import { LogListing, LogNode, Logs } from "./log-listing";
-import { InspectViewServer } from "../../inspect/inspect-view-server";
-import { activeWorkspaceFolder } from "../../../core/workspace";
-import { getRelativeUri, prettyUriPath } from "../../../core/uri";
 import { OutputWatcher } from "../../../core/package/output-watcher";
-import { selectLogDirectory } from "./log-directory-selector";
-import { Uri } from "vscode";
+import { getRelativeUri, prettyUriPath } from "../../../core/uri";
+import { activeWorkspaceFolder } from "../../../core/workspace";
 import { hasMinimumInspectVersion } from "../../../inspect/version";
 import { kInspectEvalLogFormatVersion } from "../../inspect/inspect-constants";
+import { InspectViewServer } from "../../inspect/inspect-view-server";
+import { WorkspaceEnvManager } from "../../workspace/workspace-env-provider";
+
+import { selectLogDirectory } from "./log-directory-selector";
+import { LogListing, LogNode, Logs } from "./log-listing";
+import { LogTreeDataProvider } from "./log-listing-data";
 import { LogListingMRU } from "./log-listing-mru";
 
 export async function activateLogListing(
@@ -62,7 +62,7 @@ export async function activateLogListing(
         };
         return {
           log_dir: logs.log_dir,
-          items: logs.files.map(file => ({
+          items: logs.files.map((file) => ({
             name: file.name,
             mtime: file.mtime,
             display_name: file.task,
@@ -235,7 +235,7 @@ export async function activateLogListing(
 
   // refresh when a log in our directory changes
   disposables.push(
-    outputWatcher.onInspectLogCreated(e => {
+    outputWatcher.onInspectLogCreated((e) => {
       const treeLogDir = treeDataProvider.getLogListing()?.logDir();
       if (treeLogDir && getRelativeUri(treeLogDir, e.log)) {
         treeDataProvider.refresh();
@@ -245,7 +245,7 @@ export async function activateLogListing(
 
   // refresh on change visiblity
   disposables.push(
-    tree.onDidChangeVisibility(e => {
+    tree.onDidChangeVisibility((e) => {
       if (e.visible) {
         treeDataProvider.refresh();
       }

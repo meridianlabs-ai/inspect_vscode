@@ -1,38 +1,39 @@
-import {
-  TreeView,
-  Uri,
-  window,
-  workspace,
-  ConfigurationTarget,
-  ExtensionContext,
-  ViewColumn,
-  commands,
-} from "vscode";
-
-import { Command } from "../../core/command";
-import {
-  TaskOutLineTreeDataProvider,
-  TaskTreeItem,
-} from "./task-outline-provider";
-import { pathExists, toAbsolutePath, workspacePath } from "../../core/path";
 import { writeFileSync } from "fs";
 
-import { readTemplate, templates } from "../../components/templates";
-import { isValidPythonFnName } from "../../core/python";
+import {
+  commands,
+  ConfigurationTarget,
+  ExtensionContext,
+  TreeView,
+  Uri,
+  ViewColumn,
+  window,
+  workspace,
+} from "vscode";
+
 import {
   documentHasTasks,
   firstTaskRangeForDocument,
   taskRangeForDocument,
 } from "../../components/document";
+import { scheduleReturnFocus } from "../../components/focus";
 import {
   firstTaskRangeForNotebook,
   isNotebook,
   taskRangeForNotebook,
 } from "../../components/notebook";
-import { scheduleReturnFocus } from "../../components/focus";
-import { InspectViewManager } from "../logview/logview-view";
-import { ActiveTaskManager } from "../active-task/active-task-provider";
+import { readTemplate, templates } from "../../components/templates";
+import { Command } from "../../core/command";
 import { ExecManager } from "../../core/package/exec-manager";
+import { pathExists, toAbsolutePath, workspacePath } from "../../core/path";
+import { isValidPythonFnName } from "../../core/python";
+import { ActiveTaskManager } from "../active-task/active-task-provider";
+import { InspectViewManager } from "../logview/logview-view";
+
+import {
+  TaskOutLineTreeDataProvider,
+  TaskTreeItem,
+} from "./task-outline-provider";
 
 export class ShowTaskTree implements Command {
   constructor(private readonly provider_: TaskOutLineTreeDataProvider) {}
@@ -182,7 +183,7 @@ export const findTargetViewColumn = (logViewColumn?: ViewColumn) => {
   } else {
     // Try to find a source editor which contains a task
     const visibleEditors = window.visibleTextEditors;
-    const targetEditor = visibleEditors.find(editor => {
+    const targetEditor = visibleEditors.find((editor) => {
       return documentHasTasks(editor.document);
     });
     if (targetEditor) {
@@ -216,7 +217,7 @@ export class CreateTaskCommand implements Command {
     const taskName = await window.showInputBox({
       placeHolder: "Name of the task to create",
       prompt: "Task name",
-      validateInput: input => {
+      validateInput: (input) => {
         if (!isValidPythonFnName(input)) {
           return "The task name contains invalid characters.";
         }

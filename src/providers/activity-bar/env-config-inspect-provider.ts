@@ -1,9 +1,10 @@
 import { Uri, Webview } from "vscode";
+
 import { getNonce } from "../../core/nonce";
-import { WorkspaceStateManager } from "../workspace/workspace-state-provider";
-import { WorkspaceEnvManager } from "../workspace/workspace-env-provider";
-import { kInspectEnvValues } from "../inspect/inspect-constants";
 import { PackageManager } from "../../core/package/manager";
+import { kInspectEnvValues } from "../inspect/inspect-constants";
+import { WorkspaceEnvManager } from "../workspace/workspace-env-provider";
+import { WorkspaceStateManager } from "../workspace/workspace-state-provider";
 
 import {
   EnvConfigManager,

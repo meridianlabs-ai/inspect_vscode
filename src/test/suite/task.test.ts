@@ -2,14 +2,16 @@
  * Tests for task.ts - Task parsing and parameter extraction
  */
 import * as assert from "assert";
+
 import {
-  TextDocument,
-  Uri,
-  TextLine,
-  Range,
-  Position,
   EndOfLine,
+  Position,
+  Range,
+  TextDocument,
+  TextLine,
+  Uri,
 } from "vscode";
+
 import { readTaskData } from "../../components/task";
 
 /**

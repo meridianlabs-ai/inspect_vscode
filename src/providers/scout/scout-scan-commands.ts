@@ -1,7 +1,8 @@
 import { Uri } from "vscode";
+
 import { Command } from "../../core/command";
-import { toAbsolutePath } from "../../core/path";
 import { ExecManager } from "../../core/package/exec-manager";
+import { toAbsolutePath } from "../../core/path";
 
 export function scoutScanCommands(manager: ExecManager): Command[] {
   return [new RunScoutScanCommand(manager), new DebugScoutScanCommand(manager)];

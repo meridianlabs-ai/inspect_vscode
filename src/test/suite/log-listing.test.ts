@@ -74,10 +74,10 @@ function buildLogTree(logs: LogItem[]): LogNode[] {
       currentParent = ensureDirectory(currentPath, parentDir);
 
       if (parentDir?.type === "dir") {
-        if (!parentDir.children.some(child => child.name === currentPath)) {
+        if (!parentDir.children.some((child) => child.name === currentPath)) {
           parentDir.children.push(currentParent);
         }
-      } else if (!root.some(node => node.name === currentPath)) {
+      } else if (!root.some((node) => node.name === currentPath)) {
         root.push(currentParent);
       }
     }
@@ -173,7 +173,7 @@ suite("LogListing Test Suite", () => {
       const tree = buildLogTree(items);
 
       assert.strictEqual(tree.length, 2);
-      assert.ok(tree.every(node => node.type === "file"));
+      assert.ok(tree.every((node) => node.type === "file"));
     });
 
     test("should build tree with subdirectory", () => {

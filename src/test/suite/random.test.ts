@@ -1,5 +1,6 @@
 import * as assert from "assert";
-import { randomInt, cryptoRandom } from "../../core/random";
+
+import { cryptoRandom, randomInt } from "../../core/random";
 
 suite("Random Utilities Test Suite", () => {
   suite("cryptoRandom", () => {

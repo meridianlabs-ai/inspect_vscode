@@ -1,7 +1,8 @@
 import * as fs from "fs";
-import * as os from "os";
 import { existsSync } from "node:fs";
+import * as os from "os";
 import path, { join } from "path";
+
 import { AbsolutePath, toAbsolutePath } from "../path";
 
 export function findEnvPythonPath(
@@ -30,8 +31,8 @@ function findEnvPython(directory: AbsolutePath): string | null {
 
   // Filter only directories and check if any is an environment directory
   const envDir = items
-    .map(item => path.join(directory.path, item))
-    .filter(filePath => fs.statSync(filePath).isDirectory())
+    .map((item) => path.join(directory.path, item))
+    .filter((filePath) => fs.statSync(filePath).isDirectory())
     .find(isEnvDir);
 
   if (envDir) {

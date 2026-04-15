@@ -15,7 +15,7 @@ const kInspectConfigNotifyScanComplete = "notifyScanComplete";
 // Manages the settings for the inspect extension
 export class InspectSettingsManager {
   constructor(private readonly onChanged_: (() => void) | undefined) {
-    workspace.onDidChangeConfiguration(event => {
+    workspace.onDidChangeConfiguration((event) => {
       if (event.affectsConfiguration(kInspectConfigSection)) {
         // Configuration for has changed
         this.settings_ = undefined;

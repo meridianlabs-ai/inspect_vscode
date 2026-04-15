@@ -1,6 +1,8 @@
 import { ExtensionContext } from "vscode";
-import { WorkspaceStateManager } from "./workspace/workspace-state-provider";
+
 import { log } from "../core/log";
+
+import { WorkspaceStateManager } from "./workspace/workspace-state-provider";
 
 export async function activateWorkspaceEnvironment(
   context: ExtensionContext,

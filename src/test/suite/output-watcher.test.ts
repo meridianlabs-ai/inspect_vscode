@@ -105,8 +105,8 @@ suite("OutputWatcher Test Suite", () => {
         { type: "scan", path: "/home/user/.scout/last-scan" },
       ];
 
-      const logFiles = signalFiles.filter(f => f.type === "log");
-      const scanFiles = signalFiles.filter(f => f.type === "scan");
+      const logFiles = signalFiles.filter((f) => f.type === "log");
+      const scanFiles = signalFiles.filter((f) => f.type === "scan");
 
       assert.strictEqual(logFiles.length, 1);
       assert.strictEqual(scanFiles.length, 1);

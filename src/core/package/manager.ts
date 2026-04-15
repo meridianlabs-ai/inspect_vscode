@@ -5,8 +5,9 @@ import {
   EventEmitter,
   ExtensionContext,
 } from "vscode";
-import { pythonInterpreter } from "../python";
+
 import { AbsolutePath } from "../path";
+import { pythonInterpreter } from "../python";
 
 // Fired when the active task changes
 export interface PackageChangedEvent {

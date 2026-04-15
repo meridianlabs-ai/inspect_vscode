@@ -2,6 +2,7 @@
  * Tests for manager.ts - PackageManager
  */
 import * as assert from "assert";
+
 import { Disposable } from "vscode";
 
 // Type for mocking the event system
@@ -13,7 +14,7 @@ interface MockEvent<T> {
 function createMockEvent<T>(): MockEvent<T> {
   const listeners: Array<(e: T) => void> = [];
   return {
-    fire: (data: T) => listeners.forEach(l => l(data)),
+    fire: (data: T) => listeners.forEach((l) => l(data)),
     event: (listener: (e: T) => void) => {
       listeners.push(listener);
       return {
@@ -163,7 +164,7 @@ suite("PackageManager Test Suite", () => {
         packageAvailable ? { path: "/usr/bin/inspect" } : null
       );
 
-      manager.onPackageChanged(event => {
+      manager.onPackageChanged((event) => {
         eventFired = true;
         availabilityFromEvent = event.available;
       });
@@ -185,7 +186,7 @@ suite("PackageManager Test Suite", () => {
         packageAvailable ? { path: "/usr/bin/inspect" } : null
       );
 
-      manager.onPackageChanged(event => {
+      manager.onPackageChanged((event) => {
         events.push(event);
       });
 
@@ -194,7 +195,7 @@ suite("PackageManager Test Suite", () => {
       manager.simulateInterpreterChange();
 
       // Should have fired an event with available: false
-      assert.ok(events.some(e => e.available === false));
+      assert.ok(events.some((e) => e.available === false));
       manager.dispose();
     });
 
@@ -205,7 +206,7 @@ suite("PackageManager Test Suite", () => {
         path: "/usr/bin/inspect",
       }));
 
-      manager.onPackageChanged(event => {
+      manager.onPackageChanged((event) => {
         events.push(event);
       });
 
@@ -229,7 +230,7 @@ suite("PackageManager Test Suite", () => {
         path: currentPath,
       }));
 
-      manager.onPackageChanged(event => {
+      manager.onPackageChanged((event) => {
         events.push(event);
       });
 
@@ -278,7 +279,7 @@ suite("PackageManager Test Suite", () => {
       packageAvailable = true;
 
       // Wait for watch interval to fire
-      await new Promise(resolve => setTimeout(resolve, 150));
+      await new Promise((resolve) => setTimeout(resolve, 150));
 
       assert.strictEqual(manager.isWatching(), false);
       assert.strictEqual(manager.available, true);
@@ -369,8 +370,8 @@ suite("PackageManager Test Suite", () => {
         packageAvailable ? { path: "/usr/bin/inspect" } : null
       );
 
-      manager.onPackageChanged(e => events1.push(e));
-      manager.onPackageChanged(e => events2.push(e));
+      manager.onPackageChanged((e) => events1.push(e));
+      manager.onPackageChanged((e) => events2.push(e));
 
       packageAvailable = true;
       manager.simulateInterpreterChange();
@@ -388,7 +389,7 @@ suite("PackageManager Test Suite", () => {
         packageAvailable ? { path: "/usr/bin/inspect" } : null
       );
 
-      const disposable = manager.onPackageChanged(e => events.push(e));
+      const disposable = manager.onPackageChanged((e) => events.push(e));
 
       packageAvailable = true;
       manager.simulateInterpreterChange();

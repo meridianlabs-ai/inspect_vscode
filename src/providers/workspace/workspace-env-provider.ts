@@ -1,19 +1,22 @@
-import { Command } from "../../core/command";
-import { Disposable, EventEmitter, Event, Uri } from "vscode";
-import { clearEnv, readEnv, writeEnv } from "../../core/env";
-import { isEqual } from "lodash";
-import { workspaceEnvCommands } from "./workspace-env-commands";
-import { activeWorkspaceFolder } from "../../core/workspace";
-import { log } from "../../core/log";
 import { existsSync, statSync } from "fs";
+import { join } from "path";
+
+import { isEqual } from "lodash";
+import { Disposable, Event, EventEmitter, Uri } from "vscode";
+
+import { Command } from "../../core/command";
+import { clearEnv, readEnv, writeEnv } from "../../core/env";
+import { log } from "../../core/log";
 import {
   toAbsolutePath,
   workspacePath,
   workspaceRelativePath,
 } from "../../core/path";
+import { activeWorkspaceFolder } from "../../core/workspace";
 import { kInspectEnvValues } from "../inspect/inspect-constants";
-import { join } from "path";
 import { kScoutEnvValues } from "../scout/scout-constants";
+
+import { workspaceEnvCommands } from "./workspace-env-commands";
 
 export function activateWorkspaceEnv(): [Command[], WorkspaceEnvManager] {
   // Monitor changes to the file
@@ -67,7 +70,7 @@ export class WorkspaceEnvManager implements Disposable {
   public setValues(env: Record<string, string>) {
     const envUri = this.getEnvUri();
     const keys = Object.keys(env);
-    keys.forEach(key => {
+    keys.forEach((key) => {
       const value = env[key];
       if (value === "") {
         // Only actually clear the value if it has changed

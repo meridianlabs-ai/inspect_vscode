@@ -10,9 +10,9 @@ export const initializeGlobalSettings = async () => {
     ) || [];
 
   try {
-    kInspectPackageIndexDepth.forEach(pkgDep => {
+    kInspectPackageIndexDepth.forEach((pkgDep) => {
       if (
-        !pkgIndexDepths.find(p => {
+        !pkgIndexDepths.find((p) => {
           return pkgDep.name === p.name;
         })
       ) {

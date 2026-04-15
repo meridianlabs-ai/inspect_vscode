@@ -2,14 +2,15 @@
  * Tests for active-task-provider.ts - ActiveTaskManager
  */
 import * as assert from "assert";
+
 import {
-  Uri,
+  EndOfLine,
   Position,
+  Range,
   Selection,
   TextDocument,
   TextLine,
-  Range,
-  EndOfLine,
+  Uri,
 } from "vscode";
 
 // Type for mocking the event system
@@ -21,7 +22,7 @@ interface MockEvent<T> {
 function createMockEvent<T>(): MockEvent<T> {
   const listeners: Array<(e: T) => void> = [];
   return {
-    fire: (data: T) => listeners.forEach(l => l(data)),
+    fire: (data: T) => listeners.forEach((l) => l(data)),
     event: (listener: (e: T) => void) => {
       listeners.push(listener);
       return {
@@ -149,7 +150,7 @@ suite("ActiveTaskManager Test Suite", () => {
       const mockEvent = createMockEvent<string>();
       let receivedValue: string | undefined;
 
-      mockEvent.event(value => {
+      mockEvent.event((value) => {
         receivedValue = value;
       });
 
@@ -161,8 +162,8 @@ suite("ActiveTaskManager Test Suite", () => {
       const mockEvent = createMockEvent<number>();
       const values: number[] = [];
 
-      mockEvent.event(v => values.push(v * 2));
-      mockEvent.event(v => values.push(v * 3));
+      mockEvent.event((v) => values.push(v * 2));
+      mockEvent.event((v) => values.push(v * 3));
 
       mockEvent.fire(5);
       assert.deepStrictEqual(values, [10, 15]);
@@ -172,7 +173,7 @@ suite("ActiveTaskManager Test Suite", () => {
       const mockEvent = createMockEvent<string>();
       const values: string[] = [];
 
-      const disposable = mockEvent.event(v => values.push(v));
+      const disposable = mockEvent.event((v) => values.push(v));
       mockEvent.fire("first");
       disposable.dispose();
       mockEvent.fire("second");

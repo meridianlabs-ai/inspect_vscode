@@ -4,10 +4,11 @@ import {
   CodeLensProvider,
   Command,
   ExtensionContext,
+  languages,
   TextDocument,
   Uri,
-  languages,
 } from "vscode";
+
 import { isNotebook } from "../../components/notebook";
 
 export function activateCodeLens(context: ExtensionContext) {
@@ -105,7 +106,7 @@ export class InspectCodeLensProvider implements CodeLensProvider {
           const funcLine = document.lineAt(j);
           const match = funcLine.text.match(kFuncPattern);
           if (match) {
-            taskCommands(document.uri, match[1]).forEach(cmd => {
+            taskCommands(document.uri, match[1]).forEach((cmd) => {
               lenses.push(new CodeLens(line.range, cmd));
             });
             break;

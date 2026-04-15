@@ -1,4 +1,5 @@
 import { extname } from "path";
+
 import {
   NotebookCellKind,
   NotebookDocument,
@@ -8,7 +9,8 @@ import {
   Selection,
   Uri,
 } from "vscode";
-import { TaskData, readTaskData } from "./task";
+
+import { readTaskData, TaskData } from "./task";
 
 export interface NotebookCellSelection {
   cell: NotebookRange;
@@ -35,14 +37,14 @@ export const taskRangeForNotebook = (
   const cells = cellTasks(document);
 
   // Find the cell that contains the task
-  const cellTask = cells.find(cell => {
-    return cell.tasks.find(child => {
+  const cellTask = cells.find((cell) => {
+    return cell.tasks.find((child) => {
       return child.name === task;
     });
   });
 
   if (cellTask) {
-    const taskDetail = cellTask.tasks.find(child => {
+    const taskDetail = cellTask.tasks.find((child) => {
       return child.name === task;
     });
     if (taskDetail) {
@@ -60,7 +62,7 @@ export const firstTaskRangeForNotebook = (document: NotebookDocument) => {
   const cells = cellTasks(document);
 
   // Find a cell that contains a task
-  const cellTask = cells.find(cell => {
+  const cellTask = cells.find((cell) => {
     return cell.tasks.length > 0;
   });
 

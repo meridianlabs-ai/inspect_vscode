@@ -1,9 +1,10 @@
 import { existsSync, readFileSync, writeFileSync } from "fs";
-import path from "path";
-import { lines } from "./text";
-import { runProcess } from "./process";
-import { AbsolutePath } from "./path";
 import { platform } from "os";
+import path from "path";
+
+import { AbsolutePath } from "./path";
+import { runProcess } from "./process";
+import { lines } from "./text";
 
 export function ensureGitignore(dir: AbsolutePath, entries: string[]): boolean {
   // if .gitignore exists, then ensure it has the requisite entries
@@ -13,7 +14,7 @@ export function ensureGitignore(dir: AbsolutePath, entries: string[]): boolean {
       readFileSync(gitignorePath, {
         encoding: "utf-8",
       })
-    ).map(line => line.trim());
+    ).map((line) => line.trim());
     const requiredEntries: string[] = [];
     for (const requiredEntry of entries) {
       if (!gitignore.includes(requiredEntry)) {

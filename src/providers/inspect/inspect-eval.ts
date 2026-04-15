@@ -1,13 +1,14 @@
 import { ExtensionContext, workspace } from "vscode";
-import { inspectEvalCommands } from "./inspect-eval-commands";
+
 import { Command } from "../../core/command";
+import { ExecManager, ExecProfile } from "../../core/package/exec-manager";
+import { inspectBinPath, inspectVersionDescriptor } from "../../inspect/props";
 import {
   DocumentState,
   WorkspaceStateManager,
 } from "../workspace/workspace-state-provider";
-import { inspectBinPath, inspectVersionDescriptor } from "../../inspect/props";
 
-import { ExecManager, ExecProfile } from "../../core/package/exec-manager";
+import { inspectEvalCommands } from "./inspect-eval-commands";
 
 export function activateEvalManager(
   stateManager: WorkspaceStateManager,
@@ -63,7 +64,7 @@ export function activateEvalManager(
 
       const sampleIds = docState.sampleIds;
       if (sampleIds) {
-        const ids = sampleIds.split(",").map(id => id.trim());
+        const ids = sampleIds.split(",").map((id) => id.trim());
         if (ids.length > 0) {
           args.push(...["--sample-id", ids.join(",")]);
         }
@@ -72,7 +73,7 @@ export function activateEvalManager(
       // Forwards task params
       const taskParams = docState.params;
       if (taskParams) {
-        Object.keys(taskParams).forEach(key => {
+        Object.keys(taskParams).forEach((key) => {
           const value = taskParams[key];
           args.push(...["-T", `${key}=${value}`]);
         });

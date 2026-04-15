@@ -1,4 +1,6 @@
+import { debounce } from "lodash";
 import {
+  commands,
   Event,
   EventEmitter,
   ExtensionContext,
@@ -8,19 +10,19 @@ import {
   TextDocument,
   TextEditorSelectionChangeEvent,
   Uri,
-  commands,
   window,
   workspace,
 } from "vscode";
+
+import { cellTasks, isNotebook } from "../../components/notebook";
+import { DocumentTaskInfo, readTaskData } from "../../components/task";
+import { Command } from "../../core/command";
+import { ExecManager } from "../../core/package/exec-manager";
+
 import {
   DebugActiveTaskCommand,
   RunActiveTaskCommand,
 } from "./active-task-command";
-import { Command } from "../../core/command";
-import { DocumentTaskInfo, readTaskData } from "../../components/task";
-import { cellTasks, isNotebook } from "../../components/notebook";
-import { debounce } from "lodash";
-import { ExecManager } from "../../core/package/exec-manager";
 
 // Activates the provider which tracks the currently active task (document and task name)
 export function activateActiveTaskProvider(
@@ -85,7 +87,7 @@ export class ActiveTaskManager {
     );
 
     context.subscriptions.push(
-      window.onDidChangeActiveTextEditor(async event => {
+      window.onDidChangeActiveTextEditor(async (event) => {
         if (event) {
           await this.updateActiveTaskWithDocument(event.document);
         }
@@ -144,8 +146,8 @@ export class ActiveTaskManager {
       const notebookDocument =
         await workspace.openNotebookDocument(documentUri);
       const cells = cellTasks(notebookDocument);
-      const cellTask = cells.find(c => {
-        return c.tasks.find(t => {
+      const cellTask = cells.find((c) => {
+        return c.tasks.find((t) => {
           return t.name === task;
         });
       });
@@ -190,7 +192,7 @@ function getTaskInfoFromDocument(
   // Find the first task that appears before the selection
   // or otherwise the first task
 
-  const activeTask = [...tasks].reverse().find(task => {
+  const activeTask = [...tasks].reverse().find((task) => {
     return task.line <= selectionLine;
   });
   return {
@@ -213,7 +215,7 @@ function getTaskInfo(
   // Find the first task that appears before the selection
   // or otherwise the first task
 
-  const activeTask = [...tasks].reverse().find(t => {
+  const activeTask = [...tasks].reverse().find((t) => {
     return t.name === task;
   });
   return {

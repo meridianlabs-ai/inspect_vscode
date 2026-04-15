@@ -1,8 +1,9 @@
 import { Uri } from "vscode";
-import { Command } from "../../core/command";
-import { toAbsolutePath } from "../../core/path";
+
 import { scheduleFocusActiveEditor } from "../../components/focus";
+import { Command } from "../../core/command";
 import { ExecManager } from "../../core/package/exec-manager";
+import { toAbsolutePath } from "../../core/path";
 
 export function inspectEvalCommands(manager: ExecManager): Command[] {
   return [new RunEvalCommand(manager), new DebugEvalCommand(manager)];

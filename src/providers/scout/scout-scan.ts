@@ -1,12 +1,14 @@
 import { ExtensionContext, workspace } from "vscode";
-import { scoutScanCommands } from "./scout-scan-commands";
+
 import { Command } from "../../core/command";
+import { ExecManager, ExecProfile } from "../../core/package/exec-manager";
+import { scoutBinPath, scoutVersionDescriptor } from "../../scout/props";
 import {
   DocumentState,
   WorkspaceStateManager,
 } from "../workspace/workspace-state-provider";
-import { scoutBinPath, scoutVersionDescriptor } from "../../scout/props";
-import { ExecManager, ExecProfile } from "../../core/package/exec-manager";
+
+import { scoutScanCommands } from "./scout-scan-commands";
 
 export function activateScoutScanManager(
   stateManager: WorkspaceStateManager,

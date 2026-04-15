@@ -1,6 +1,6 @@
-import vscode from "vscode";
-import { ExtensionContext, Uri } from "vscode";
-import { HostWebviewPanel } from "../../hooks";
+import vscode, { ExtensionContext, Uri } from "vscode";
+
+import { Disposable } from "../../core/dispose";
 import {
   kMethodGetScan,
   kMethodGetScannerDataframe,
@@ -9,17 +9,18 @@ import {
   kMethodHttpRequest,
   webviewPanelJsonRpcServer,
 } from "../../core/jsonrpc";
-import { RouteMessage } from "./scanview-message";
 import {
   getWebviewPanelHtml,
   handleWebviewPanelOpenMessages,
 } from "../../core/webview";
+import { HostWebviewPanel } from "../../hooks";
+import { scoutViewPath } from "../../scout/props";
 import {
   HttpProxyRpcRequest,
   ScoutViewServer,
 } from "../scout/scout-view-server";
-import { scoutViewPath } from "../../scout/props";
-import { Disposable } from "../../core/dispose";
+
+import { RouteMessage } from "./scanview-message";
 
 export class ScanviewPanel extends Disposable {
   constructor(
@@ -74,7 +75,7 @@ export class ScanviewPanel extends Disposable {
       const existingRoots =
         this.panel_.webview.options.localResourceRoots ?? [];
       const distUri = Uri.file(viewDir.path);
-      if (!existingRoots.some(r => r.toString() === distUri.toString())) {
+      if (!existingRoots.some((r) => r.toString() === distUri.toString())) {
         this.panel_.webview.options = {
           ...this.panel_.webview.options,
           localResourceRoots: [...existingRoots, distUri],

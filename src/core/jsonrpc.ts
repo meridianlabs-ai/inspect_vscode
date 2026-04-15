@@ -111,7 +111,7 @@ export function jsonRpcPostMessageRequestTransport(
   >();
 
   // listen for responses
-  const disconnect = target.onMessage(ev => {
+  const disconnect = target.onMessage((ev) => {
     const response = asJsonRpcResponse(ev);
     if (response) {
       const request = requests.get(response.id);
@@ -161,7 +161,7 @@ export function jsonRpcPostMessageServer(
     typeof methods === "function" ? methods : (name: string) => methods[name];
 
   // listen for messages
-  return target.onMessage(data => {
+  return target.onMessage((data) => {
     const request = asJsonRpcRequest(data);
     if (request) {
       // lookup method
@@ -173,10 +173,10 @@ export function jsonRpcPostMessageServer(
 
       // dispatch method
       method(request.params || [])
-        .then(value => {
+        .then((value) => {
           target.postMessage(jsonRpcResponse(request, value));
         })
-        .catch(error => {
+        .catch((error) => {
           target.postMessage({
             jsonrpc: request.jsonrpc,
             id: request.id,
@@ -278,7 +278,7 @@ export function webviewPanelJsonRpcServer(
       void webviewPanel.webview.postMessage(data);
     },
     onMessage: (handler: (data: unknown) => void) => {
-      const disposable = webviewPanel.webview.onDidReceiveMessage(ev => {
+      const disposable = webviewPanel.webview.onDidReceiveMessage((ev) => {
         handler(ev);
       });
       return () => {

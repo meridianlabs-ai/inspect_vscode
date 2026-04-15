@@ -1,17 +1,19 @@
+import { existsSync } from "fs";
+import { basename } from "path";
+
 import {
   commands,
   ExtensionContext,
   MessageItem,
+  TerminalLink,
+  TerminalLinkContext,
   Uri,
   window,
   workspace,
 } from "vscode";
 
-import { workspacePath } from "../../core/path";
-import { TerminalLink, TerminalLinkContext } from "vscode";
-import { existsSync } from "fs";
-import { basename } from "path";
 import { OutputWatcher } from "../../core/package/output-watcher";
+import { workspacePath } from "../../core/path";
 import { isUri } from "../../core/uri";
 
 const kLogFilePattern = /^.*Log: (\S*?\.json|\S*?\.eval)\s*/g;
@@ -29,7 +31,7 @@ export const logviewTerminalLinkProvider = (
   const recentlyCreatedLogs = new Set<Uri>();
 
   context.subscriptions.push(
-    outputWatcher.onInspectLogCreated(e => {
+    outputWatcher.onInspectLogCreated((e) => {
       if (e.externalWorkspace) {
         return;
       }
@@ -52,7 +54,7 @@ export const logviewTerminalLinkProvider = (
       const matches = [...context.line.matchAll(kLogFilePattern)];
       if (matches.length > 0) {
         // Forward matches
-        const result = matches.map(match => {
+        const result = matches.map((match) => {
           // The path from the terminal.
           const path = match[1];
 
@@ -71,14 +73,14 @@ export const logviewTerminalLinkProvider = (
 
       const fileOnlyMatches = [...context.line.matchAll(kEvalJsonPattern)];
       const fileOnlyResult = fileOnlyMatches
-        .map(match => {
+        .map((match) => {
           // The path from the terminal.
           const path = match[1];
 
           // If this is a recently created log or a full uri, we can use it
           const fullPath = isUri(path)
             ? path
-            : [...recentlyCreatedLogs].find(logPath =>
+            : [...recentlyCreatedLogs].find((logPath) =>
                 logPath.path.endsWith(path)
               );
 
@@ -97,7 +99,7 @@ export const logviewTerminalLinkProvider = (
             return undefined;
           }
         })
-        .filter(link => link !== undefined);
+        .filter((link) => link !== undefined);
 
       if (fileOnlyResult.length > 0) {
         // Return the file only results

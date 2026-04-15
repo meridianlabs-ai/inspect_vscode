@@ -1,15 +1,17 @@
+import { existsSync } from "fs";
+
 import {
   commands,
   ExtensionContext,
   MessageItem,
+  TerminalLink,
+  TerminalLinkContext,
   Uri,
   window,
   workspace,
 } from "vscode";
 
-import { TerminalLink, TerminalLinkContext } from "vscode";
 import { workspacePath } from "../../core/path";
-import { existsSync } from "fs";
 
 const kScanResultPattern =
   /([^\s"]*scan_id=[23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]{22})/g;
@@ -24,7 +26,7 @@ export const scanviewTerminalLinkProvider = (_context: ExtensionContext) => {
       const matches = [...context.line.matchAll(kScanResultPattern)];
       if (matches.length > 0) {
         // Forward matches
-        const result = matches.map(match => {
+        const result = matches.map((match) => {
           // The path from the terminal.
           const path = match[1];
 

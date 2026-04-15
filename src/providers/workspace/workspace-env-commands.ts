@@ -1,7 +1,9 @@
 import { existsSync, writeFileSync } from "fs";
+
+import { window, workspace } from "vscode";
+
 import { Command } from "../../core/command";
 import { workspacePath } from "../../core/path";
-import { window, workspace } from "vscode";
 
 export function workspaceEnvCommands() {
   return [new EditEnvFileCommand()];

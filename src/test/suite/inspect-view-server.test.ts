@@ -1,5 +1,7 @@
 import * as assert from "assert";
+
 import { Uri } from "vscode";
+
 import { InspectViewServer } from "../../providers/inspect/inspect-view-server";
 
 suite("InspectViewServer Test Suite", () => {
@@ -502,7 +504,7 @@ suite("InspectViewServer Test Suite", () => {
       ];
 
       assert.ok(jsonEndpoints.length > 0);
-      jsonEndpoints.forEach(endpoint => {
+      jsonEndpoints.forEach((endpoint) => {
         assert.ok(typeof endpoint === "string");
       });
     });
@@ -511,7 +513,7 @@ suite("InspectViewServer Test Suite", () => {
       const binaryEndpoints = ["evalLogBytes"];
 
       assert.ok(binaryEndpoints.length > 0);
-      binaryEndpoints.forEach(endpoint => {
+      binaryEndpoints.forEach((endpoint) => {
         assert.ok(typeof endpoint === "string");
       });
     });

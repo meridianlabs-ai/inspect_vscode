@@ -1,10 +1,11 @@
 import * as assert from "assert";
-import * as fs from "fs";
 import { spawnSync } from "child_process";
+import * as fs from "fs";
+
 import { Uri } from "vscode";
 
-import { getWebviewPanelHtml } from "../../core/webview";
 import { toAbsolutePath } from "../../core/path";
+import { getWebviewPanelHtml } from "../../core/webview";
 import { HostWebviewPanel } from "../../hooks";
 
 /**

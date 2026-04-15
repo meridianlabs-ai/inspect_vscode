@@ -1,8 +1,10 @@
 import { existsSync } from "node:fs";
+import { dirname, join } from "path";
+
 import { AbsolutePath, toAbsolutePath } from "../path";
 import { runProcess, spawnProcess } from "../process";
+
 import { PythonInterpreter, pythonInterpreter } from "./interpreter";
-import { dirname, join } from "path";
 
 export function runPythonModule(
   module: string,
@@ -27,7 +29,7 @@ export function pythonBinaryPath(
   }
 
   // We couldn't find it, so now look around based upon heuristics
-  const path = platformPaths(interpreter, binary).find(path => {
+  const path = platformPaths(interpreter, binary).find((path) => {
     return existsSync(path);
   });
   if (path) {

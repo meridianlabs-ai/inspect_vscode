@@ -1,14 +1,16 @@
 import {
+  commands,
   ExtensionContext,
   TextDocumentShowOptions,
   Uri,
-  commands,
 } from "vscode";
-import { kInspectLogViewType } from "./logview/logview-editor";
-import { hasMinimumInspectVersion } from "../inspect/version";
-import { kInspectEvalLogFormatVersion } from "./inspect/inspect-constants";
-import { InspectViewManager } from "./logview/logview-view";
+
 import { withEditorAssociation } from "../core/vscode/association";
+import { hasMinimumInspectVersion } from "../inspect/version";
+
+import { kInspectEvalLogFormatVersion } from "./inspect/inspect-constants";
+import { kInspectLogViewType } from "./logview/logview-editor";
+import { InspectViewManager } from "./logview/logview-view";
 
 export function activateOpenLog(
   context: ExtensionContext,

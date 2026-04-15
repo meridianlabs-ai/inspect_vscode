@@ -1,8 +1,9 @@
 import { ExtensionContext } from "vscode";
 
-import { LogListingMRU } from "./log-listing-mru";
-import { WorkspaceEnvManager } from "../../workspace/workspace-env-provider";
 import { selectDirectory } from "../../../core/select";
+import { WorkspaceEnvManager } from "../../workspace/workspace-env-provider";
+
+import { LogListingMRU } from "./log-listing-mru";
 
 export async function selectLogDirectory(
   context: ExtensionContext,

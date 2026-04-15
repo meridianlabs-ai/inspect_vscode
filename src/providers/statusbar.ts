@@ -1,9 +1,10 @@
 import { ExtensionContext, StatusBarAlignment, window } from "vscode";
-import { inspectVersion } from "../inspect";
-import { inspectBinPath } from "../inspect/props";
+
 import { PackageManager } from "../core/package/manager";
 import { VersionDescriptor } from "../core/package/props";
 import { AbsolutePath } from "../core/path";
+import { inspectVersion } from "../inspect";
+import { inspectBinPath } from "../inspect/props";
 import { scoutBinPath, scoutVersionDescriptor } from "../scout/props";
 
 export function activateStatusBar(

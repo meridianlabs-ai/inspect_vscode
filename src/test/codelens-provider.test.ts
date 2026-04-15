@@ -1,13 +1,15 @@
 import * as assert from "assert";
+
 import {
   CancellationToken,
+  EndOfLine,
   Position,
   Range,
   TextDocument,
   TextLine,
-  EndOfLine,
   Uri,
 } from "vscode";
+
 import { InspectCodeLensProvider } from "../providers/codelens/codelens-provider";
 
 class MockTextLine implements TextLine {

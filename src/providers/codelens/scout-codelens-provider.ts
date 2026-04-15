@@ -4,10 +4,11 @@ import {
   CodeLensProvider,
   Command,
   ExtensionContext,
+  languages,
   TextDocument,
   Uri,
-  languages,
 } from "vscode";
+
 import { isNotebook } from "../../components/notebook";
 
 export function activateScoutCodeLens(context: ExtensionContext) {
@@ -106,7 +107,7 @@ export class ScoutCodeLensProvider implements CodeLensProvider {
           const funcLine = document.lineAt(j);
           const match = funcLine.text.match(kFuncPattern);
           if (match) {
-            scanCommands(document.uri, match[1]).forEach(cmd => {
+            scanCommands(document.uri, match[1]).forEach((cmd) => {
               lenses.push(new CodeLens(line.range, cmd));
             });
             break;

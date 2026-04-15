@@ -1,21 +1,21 @@
+import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import {
-  ExtensionContext,
-  Disposable,
   commands,
-  workspace,
+  Disposable,
+  ExtensionContext,
+  FileSystemWatcher,
   RelativePattern,
   Uri,
-  FileSystemWatcher,
+  workspace,
 } from "vscode";
 
-import { join } from "node:path";
-import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
-
-import { WorkspaceStateManager } from "../workspace/workspace-state-provider";
 import { userDataDir } from "../../core/appdirs";
+import { removeFilesSync } from "../../core/file";
 import { log } from "../../core/log";
 import { kPythonPackageName } from "../../inspect/props";
-import { removeFilesSync } from "../../core/file";
+import { WorkspaceStateManager } from "../workspace/workspace-state-provider";
 
 export function activateInspectCommands(
   stateManager: WorkspaceStateManager,
@@ -66,7 +66,9 @@ export class InspectCommandDispatcher implements Disposable {
         join(this.commandsDir_, commandFile),
         { encoding: "utf-8" }
       );
-      removeFilesSync(commandFiles.map(file => join(this.commandsDir_, file)));
+      removeFilesSync(
+        commandFiles.map((file) => join(this.commandsDir_, file))
+      );
       return JSON.parse(commandContents) as Array<{
         command: string;
         args: unknown[];

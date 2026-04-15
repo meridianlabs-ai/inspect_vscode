@@ -1,4 +1,5 @@
-import { Socket, createServer } from "net";
+import { createServer, Socket } from "net";
+
 import { randomInt } from "./random";
 
 const kLocalhost = "127.0.0.1";

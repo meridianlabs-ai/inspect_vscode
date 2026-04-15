@@ -3,8 +3,8 @@ import { ExtensionContext, Uri } from "vscode";
 import { PackageManager } from "../../core/package/manager";
 import { PackageViewServer } from "../../core/package/view-server";
 import { AbsolutePath, toAbsolutePath } from "../../core/path";
-import { scoutBinPath } from "../../scout/props";
 import { basename, dirname } from "../../core/uri";
+import { scoutBinPath } from "../../scout/props";
 
 // Custom request/response types for JSON-RPC proxy communication.
 // We can't use fetch's Request/Response/Headers because:

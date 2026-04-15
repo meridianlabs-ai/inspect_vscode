@@ -2,8 +2,8 @@ import "./vscode-controls.css";
 import "./scout-panel-webview.css";
 
 import {
-  provideVSCodeDesignSystem,
   allComponents,
+  provideVSCodeDesignSystem,
 } from "@vscode/webview-ui-toolkit";
 
 // Declare the acquireVsCodeApi function
@@ -33,7 +33,7 @@ function init() {
 
   // Set up navigation link click handlers
   const navLinks = document.querySelectorAll(".nav-link");
-  navLinks.forEach(link => {
+  navLinks.forEach((link) => {
     link.addEventListener("click", (e: Event) => {
       e.preventDefault();
       const target = (e.currentTarget as HTMLElement).dataset.target;

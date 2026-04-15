@@ -1,10 +1,13 @@
-import * as vscode from "vscode";
-import { LogListing, LogNode } from "./log-listing";
-import { EvalLog, EvalResults } from "../../../@types/log";
 import path from "path";
+
+import * as vscode from "vscode";
 import { MarkdownString } from "vscode";
 import { stringify } from "yaml";
+
+import { EvalLog, EvalResults } from "../../../@types/log";
 import { sleep } from "../../../core/wait";
+
+import { LogListing, LogNode } from "./log-listing";
 
 export const kLogListCacheName = "logListingCache";
 
@@ -68,7 +71,7 @@ export class LogElementQueueProcessor {
     try {
       // Collect all URIs
       const elementUris = new Map<string, LogNode>();
-      elements.forEach(element => {
+      elements.forEach((element) => {
         const listing = this.logListing();
         const uri = listing?.uriForNode(element);
         if (uri) {
@@ -79,7 +82,7 @@ export class LogElementQueueProcessor {
 
       // Handle cached elements (if they're in the cache,
       // screen them out after populating them from cache)
-      const uris = allUris.filter(uri => {
+      const uris = allUris.filter((uri) => {
         const cached = this.elementCache.get(uri);
         if (cached) {
           const el = elementUris.get(uri);
@@ -142,7 +145,7 @@ export class LogElementQueueProcessor {
       this.queue = [];
     } finally {
       // Remove processed elements
-      this.queue = this.queue.filter(item => !elements.includes(item));
+      this.queue = this.queue.filter((item) => !elements.includes(item));
       this.isProcessing = false;
 
       // Process remaining items if any
@@ -271,7 +274,7 @@ function evalTarget(log: EvalLog): string {
   // scorers
   if (log.results) {
     const scorer_names = new Set<string>(
-      log.results.scores.map(score => score.scorer)
+      log.results.scores.map((score) => score.scorer)
     );
     target.push("scorers: " + Array.from(scorer_names).join(", "));
   }
@@ -311,11 +314,13 @@ function isObject(value: unknown): value is Record<string, unknown> {
 }
 
 function evalResults(results: EvalResults): string[] {
-  const scorer_names = new Set<string>(results.scores.map(score => score.name));
+  const scorer_names = new Set<string>(
+    results.scores.map((score) => score.name)
+  );
   const reducer_names = new Set<string>(
     results.scores
-      .filter(score => score.reducer !== null)
-      .map(score => score.reducer || "")
+      .filter((score) => score.reducer !== null)
+      .map((score) => score.reducer || "")
   );
   const show_reducer = reducer_names.size > 1 || !reducer_names.has("avg");
   const output: Record<string, string> = {};

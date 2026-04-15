@@ -1,12 +1,14 @@
 import * as assert from "assert";
 import * as os from "os";
+
 import { Uri } from "vscode";
+
 import {
-  resolveToUri,
   dirname,
-  prettyUriPath,
   getRelativeUri,
   normalizeWindowsUri,
+  prettyUriPath,
+  resolveToUri,
 } from "../../core/uri";
 
 suite("URI Utilities Test Suite", () => {

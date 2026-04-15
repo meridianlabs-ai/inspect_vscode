@@ -1,4 +1,5 @@
 import * as assert from "assert";
+
 import { getNonce } from "../../core/nonce";
 
 suite("Nonce Utilities Test Suite", () => {
@@ -65,9 +66,9 @@ suite("Nonce Utilities Test Suite", () => {
       }
 
       // Check that we have both upper and lower case letters and numbers
-      const hasUpperCase = allChars.some(c => /[A-Z]/.test(c));
-      const hasLowerCase = allChars.some(c => /[a-z]/.test(c));
-      const hasNumbers = allChars.some(c => /[0-9]/.test(c));
+      const hasUpperCase = allChars.some((c) => /[A-Z]/.test(c));
+      const hasLowerCase = allChars.some((c) => /[a-z]/.test(c));
+      const hasNumbers = allChars.some((c) => /[0-9]/.test(c));
 
       assert.ok(hasUpperCase, "Should contain uppercase letters");
       assert.ok(hasLowerCase, "Should contain lowercase letters");

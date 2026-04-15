@@ -1,5 +1,6 @@
 import path, { join, relative } from "path";
-import { AbsolutePath, activeWorkspacePath } from "../../core/path";
+
+import { throttle } from "lodash";
 import {
   Event,
   EventEmitter,
@@ -10,12 +11,12 @@ import {
   workspace,
 } from "vscode";
 
-import { throttle } from "lodash";
 import { startup } from "../../core/log";
 import {
   PackageChangedEvent,
   PackageManager,
 } from "../../core/package/manager";
+import { AbsolutePath, activeWorkspacePath } from "../../core/path";
 
 // Activates the provider which tracks the currently active task (document and task name)
 export function activateWorkspaceTaskProvider(
@@ -133,7 +134,7 @@ async function workspaceTasks(
   const files = await workspace.findFiles("**/*.py", kExcludeGlob);
 
   // Filter files with skip prefixed
-  const validFiles = files.filter(file => {
+  const validFiles = files.filter((file) => {
     const relativePath = relative(workspacePath.path, file.fsPath);
     return !relativePath.startsWith("_") && !relativePath.startsWith(".");
   });
@@ -147,7 +148,7 @@ async function workspaceTasks(
   const tasks: TaskDescriptor[] = [];
 
   // Try to cached file data, if possible
-  const fileStatPromises = validFiles.map(async file => {
+  const fileStatPromises = validFiles.map(async (file) => {
     const filePath = file.toString();
     const stat = await workspace.fs.stat(file);
     const cached = taskFileCache[filePath];
@@ -164,7 +165,7 @@ async function workspaceTasks(
 
   // Resolve file stats and filter out cached results
   const filesToProcess = (await Promise.all(fileStatPromises)).filter(
-    file => file !== null
+    (file) => file !== null
   ) as { file: Uri; filePath: string; stat: FileStat }[];
 
   startup.info(`Inspecting ${filesToProcess.length} files for tasks`);
@@ -214,7 +215,7 @@ async function inspectTaskData(
   const treeMap: Map<string, TaskPath> = new Map();
 
   // Got through the task descriptors and
-  taskDescriptors.forEach(descriptor => {
+  taskDescriptors.forEach((descriptor) => {
     // track the parent node as we make children
     let parentNode: TaskPath | undefined;
 
@@ -254,7 +255,7 @@ async function inspectTaskData(
   });
 
   // Return the root tree nodes
-  const vals = Array.from(treeMap.values()).filter(entry => {
+  const vals = Array.from(treeMap.values()).filter((entry) => {
     return entry.parent === undefined;
   });
 

@@ -1,14 +1,15 @@
 import { ChildProcess, SpawnOptions } from "child_process";
 import { randomUUID } from "crypto";
 import * as os from "os";
-import AsyncLock from "async-lock";
 
+import AsyncLock from "async-lock";
 import { Disposable, ExtensionContext, OutputChannel, window } from "vscode";
 
-import { findOpenPort } from "../../core/port";
 import { AbsolutePath, activeWorkspacePath } from "../../core/path";
-import { shQuote } from "../../core/string";
+import { findOpenPort } from "../../core/port";
 import { spawnProcess } from "../../core/process";
+import { shQuote } from "../../core/string";
+
 import { PackageManager } from "./manager";
 
 export class PackageViewServer implements Disposable {

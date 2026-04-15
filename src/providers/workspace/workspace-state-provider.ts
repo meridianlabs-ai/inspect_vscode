@@ -1,4 +1,5 @@
 import { ExtensionContext } from "vscode";
+
 import { Command } from "../../core/command";
 import { randomInt } from "../../core/random";
 

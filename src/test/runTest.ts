@@ -1,4 +1,5 @@
 import * as path from "path";
+
 import { runTests } from "@vscode/test-electron";
 
 async function main() {
@@ -32,7 +33,7 @@ async function main() {
 }
 
 // Handle promise rejection properly to satisfy ESLint
-void main().catch(err => {
+void main().catch((err) => {
   console.error("Failed to run tests:", err);
   process.exit(1);
 });

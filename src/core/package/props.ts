@@ -1,11 +1,12 @@
-import { SemVer, coerce } from "semver";
+import { existsSync } from "fs";
+
+import { coerce, SemVer } from "semver";
+import { Disposable } from "vscode";
 
 import { log } from "../log";
-import { pythonBinaryPath, pythonInterpreter } from "../python";
 import { AbsolutePath, toAbsolutePath } from "../path";
-import { Disposable } from "vscode";
 import { runProcess } from "../process";
-import { existsSync } from "fs";
+import { pythonBinaryPath, pythonInterpreter } from "../python";
 
 export interface VersionDescriptor {
   raw: string;

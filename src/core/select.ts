@@ -5,9 +5,10 @@ import {
   Uri,
   window,
 } from "vscode";
+
+import { ListingMRU } from "./listing-mru";
 import { prettyUriPath } from "./uri";
 import { activeWorkspaceFolder } from "./workspace";
-import { ListingMRU } from "./listing-mru";
 
 const kSeparator = "<separator>";
 const kWorkspaceLogDirectory = "<workspace-log-dir>";
@@ -26,11 +27,11 @@ export async function selectDirectory(
   mru: ListingMRU,
   workspaceDefaultDir = true
 ): Promise<Uri | null | undefined> {
-  return new Promise<Uri | null | undefined>(resolve => {
+  return new Promise<Uri | null | undefined>((resolve) => {
     // get the mru (screen out the current workspaceLogDir)
     const mruLocations = mru
       .get()
-      .filter(location => location.toString() !== defaultDir.toString());
+      .filter((location) => location.toString() !== defaultDir.toString());
 
     // build list of items
     const items: SelectLocationQuickPickItem[] = [];
@@ -143,7 +144,7 @@ export async function selectRemoteURL(
   const remoteUrl = await window.showInputBox({
     title: `Remote ${entity}`,
     prompt: `Provide a remote ${entity.toLowerCase()} (e.g. s3://my-bucket/${dirname})`,
-    validateInput: value => {
+    validateInput: (value) => {
       // don't try to validate empty string
       if (value.length === 0) {
         return null;

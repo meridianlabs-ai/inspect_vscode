@@ -1,14 +1,15 @@
 import {
-  extensions,
+  Disposable,
   Event,
   EventEmitter,
-  Disposable,
-  Uri,
   Extension,
+  extensions,
+  Uri,
 } from "vscode";
-import { activeWorkspaceFolder } from "../workspace";
+
 import { log } from "../log";
 import { runProcess } from "../process";
+import { activeWorkspaceFolder } from "../workspace";
 
 export function pythonInterpreter(): PythonInterpreter {
   return pythonInterpreter_;
@@ -43,7 +44,7 @@ export class PythonInterpreter implements Disposable {
     // subscribe to changes
     if (this.pyExtension_) {
       const api = this.pyExtension_.exports;
-      this.eventHandle_ = api.settings.onDidChangeExecutionDetails(e => {
+      this.eventHandle_ = api.settings.onDidChangeExecutionDetails((e) => {
         const execCommand = this.getExecCommand();
         if (execCommand) {
           this.execCommand_ = execCommand;

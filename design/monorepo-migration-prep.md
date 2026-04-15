@@ -25,28 +25,9 @@ The VS Code extension (`inspect_vscode`) will eventually move into the `ts-mono`
 
 Moved `@eslint/eslintrc`, `@eslint/js`, `@types/glob`, `@types/semver` from `dependencies` to `devDependencies`. Also fixed `ELECTRON_RUN_AS_NODE` test runner issue (VS Code terminal sets this env var, causing the test Electron binary to run as plain Node.js).
 
-### PR 2: Prettier alignment
+### ~~PR 2: Prettier alignment~~ ✅ Done
 
-- Change `arrowParens` from `"avoid"` to `"always"` in [.prettierrc](.prettierrc)
-- Add `@ianvs/prettier-plugin-sort-imports` as devDependency
-- Add `importOrder` config matching monorepo pattern:
-  ```json
-  [
-    "<BUILTIN_MODULES>",
-    "",
-    "<THIRD_PARTY_MODULES>",
-    "",
-    "^@tsmono/",
-    "",
-    "^[.][.]",
-    "",
-    "^[.]/"
-  ]
-  ```
-- Run `prettier --write .` to reformat entire codebase
-- Pure formatting change, large diff but zero behavior change
-
-**Files:** [.prettierrc](.prettierrc), [package.json](package.json), all `.ts` files (reformatted)
+Changed `arrowParens` to `"always"`, added `@ianvs/prettier-plugin-sort-imports` with monorepo import ordering, and reformatted entire codebase.
 
 ### PR 3: ESLint modernization
 

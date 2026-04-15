@@ -1,11 +1,18 @@
-import vscode, { Event, EventEmitter, TreeItem } from "vscode";
+import { format, isThisYear, isToday } from "date-fns";
+import { throttle } from "lodash";
+import vscode, {
+  Event,
+  EventEmitter,
+  MarkdownString,
+  ThemeIcon,
+  TreeDataProvider,
+  TreeItem,
+  Uri,
+} from "vscode";
 
-import { MarkdownString, ThemeIcon, TreeDataProvider, Uri } from "vscode";
+import { ListingMRU } from "../../../core/listing-mru";
 import { log } from "../../../core/log";
 import { normalizeWindowsUri } from "../../../core/uri";
-import { ListingMRU } from "../../../core/listing-mru";
-import { throttle } from "lodash";
-import { isToday, format, isThisYear } from "date-fns";
 
 export type LogNode =
   | ({
@@ -163,7 +170,7 @@ export class LogListing {
 
 function deduplicateByName(logs: LogItem[]): LogItem[] {
   const seen = new Set<string>();
-  return logs.filter(item => {
+  return logs.filter((item) => {
     if (seen.has(item.name)) {
       return false;
     }
@@ -223,10 +230,10 @@ function buildLogTree(logs: LogItem[]): LogNode[] {
       currentParent = ensureDirectory(currentPath, parentDir);
 
       if (parentDir?.type === "dir") {
-        if (!parentDir.children.some(child => child.name === currentPath)) {
+        if (!parentDir.children.some((child) => child.name === currentPath)) {
           parentDir.children.push(currentParent);
         }
-      } else if (!root.some(node => node.name === currentPath)) {
+      } else if (!root.some((node) => node.name === currentPath)) {
         root.push(currentParent);
       }
     }
