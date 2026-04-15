@@ -6,24 +6,25 @@ The VS Code extension (`inspect_vscode`) will eventually move into the `ts-mono`
 
 ## Key Differences
 
-| Area | Extension (current) | Monorepo |
-|---|---|---|
-| Package manager | yarn 1.22.22 | pnpm 10.29.3 |
-| Build | Webpack 5 (CommonJS ext + ESM webviews) | Vite |
-| TypeScript | ^5.7.0, ES2022/commonjs | ^6.0.2, ESNext/bundler |
-| ESLint | v9 flat config w/ FlatCompat | `@tsmono/eslint-config/base` |
-| Prettier | `.prettierrc` (arrowParens: avoid) | `@tsmono/prettier-config` (arrowParens: always, import sorting) |
-| Testing | Mocha + @vscode/test-electron | Vitest + Playwright |
-| Node | .nvmrc=18, engines>=20 | >=22 |
-| Module type | (not set, defaults CJS) | `"type": "module"` |
-| Orchestration | N/A | Turborepo |
-| Script names | compile, watch, package, prettier | build, dev, build:production, format |
+| Area            | Extension (current)                     | Monorepo                                                        |
+| --------------- | --------------------------------------- | --------------------------------------------------------------- |
+| Package manager | yarn 1.22.22                            | pnpm 10.29.3                                                    |
+| Build           | Webpack 5 (CommonJS ext + ESM webviews) | Vite                                                            |
+| TypeScript      | ^5.7.0, ES2022/commonjs                 | ^6.0.2, ESNext/bundler                                          |
+| ESLint          | v9 flat config w/ FlatCompat            | `@tsmono/eslint-config/base`                                    |
+| Prettier        | `.prettierrc` (arrowParens: avoid)      | `@tsmono/prettier-config` (arrowParens: always, import sorting) |
+| Testing         | Mocha + @vscode/test-electron           | Vitest + Playwright                                             |
+| Node            | .nvmrc=18, engines>=20                  | >=22                                                            |
+| Module type     | (not set, defaults CJS)                 | `"type": "module"`                                              |
+| Orchestration   | N/A                                     | Turborepo                                                       |
+| Script names    | compile, watch, package, prettier       | build, dev, build:production, format                            |
 
 ## Prep PRs (in order)
 
 ### PR 1: Fix dependency categorization
 
 Move misplaced packages from `dependencies` to `devDependencies`:
+
 - `@eslint/eslintrc`, `@eslint/js` (lint tooling)
 - `@types/glob`, `@types/semver` (type packages)
 
@@ -35,7 +36,17 @@ Move misplaced packages from `dependencies` to `devDependencies`:
 - Add `@ianvs/prettier-plugin-sort-imports` as devDependency
 - Add `importOrder` config matching monorepo pattern:
   ```json
-  ["<BUILTIN_MODULES>", "", "<THIRD_PARTY_MODULES>", "", "^@tsmono/", "", "^[.][.]", "", "^[.]/"]
+  [
+    "<BUILTIN_MODULES>",
+    "",
+    "<THIRD_PARTY_MODULES>",
+    "",
+    "^@tsmono/",
+    "",
+    "^[.][.]",
+    "",
+    "^[.]/"
+  ]
   ```
 - Run `prettier --write .` to reformat entire codebase
 - Pure formatting change, large diff but zero behavior change
@@ -45,6 +56,7 @@ Move misplaced packages from `dependencies` to `devDependencies`:
 ### PR 3: ESLint modernization
 
 Rewrite [eslint.config.mjs](eslint.config.mjs) to match monorepo pattern:
+
 - Drop `FlatCompat` — use `typescript-eslint` directly
 - Add `eslint-config-prettier` and `eslint-plugin-import` to devDeps
 - Switch from `parserOptions.project` to `parserOptions.projectService`
@@ -56,6 +68,7 @@ Rewrite [eslint.config.mjs](eslint.config.mjs) to match monorepo pattern:
 ### PR 4: TypeScript strictness alignment
 
 Enable the two strict options the monorepo has that we don't:
+
 - `noUncheckedIndexedAccess: true`
 - `useUnknownInCatchVariables: true`
 
@@ -75,17 +88,18 @@ Fix all resulting type errors. This is the most valuable prep step — these rul
 
 Rename scripts to match monorepo conventions:
 
-| Old | New |
-|---|---|
-| `compile` | `build` |
-| `watch` | `dev` |
-| `package` | `build:production` |
-| `prettier` | `format` |
-| (new) | `format:check` (`prettier --check .`) |
-| (new) | `typecheck` (`tsc --noEmit`) |
-| `check-all` | `check` |
+| Old         | New                                   |
+| ----------- | ------------------------------------- |
+| `compile`   | `build`                               |
+| `watch`     | `dev`                                 |
+| `package`   | `build:production`                    |
+| `prettier`  | `format`                              |
+| (new)       | `format:check` (`prettier --check .`) |
+| (new)       | `typecheck` (`tsc --noEmit`)          |
+| `check-all` | `check`                               |
 
 Also:
+
 - Add `"type": "module"` to package.json
 - Convert [webpack.config.js](webpack.config.js) from `require`/`module.exports` to `import`/`export default`
 - Rename [eslint.config.mjs](eslint.config.mjs) to `eslint.config.js` (`.js` is ESM with `type: module`)
@@ -134,10 +148,12 @@ These happen when the code physically moves into `apps/vscode/`:
 ## Verification
 
 After each PR:
+
 - `yarn check-all` (or `pnpm check` after PR 7) passes
 - Extension loads and functions correctly in VS Code (`F5` to launch Extension Development Host)
 - CI passes
 
 After all prep PRs:
+
 - The only remaining differences from monorepo conventions are the config imports (pointing at local configs vs `@tsmono/*` workspace packages)
 - The actual move PR should be mostly file relocation + config import swaps
