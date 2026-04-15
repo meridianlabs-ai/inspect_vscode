@@ -11,6 +11,11 @@ async function main() {
     // Passed to --extensionTestsPath
     const extensionTestsPath = path.resolve(__dirname, "./suite/index");
 
+    // Unset ELECTRON_RUN_AS_NODE so the VS Code binary launches as
+    // Electron rather than plain Node.js. This var is inherited when
+    // tests are run from a VS Code integrated terminal.
+    delete process.env.ELECTRON_RUN_AS_NODE;
+
     // Download VS Code, unzip it and run the integration test
     await runTests({
       extensionDevelopmentPath,

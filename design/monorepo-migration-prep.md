@@ -21,14 +21,9 @@ The VS Code extension (`inspect_vscode`) will eventually move into the `ts-mono`
 
 ## Prep PRs (in order)
 
-### PR 1: Fix dependency categorization
+### ~~PR 1: Fix dependency categorization~~ ✅ Done
 
-Move misplaced packages from `dependencies` to `devDependencies`:
-
-- `@eslint/eslintrc`, `@eslint/js` (lint tooling)
-- `@types/glob`, `@types/semver` (type packages)
-
-**Files:** [package.json](package.json)
+Moved `@eslint/eslintrc`, `@eslint/js`, `@types/glob`, `@types/semver` from `dependencies` to `devDependencies`. Also fixed `ELECTRON_RUN_AS_NODE` test runner issue (VS Code terminal sets this env var, causing the test Electron binary to run as plain Node.js).
 
 ### PR 2: Prettier alignment
 
