@@ -29,17 +29,9 @@ Moved `@eslint/eslintrc`, `@eslint/js`, `@types/glob`, `@types/semver` from `dep
 
 Changed `arrowParens` to `"always"`, added `@ianvs/prettier-plugin-sort-imports` with monorepo import ordering, and reformatted entire codebase.
 
-### PR 3: ESLint modernization
+### ~~PR 3: ESLint modernization~~ ✅ Done
 
-Rewrite [eslint.config.mjs](eslint.config.mjs) to match monorepo pattern:
-
-- Drop `FlatCompat` — use `typescript-eslint` directly
-- Add `eslint-config-prettier` and `eslint-plugin-import` to devDeps
-- Switch from `parserOptions.project` to `parserOptions.projectService`
-- Keep extension-specific rules (`naming-convention`, `curly`, `eqeqeq`, `no-throw-literal`)
-- Fix any new lint errors from `recommendedTypeChecked`
-
-**Files:** [eslint.config.mjs](eslint.config.mjs), [package.json](package.json)
+Rewrote eslint config: dropped `FlatCompat`, using `typescript-eslint` directly, added `eslint-config-prettier`, `eslint-plugin-import`, `eslint-import-resolver-typescript`, switched to `projectService`.
 
 ### PR 4: TypeScript strictness alignment
 
