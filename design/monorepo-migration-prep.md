@@ -45,17 +45,9 @@ Upgraded TypeScript from ^5.7.0 to ^6.0.2. Only fix needed: added `src/@types/cs
 
 Renamed scripts to monorepo conventions (`build`, `dev`, `build:production`, `format`, `format:check`, `typecheck`, `check-all`). Updated CI, CLAUDE.md, and .vscode/tasks.json. Note: `type: module` was dropped — VS Code extension host + tsc CommonJS output conflicts with ESM package type. Will be handled during monorepo move (extension workspace can stay CJS while root is ESM).
 
-### PR 7: Package manager migration (yarn -> pnpm)
+### ~~PR 7: Package manager migration (yarn -> pnpm)~~ ✅ Done
 
-- Delete `yarn.lock` and `.yarnrc`
-- Remove `"packageManager": "yarn@1.22.22"` from package.json
-- Update `.nvmrc` from `18` to `22`
-- Update `engines.node` from `>=20.0.0` to `>=22.0.0`
-- Update CI to use pnpm + Node 22
-- Generate `pnpm-lock.yaml`
-- Add `vsce:package` script: `vsce package --no-dependencies` (needed for pnpm monorepo compat)
-
-**Files:** [package.json](package.json), [.nvmrc](.nvmrc), [.yarnrc](.yarnrc) (delete), `yarn.lock` (delete), [.github/workflows/ci.yml](.github/workflows/ci.yml), [.github/workflows/release.yml](.github/workflows/release.yml)
+Migrated from yarn 1.22.22 to pnpm 10.29.3. Deleted yarn.lock and .yarnrc, updated .nvmrc to 22, engines.node to >=22.0.0, all CI workflows to pnpm + Node 22, CLAUDE.md references, and added `vsce:package` script.
 
 ## What stays the same
 

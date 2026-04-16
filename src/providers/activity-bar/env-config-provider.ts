@@ -47,9 +47,9 @@ export interface EnvConfigManager<T extends EnvConfig> {
   setConfiguration: (key: string, value: string, state: T) => void;
 }
 
-export class EnvConfigurationProvider<T extends EnvConfig>
-  implements WebviewViewProvider
-{
+export class EnvConfigurationProvider<
+  T extends EnvConfig,
+> implements WebviewViewProvider {
   constructor(
     protected readonly extensionUri_: Uri,
     protected readonly envManager_: WorkspaceEnvManager,

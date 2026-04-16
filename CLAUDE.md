@@ -5,16 +5,16 @@ VS Code extension for the Inspect AI evaluation framework. Provides log viewing,
 ## Commands
 
 ```bash
-yarn install          # install dependencies
-yarn build            # build with webpack
-yarn dev              # build and watch
-yarn test             # run tests (runs build first)
-yarn typecheck        # tsc --noEmit
-yarn lint             # eslint
-yarn lint:fix         # eslint with auto-fix
-yarn format           # format code
-yarn format:check     # check formatting without writing
-yarn check-all        # lint + format:check + typecheck + test (CI equivalent)
+pnpm install          # install dependencies
+pnpm build            # build with webpack
+pnpm dev              # build and watch
+pnpm test             # run tests (runs build first)
+pnpm typecheck        # tsc --noEmit
+pnpm lint             # eslint
+pnpm lint:fix         # eslint with auto-fix
+pnpm format           # format code
+pnpm format:check     # check formatting without writing
+pnpm check-all        # lint + format:check + typecheck + test (CI equivalent)
 ```
 
 ## Key Patterns
@@ -33,7 +33,7 @@ yarn check-all        # lint + format:check + typecheck + test (CI equivalent)
 
 ## Before Committing Changes
 
-- Be sure to use `yarn check-all` to run formatting, linting, and testing before committing.
+- Be sure to use `pnpm check-all` to run formatting, linting, and testing before committing.
 
 ## Gotchas
 

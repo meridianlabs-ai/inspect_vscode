@@ -9,7 +9,7 @@
   },
   "version": "0.9.4",
   "license": "MIT",
-  "packageManager": "yarn@1.22.22",
+  "packageManager": "pnpm@10.29.3",
   "homepage": "https://inspect.aisi.org.uk/",
   "repository": {
     "type": "git",
@@ -20,7 +20,7 @@
   },
   "engines": {
     "vscode": "^1.85.0",
-    "node": ">=20.0.0"
+    "node": ">=22.0.0"
   },
   "categories": [
     "Machine Learning",
@@ -626,20 +626,21 @@
     }
   },
   "scripts": {
-    "vscode:prepublish": "yarn run build:production",
+    "vscode:prepublish": "pnpm run build:production",
     "build": "webpack",
     "build:production": "webpack --mode production --devtool hidden-source-map",
     "dev": "webpack --watch",
     "compile-tests": "tsc -p . --outDir out",
     "watch-tests": "tsc -p . -w --outDir out",
-    "pretest": "yarn run compile-tests && yarn run build",
+    "pretest": "pnpm run compile-tests && pnpm run build",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --ext ts",
     "lint:fix": "eslint src --ext ts --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "node ./out/test/runTest.js",
-    "check-all": "yarn lint && yarn format:check && yarn typecheck && yarn test"
+    "vsce:package": "vsce package --no-dependencies",
+    "check-all": "pnpm lint && pnpm format:check && pnpm typecheck && pnpm test"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.3",

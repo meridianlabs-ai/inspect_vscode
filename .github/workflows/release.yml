@@ -32,23 +32,26 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 20
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: "yarn"
+          node-version: 22
+          cache: "pnpm"
 
       - name: Install dependencies
-        run: yarn install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Run linter
-        run: yarn lint
+        run: pnpm lint
 
       - name: Run TypeScript compiler
-        run: yarn compile
+        run: pnpm build
 
       - name: Build extension
-        run: yarn package
+        run: pnpm build:production
 
       - name: Setup virtual display
         run: |
@@ -56,13 +59,13 @@ jobs:
           sudo apt-get install -y xvfb
 
       - name: Run tests
-        run: xvfb-run -a yarn test
+        run: xvfb-run -a pnpm test
 
       - name: Package extension
-        run: yarn vsce package
+        run: pnpm vsce:package
 
       - name: Publish to VS Code Marketplace
-        run: yarn vsce publish --pat ${{ secrets.VSCE_PAT }}
+        run: pnpm vsce publish --pat ${{ secrets.VSCE_PAT }}
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
 
