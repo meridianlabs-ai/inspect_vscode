@@ -54,20 +54,25 @@ export const logviewTerminalLinkProvider = (
       const matches = [...context.line.matchAll(kLogFilePattern)];
       if (matches.length > 0) {
         // Forward matches
-        const result = matches.map((match) => {
-          // The path from the terminal.
-          const path = match[1]!;
+        const result = matches
+          .map((match) => {
+            // The path from the terminal.
+            const path = match[1];
+            if (!path) {
+              return undefined;
+            }
 
-          // Sort out the decoration range for the link
-          const line = context.line;
-          const startIndex = line.indexOf(path);
-          return {
-            startIndex,
-            length: path.length,
-            tooltip: "View Log",
-            data: path,
-          } as LogViewTerminalLink;
-        });
+            // Sort out the decoration range for the link
+            const line = context.line;
+            const startIndex = line.indexOf(path);
+            return {
+              startIndex,
+              length: path.length,
+              tooltip: "View Log",
+              data: path,
+            } as LogViewTerminalLink;
+          })
+          .filter((link) => link !== undefined);
         return result;
       }
 
@@ -146,7 +151,8 @@ export const resolveLogFile = async (link: string) => {
       const filename = basename(link);
       const files = await workspace.findFiles(`**/${filename}`);
       if (files.length === 1) {
-        return Uri.file(files[0]!.path);
+        const [file] = files;
+        return file ? Uri.file(file.path) : undefined;
       } else {
         return undefined;
       }

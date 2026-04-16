@@ -189,12 +189,15 @@ suite("LogListing Test Suite", () => {
       const tree = buildLogTree(items);
 
       assert.strictEqual(tree.length, 1);
-      assert.strictEqual(tree[0]!.type, "dir");
-      assert.strictEqual(tree[0]!.name, "subdir");
-      const node0 = tree[0]!;
+      const [node0] = tree;
+      assert.ok(node0);
+      assert.strictEqual(node0.type, "dir");
+      assert.strictEqual(node0.name, "subdir");
       if (node0.type === "dir") {
         assert.strictEqual(node0.children.length, 1);
-        assert.strictEqual(node0.children[0]!.type, "file");
+        const [child] = node0.children;
+        assert.ok(child);
+        assert.strictEqual(child.type, "file");
       }
     });
 
@@ -211,13 +214,15 @@ suite("LogListing Test Suite", () => {
       const tree = buildLogTree(items);
 
       assert.strictEqual(tree.length, 1);
-      assert.strictEqual(tree[0]!.type, "dir");
-      assert.strictEqual(tree[0]!.name, "level1");
+      const [node0] = tree;
+      assert.ok(node0);
+      assert.strictEqual(node0.type, "dir");
+      assert.strictEqual(node0.name, "level1");
 
-      const node0 = tree[0]!;
       if (node0.type === "dir") {
         assert.strictEqual(node0.children.length, 1);
-        const level2 = node0.children[0]!;
+        const [level2] = node0.children;
+        assert.ok(level2);
         assert.strictEqual(level2.type, "dir");
         assert.strictEqual(level2.name, "level1/level2");
       }
@@ -242,8 +247,9 @@ suite("LogListing Test Suite", () => {
       const tree = buildLogTree(items);
 
       assert.strictEqual(tree.length, 1);
-      assert.strictEqual(tree[0]!.type, "dir");
-      const node0 = tree[0]!;
+      const [node0] = tree;
+      assert.ok(node0);
+      assert.strictEqual(node0.type, "dir");
       if (node0.type === "dir") {
         assert.strictEqual(node0.children.length, 2);
       }
@@ -260,10 +266,12 @@ suite("LogListing Test Suite", () => {
       ];
 
       const tree = buildLogTree(items);
-      const parentDir = tree[0]!;
+      const [parentDir] = tree;
+      assert.ok(parentDir);
 
       if (parentDir.type === "dir") {
-        const fileNode = parentDir.children[0]!;
+        const [fileNode] = parentDir.children;
+        assert.ok(fileNode);
         assert.strictEqual(fileNode.parent, parentDir);
       }
     });
@@ -312,8 +320,10 @@ suite("LogListing Test Suite", () => {
 
       const sorted = sortLogTree(nodes);
 
-      assert.strictEqual(sorted[0]!.type, "dir");
-      assert.strictEqual(sorted[1]!.type, "file");
+      const [first, second] = sorted;
+      assert.ok(first && second);
+      assert.strictEqual(first.type, "dir");
+      assert.strictEqual(second.type, "file");
     });
 
     test("should sort nested children", () => {
@@ -341,11 +351,14 @@ suite("LogListing Test Suite", () => {
       ];
 
       const sorted = sortLogTree(nodes);
-      const dir = sorted[0]!;
+      const [dir] = sorted;
+      assert.ok(dir);
 
       if (dir.type === "dir") {
-        assert.strictEqual((dir.children[0]! as LogItem).mtime, 2000);
-        assert.strictEqual((dir.children[1]! as LogItem).mtime, 1000);
+        const [first, second] = dir.children;
+        assert.ok(first && second);
+        assert.strictEqual((first as LogItem).mtime, 2000);
+        assert.strictEqual((second as LogItem).mtime, 1000);
       }
     });
   });

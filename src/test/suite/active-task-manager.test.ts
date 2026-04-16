@@ -256,7 +256,7 @@ def second_task():
       // Find closest @task decorator above cursor
       let foundTaskLine = -1;
       for (let i = cursorLine; i >= 0; i--) {
-        if (lines[i]!.trim().startsWith("@task")) {
+        if (lines[i]?.trim().startsWith("@task")) {
           foundTaskLine = i;
           break;
         }
@@ -282,7 +282,7 @@ def second_task():
       // Find closest @task decorator above cursor
       let foundTaskLine = -1;
       for (let i = cursorLine; i >= 0; i--) {
-        if (lines[i]!.trim().startsWith("@task")) {
+        if (lines[i]?.trim().startsWith("@task")) {
           foundTaskLine = i;
           break;
         }
@@ -308,7 +308,7 @@ def my_task():
       // Find closest @task decorator above cursor
       let foundTaskLine = -1;
       for (let i = cursorLine; i >= 0; i--) {
-        if (lines[i]!.trim().startsWith("@task")) {
+        if (lines[i]?.trim().startsWith("@task")) {
           foundTaskLine = i;
           break;
         }
@@ -370,7 +370,8 @@ def my_task():
       const values = ["first", "second", "third"];
 
       // In a debounced scenario, only "third" would be processed
-      const finalValue = values[values.length - 1]!;
+      const finalValue = values[values.length - 1];
+      assert.ok(finalValue, "Expected at least one value");
       results.push(finalValue);
 
       assert.strictEqual(results.length, 1);

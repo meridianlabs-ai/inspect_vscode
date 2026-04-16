@@ -82,7 +82,11 @@ export class PythonInterpreter implements Disposable {
         "-c",
         "import sys; print(sys.prefix);",
       ];
-      const result = runProcess(this.execCommand_[0]!, args);
+      const [cmd] = this.execCommand_;
+      if (!cmd) {
+        return;
+      }
+      const result = runProcess(cmd, args);
       this.pythonBinDir_ = result.trim();
     }
   }

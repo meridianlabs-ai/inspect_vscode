@@ -241,7 +241,8 @@ suite("PackageManager Test Suite", () => {
       // Should have received at least one event
       assert.ok(events.length > 0);
       // The bin path should be set in the event
-      const lastEvent = events[events.length - 1]!;
+      const lastEvent = events[events.length - 1];
+      assert.ok(lastEvent, "Expected at least one event");
       assert.ok(
         lastEvent.binPath === null || lastEvent.binPath.path !== undefined
       );

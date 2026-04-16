@@ -106,7 +106,10 @@ const parseParameters = (paramStr: string): string[] => {
   // Accumulate chars, tracking brackets and only
   // pay attention to commas outside brackets
   for (let i = 0; i < paramStr.length; i++) {
-    const char = paramStr[i]!;
+    const char = paramStr[i];
+    if (!char) {
+      continue;
+    }
 
     if (["[", "(", "{"].includes(char)) {
       bracketDepth++;

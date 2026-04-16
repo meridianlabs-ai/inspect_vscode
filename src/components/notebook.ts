@@ -69,7 +69,10 @@ export const firstTaskRangeForNotebook = (document: NotebookDocument) => {
   // If there is a cell with a task, compute its range
   if (cellTask) {
     // Just take the first task in the cell
-    const task = cellTask.tasks[0]!;
+    const [task] = cellTask.tasks;
+    if (!task) {
+      return;
+    }
     const index = cellTask.cellIndex;
     const position = new Position(task.line + 1, 0);
     return {

@@ -20,8 +20,8 @@ export const taskRangeForDocument = async (task: string, documentUri: Uri) => {
 
 export const firstTaskRangeForDocument = async (documentUri: Uri) => {
   const taskDatas = await tasksForDocument(documentUri);
-  if (taskDatas.length > 0) {
-    const firstTask = taskDatas[0]!;
+  const [firstTask] = taskDatas;
+  if (firstTask) {
     const position = new Position(firstTask.line + 1, 0);
     return new Selection(position, position);
   }
