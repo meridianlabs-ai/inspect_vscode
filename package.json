@@ -640,7 +640,7 @@
     "format:check": "prettier --check .",
     "test": "node ./out/test/runTest.js",
     "vsce:package": "vsce package --no-dependencies",
-    "check-all": "pnpm lint && pnpm format:check && pnpm typecheck && pnpm test"
+    "check": "pnpm lint && pnpm format:check && pnpm typecheck && pnpm test"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.3",

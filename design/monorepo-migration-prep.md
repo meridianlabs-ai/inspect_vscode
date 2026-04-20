@@ -43,7 +43,7 @@ Upgraded TypeScript from ^5.7.0 to ^6.0.2. Only fix needed: added `src/@types/cs
 
 ### ~~PR 6: Script renaming~~ ✅ Done
 
-Renamed scripts to monorepo conventions (`build`, `dev`, `build:production`, `format`, `format:check`, `typecheck`, `check-all`). Updated CI, CLAUDE.md, and .vscode/tasks.json. Note: `type: module` was dropped — VS Code extension host + tsc CommonJS output conflicts with ESM package type. Will be handled during monorepo move (extension workspace can stay CJS while root is ESM).
+Renamed scripts to monorepo conventions (`build`, `dev`, `build:production`, `format`, `format:check`, `typecheck`, `check`). Updated CI, CLAUDE.md, and .vscode/tasks.json. Note: `type: module` was dropped — VS Code extension host + tsc CommonJS output conflicts with ESM package type. Will be handled during monorepo move (extension workspace can stay CJS while root is ESM).
 
 ### ~~PR 7: Package manager migration (yarn -> pnpm)~~ ✅ Done
 
@@ -78,7 +78,7 @@ These happen when the code physically moves into `apps/vscode/`:
 
 After each PR:
 
-- `yarn check-all` (or `pnpm check` after PR 7) passes
+- `pnpm check` passes
 - Extension loads and functions correctly in VS Code (`F5` to launch Extension Development Host)
 - CI passes
 

@@ -14,7 +14,7 @@ pnpm lint             # eslint
 pnpm lint:fix         # eslint with auto-fix
 pnpm format           # format code
 pnpm format:check     # check formatting without writing
-pnpm check-all        # lint + format:check + typecheck + test (CI equivalent)
+pnpm check            # lint + format:check + typecheck + test (CI equivalent)
 ```
 
 ## Key Patterns
@@ -33,7 +33,7 @@ pnpm check-all        # lint + format:check + typecheck + test (CI equivalent)
 
 ## Before Committing Changes
 
-- Be sure to use `pnpm check-all` to run formatting, linting, and testing before committing.
+- Be sure to use `pnpm check` to run formatting, linting, and testing before committing.
 
 ## Gotchas
 
