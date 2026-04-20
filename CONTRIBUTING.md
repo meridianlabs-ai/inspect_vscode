@@ -41,18 +41,18 @@ The Inspect Log Viewer and Scout Viewer web applications displayed within the ex
 
 ### Available Commands
 
-| Command              | Description                                          |
-| -------------------- | ---------------------------------------------------- |
-| `pnpm build`         | Build the extension with webpack                     |
-| `pnpm dev`           | Build and watch for changes                          |
-| `pnpm test`          | Run tests (compiles first)                           |
-| `pnpm lint`          | Run ESLint                                           |
-| `pnpm lint:fix`      | Run ESLint with auto-fix                             |
-| `pnpm format`        | Format code with Prettier                            |
-| `pnpm format:check`  | Check formatting without writing                     |
-| `pnpm typecheck`     | Run TypeScript compiler (no emit)                    |
-| `pnpm check`         | Run lint + format:check + typecheck + test (CI equiv)|
-| `pnpm vsce:package`  | Create production VSIX package                       |
+| Command             | Description                                           |
+| ------------------- | ----------------------------------------------------- |
+| `pnpm build`        | Build the extension with webpack                      |
+| `pnpm dev`          | Build and watch for changes                           |
+| `pnpm test`         | Run tests (compiles first)                            |
+| `pnpm lint`         | Run ESLint                                            |
+| `pnpm lint:fix`     | Run ESLint with auto-fix                              |
+| `pnpm format`       | Format code with Prettier                             |
+| `pnpm format:check` | Check formatting without writing                      |
+| `pnpm typecheck`    | Run TypeScript compiler (no emit)                     |
+| `pnpm check`        | Run lint + format:check + typecheck + test (CI equiv) |
+| `pnpm vsce:package` | Create production VSIX package                        |
 
 ### Running the Extension
 
