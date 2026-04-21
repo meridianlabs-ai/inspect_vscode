@@ -1,13 +1,17 @@
-# inspect-vscode
+# Inspect AI for VS Code
 
-VS Code extension for the Inspect framework for large language model evaluations. This extension provides support for developing evaluations using Inspect, including:
+VS Code extension for the [Inspect](https://inspect.aisi.org.uk/) framework for large language model evaluations. This extension provides support for developing evaluations using Inspect, including:
 
 - Integrated viewer for evaluation log files
 - Panel to browse, run, and debug tasks in the workspace
 - Panel for editing Inspect `.env` file
 - Panel for configuring task CLI options and args
-- Commands and key-bindings for running tasks
-- Commands and key-bindings for debugging tasks
+- Commands and key-bindings for running and debugging tasks
+
+## Prerequisites
+
+- [Inspect AI](https://github.com/UKGovernmentBEIS/inspect_ai) >= 0.3.8 installed in your active Python environment
+- Scout features (see below) only activate if [Inspect Scout](https://github.com/UKGovernmentBEIS/inspect_scout) is also installed
 
 ## Log Viewer
 
@@ -19,7 +23,7 @@ The Tasks panel displays a listing of all the Inspect tasks within your workspac
 
 ## Configuration Panel
 
-Use the Configuration (.env) panel to edit common settings in your `.env.` file including the model provider and name, and the log directory and level.
+Use the Configuration (.env) panel to edit common settings in your `.env` file including the model provider and name, and the log directory and level.
 
 ## Task Panel
 
@@ -32,3 +36,18 @@ The Inspect VS Code extension includes commands and keyboard shortcuts for runni
 Use the run or debug commands to execute the current task. You can alternatively use the <kbd>Ctrl+Shift+U</kbd> keyboard shortcut to run a task, or the <kbd>Ctrl+Shift+T</kbd> keyboard shortcut to debug a task.
 
 > Note that on the Mac you should use `Cmd` rather than `Ctrl` as the prefix for all Inspect keyboard shortcuts.
+
+## Scout
+
+When [Inspect Scout](https://github.com/UKGovernmentBEIS/inspect_scout) is installed, the extension provides a dedicated Scout activity bar with additional features:
+
+- **Scan Viewer** — Custom editor for browsing and inspecting scan results
+- **Scan Listing** — Tree view of all available scans with refresh, delete, and reveal-in-explorer actions
+- **Run & Debug Scans** — Execute or debug Scout scans directly from VS Code
+- **Scout View** — Tabbed interface for navigating project configuration, transcripts, scans, and validations
+- **Project Configuration** — Detects and validates `scout.yml`/`scout.yaml` files in your workspace
+- **Scan Notifications** — Configurable notifications when scans complete, with a quick link to view results
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and guidelines.
