@@ -7,7 +7,7 @@
   "author": {
     "name": "Meridian Labs"
   },
-  "version": "0.9.5",
+  "version": "0.9.6",
   "license": "MIT",
   "packageManager": "pnpm@10.29.3",
   "homepage": "https://inspect.aisi.org.uk/",
