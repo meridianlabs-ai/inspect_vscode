@@ -5,7 +5,7 @@
 - [Node.js](https://nodejs.org/) >= 22.0.0
 - [pnpm](https://pnpm.io/) package manager
 - [VS Code](https://code.visualstudio.com/) >= 1.85.0
-- Python with [Inspect AI](https://github.com/UKGovernmentBEIS/inspect_ai) and [Scout](https://github.com/UKGovernmentBEIS/inspect_scout) installed
+- Python with [Inspect AI](https://github.com/UKGovernmentBEIS/inspect_ai) and [Scout](https://github.com/meridianlabs-ai/inspect_scout) installed
 
 ## Python Package Dependencies
 
@@ -69,7 +69,7 @@ For continuous development, run `pnpm dev` in a terminal to automatically rebuil
 pnpm test
 ```
 
-Tests run in a headless VS Code environment using `@vscode/test-electron`.
+Tests run in a headless VS Code environment using `@vscode/test-cli`.
 
 ### Debugging
 
@@ -90,10 +90,16 @@ src/
 │   ├── package/         # Package management
 │   └── vscode/          # VS Code API wrappers
 ├── providers/           # VS Code feature implementations
+│   ├── active-task/     # Active task tracking
 │   ├── activity-bar/    # Main sidebar UI (webview)
-│   ├── logview/         # Log viewer
 │   ├── codelens/        # CodeLens providers
-│   └── ...
+│   ├── inspect/         # Inspect task running/debugging
+│   ├── logview/         # Log viewer
+│   ├── scanview/        # Scout scan viewer
+│   ├── scout/           # Scout scan running/debugging
+│   ├── settings/        # Extension settings
+│   ├── workspace/       # Workspace utilities
+│   └── yaml/            # YAML support
 ├── inspect/             # Inspect AI integration
 └── scout/               # Scout integration
 ```
@@ -178,7 +184,7 @@ The Inspect and Scout viewer web applications are maintained in their respective
 
 1. Clone and install an editable version of the relevant package:
    - [Inspect AI](https://github.com/UKGovernmentBEIS/inspect_ai)
-   - [Scout](https://github.com/UKGovernmentBEIS/inspect_scout)
+   - [Scout](https://github.com/meridianlabs-ai/inspect_scout)
 
 2. From within the package directory, run the view development commands
 
