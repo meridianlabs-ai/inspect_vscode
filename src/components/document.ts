@@ -1,4 +1,5 @@
 import { Position, Selection, TextDocument, Uri, workspace } from "vscode";
+
 import { readTaskData } from "./task";
 
 // Provides a Selection for a task with a document
@@ -6,7 +7,7 @@ export const taskRangeForDocument = async (task: string, documentUri: Uri) => {
   const taskDatas = await tasksForDocument(documentUri);
 
   // Find the task that matches the name (or just select the first task)
-  const taskData = taskDatas.find(data => {
+  const taskData = taskDatas.find((data) => {
     return data.name === task;
   });
 
@@ -19,8 +20,9 @@ export const taskRangeForDocument = async (task: string, documentUri: Uri) => {
 
 export const firstTaskRangeForDocument = async (documentUri: Uri) => {
   const taskDatas = await tasksForDocument(documentUri);
-  if (taskDatas.length > 0) {
-    const position = new Position(taskDatas[0].line + 1, 0);
+  const [firstTask] = taskDatas;
+  if (firstTask) {
+    const position = new Position(firstTask.line + 1, 0);
     return new Selection(position, position);
   }
 };

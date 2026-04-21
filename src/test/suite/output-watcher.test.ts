@@ -105,8 +105,8 @@ suite("OutputWatcher Test Suite", () => {
         { type: "scan", path: "/home/user/.scout/last-scan" },
       ];
 
-      const logFiles = signalFiles.filter(f => f.type === "log");
-      const scanFiles = signalFiles.filter(f => f.type === "scan");
+      const logFiles = signalFiles.filter((f) => f.type === "log");
+      const scanFiles = signalFiles.filter((f) => f.type === "scan");
 
       assert.strictEqual(logFiles.length, 1);
       assert.strictEqual(scanFiles.length, 1);
@@ -322,7 +322,11 @@ suite("OutputWatcher Test Suite", () => {
   suite("Version-Based Signal File Format", () => {
     test("should use JSON format for version 0.3.10+", () => {
       const version = "0.3.10";
-      const [major, minor, patch] = version.split(".").map(Number);
+      const [major, minor, patch] = version.split(".").map(Number) as [
+        number,
+        number,
+        number,
+      ];
 
       const useJsonFormat =
         major > 0 || minor > 3 || (minor === 3 && patch >= 10);
@@ -332,7 +336,11 @@ suite("OutputWatcher Test Suite", () => {
 
     test("should use plain text format for version 0.3.8", () => {
       const version = "0.3.8";
-      const [major, minor, patch] = version.split(".").map(Number);
+      const [major, minor, patch] = version.split(".").map(Number) as [
+        number,
+        number,
+        number,
+      ];
 
       const useJsonFormat =
         major > 0 || minor > 3 || (minor === 3 && patch >= 10);
@@ -349,7 +357,11 @@ suite("OutputWatcher Test Suite", () => {
       ];
 
       for (const { version, expected } of testCases) {
-        const [major, minor, patch] = version.split(".").map(Number);
+        const [major, minor, patch] = version.split(".").map(Number) as [
+          number,
+          number,
+          number,
+        ];
         const useJsonFormat =
           major > 0 || minor > 3 || (minor === 3 && patch >= 10);
 

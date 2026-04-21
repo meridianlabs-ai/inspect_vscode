@@ -9,7 +9,7 @@ export class ListingMRU {
   ) {}
 
   public get(): Uri[] {
-    return this.getStoredMRU().map(uri => Uri.parse(uri));
+    return this.getStoredMRU().map((uri) => Uri.parse(uri));
   }
 
   public async add(logLocation: Uri): Promise<void> {
@@ -18,7 +18,7 @@ export class ListingMRU {
 
     // remove then add so its at the front
     const filteredMru = currentMru.filter(
-      str => str !== logLocation.toString()
+      (str) => str !== logLocation.toString()
     );
     filteredMru.unshift(logLocation.toString());
 
@@ -32,7 +32,7 @@ export class ListingMRU {
   public async remove(logLocation: Uri): Promise<void> {
     // remove the uri
     const currentMru = this.getStoredMRU();
-    const newMru = currentMru.filter(str => str !== logLocation.toString());
+    const newMru = currentMru.filter((str) => str !== logLocation.toString());
 
     // save back to workspace state
     await this.context_.workspaceState.update(this.mruKey_, newMru);

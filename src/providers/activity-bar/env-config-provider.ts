@@ -1,20 +1,21 @@
+import { debounce } from "lodash";
 import {
+  commands,
   Disposable,
+  env,
   Uri,
   Webview,
   WebviewView,
   WebviewViewProvider,
-  env,
-  commands,
 } from "vscode";
-import { WorkspaceStateManager } from "../workspace/workspace-state-provider";
-import { WorkspaceEnvManager } from "../workspace/workspace-env-provider";
-import { inspectVersion } from "../../inspect";
-import { debounce } from "lodash";
+
 import {
   PackageChangedEvent,
   PackageManager,
 } from "../../core/package/manager";
+import { inspectVersion } from "../../inspect";
+import { WorkspaceEnvManager } from "../workspace/workspace-env-provider";
+import { WorkspaceStateManager } from "../workspace/workspace-state-provider";
 
 export const kActiveTaskChanged = "activeTaskChanged";
 export const kInitialize = "initialize";
@@ -46,9 +47,9 @@ export interface EnvConfigManager<T extends EnvConfig> {
   setConfiguration: (key: string, value: string, state: T) => void;
 }
 
-export class EnvConfigurationProvider<T extends EnvConfig>
-  implements WebviewViewProvider
-{
+export class EnvConfigurationProvider<
+  T extends EnvConfig,
+> implements WebviewViewProvider {
   constructor(
     protected readonly extensionUri_: Uri,
     protected readonly envManager_: WorkspaceEnvManager,
@@ -206,7 +207,7 @@ export class EnvConfigurationProvider<T extends EnvConfig>
 
   private disposables_: Disposable[] = [];
   private dispose() {
-    this.disposables_.forEach(disposable => {
+    this.disposables_.forEach((disposable) => {
       disposable.dispose();
     });
   }
@@ -281,7 +282,7 @@ export function modelPickerHTML(modelCaption: string = "Model"): string {
     "openrouter",
     "hf-inference-providers",
   ];
-  const modelOptions = kInspectProviders.map(model => {
+  const modelOptions = kInspectProviders.map((model) => {
     return `<fast-option value="${model}">${model}</fast-option>`;
   });
   return `

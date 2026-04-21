@@ -1,6 +1,7 @@
 import { Command } from "../../core/command";
 import { ExecManager } from "../../core/package/exec-manager";
 import { toAbsolutePath } from "../../core/path";
+
 import { ActiveTaskManager } from "./active-task-provider";
 
 export class RunActiveTaskCommand implements Command {

@@ -1,23 +1,23 @@
 import * as vscode from "vscode";
+import { Uri } from "vscode";
+import { stringify } from "yaml";
 
 import { Command } from "../../../core/command";
-
-import { LogItem, LogListing, LogNode, Logs } from "./log-listing";
-import { activeWorkspaceFolder } from "../../../core/workspace";
+import { OutputWatcher } from "../../../core/package/output-watcher";
+import { workspaceUri } from "../../../core/path";
 import {
   getRelativeUri,
   isUri,
   prettyUriPath,
   resolveToUri,
 } from "../../../core/uri";
-import { Uri } from "vscode";
-import { ScansTreeDataProvider } from "./scan-listing-data";
-import { ScoutViewServer } from "../../scout/scout-view-server";
+import { activeWorkspaceFolder } from "../../../core/workspace";
 import { ScanResultsListingMRU } from "../../scanview/scanview-view";
-import { stringify } from "yaml";
-import { OutputWatcher } from "../../../core/package/output-watcher";
 import { ScoutProjectManager } from "../../scout/scout-project";
-import { workspaceUri } from "../../../core/path";
+import { ScoutViewServer } from "../../scout/scout-view-server";
+
+import { LogItem, LogListing, LogNode, Logs } from "./log-listing";
+import { ScansTreeDataProvider } from "./scan-listing-data";
 
 export async function activateScanListing(
   context: vscode.ExtensionContext,
@@ -157,7 +157,7 @@ export async function activateScanListing(
 
   // refresh when a scan occurs
   disposables.push(
-    outputWatcher.onScoutScanCreated(e => {
+    outputWatcher.onScoutScanCreated((e) => {
       const treeLogDir = treeDataProvider.getLogListing()?.logDir();
       if (treeLogDir && getRelativeUri(treeLogDir, e.scan)) {
         treeDataProvider.refresh();
@@ -167,7 +167,7 @@ export async function activateScanListing(
 
   // refresh on change visiblity
   disposables.push(
-    tree.onDidChangeVisibility(e => {
+    tree.onDidChangeVisibility((e) => {
       if (e.visible) {
         treeDataProvider.refresh();
       }

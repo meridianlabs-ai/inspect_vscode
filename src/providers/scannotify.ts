@@ -1,5 +1,7 @@
-import { window, ExtensionContext, MessageItem, commands } from "vscode";
+import { commands, ExtensionContext, MessageItem, window } from "vscode";
+
 import { OutputWatcher } from "../core/package/output-watcher";
+
 import { InspectSettingsManager } from "./settings/inspect-settings";
 
 export function activateScanNotify(
@@ -8,7 +10,7 @@ export function activateScanNotify(
   settingsMgr: InspectSettingsManager
 ) {
   context.subscriptions.push(
-    outputWatcher.onScoutScanCreated(async e => {
+    outputWatcher.onScoutScanCreated(async (e) => {
       if (e.externalWorkspace) {
         return;
       }

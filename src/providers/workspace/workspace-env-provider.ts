@@ -1,19 +1,22 @@
-import { Command } from "../../core/command";
-import { Disposable, EventEmitter, Event, Uri } from "vscode";
-import { clearEnv, readEnv, writeEnv } from "../../core/env";
-import { isEqual } from "lodash";
-import { workspaceEnvCommands } from "./workspace-env-commands";
-import { activeWorkspaceFolder } from "../../core/workspace";
-import { log } from "../../core/log";
 import { existsSync, statSync } from "fs";
+import { join } from "path";
+
+import { isEqual } from "lodash";
+import { Disposable, Event, EventEmitter, Uri } from "vscode";
+
+import { Command } from "../../core/command";
+import { clearEnv, readEnv, writeEnv } from "../../core/env";
+import { log } from "../../core/log";
 import {
   toAbsolutePath,
   workspacePath,
   workspaceRelativePath,
 } from "../../core/path";
+import { activeWorkspaceFolder } from "../../core/workspace";
 import { kInspectEnvValues } from "../inspect/inspect-constants";
-import { join } from "path";
 import { kScoutEnvValues } from "../scout/scout-constants";
+
+import { workspaceEnvCommands } from "./workspace-env-commands";
 
 export function activateWorkspaceEnv(): [Command[], WorkspaceEnvManager] {
   // Monitor changes to the file
@@ -67,8 +70,8 @@ export class WorkspaceEnvManager implements Disposable {
   public setValues(env: Record<string, string>) {
     const envUri = this.getEnvUri();
     const keys = Object.keys(env);
-    keys.forEach(key => {
-      const value = env[key];
+    keys.forEach((key) => {
+      const value = env[key] ?? "";
       if (value === "") {
         // Only actually clear the value if it has changed
         if (this.env[key] && this.env[key] !== value) {
@@ -88,7 +91,7 @@ export class WorkspaceEnvManager implements Disposable {
   public getDefaultLogDir() {
     // See if there is a log dir
     const envVals = this.getValues();
-    const env_log = envVals[kInspectEnvValues.logDir];
+    const env_log = envVals[kInspectEnvValues.logDir] ?? "";
 
     // If there is a log dir, try to parse and use it
     try {
@@ -105,7 +108,7 @@ export class WorkspaceEnvManager implements Disposable {
   public getDefaultScanResultsDir() {
     // See if there is a log dir
     const envVals = this.getValues();
-    const envResults = envVals[kScoutEnvValues.scanResults];
+    const envResults = envVals[kScoutEnvValues.scanResults] ?? "";
 
     // If there is a results dir, try to parse and use it
     try {

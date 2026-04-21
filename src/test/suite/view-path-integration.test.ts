@@ -1,10 +1,11 @@
 import * as assert from "assert";
-import * as fs from "fs";
 import { spawnSync } from "child_process";
+import * as fs from "fs";
+
 import { Uri } from "vscode";
 
-import { getWebviewPanelHtml } from "../../core/webview";
 import { toAbsolutePath } from "../../core/path";
+import { getWebviewPanelHtml } from "../../core/webview";
 import { HostWebviewPanel } from "../../hooks";
 
 /**
@@ -23,7 +24,7 @@ function findBinary(name: string): string | null {
     windowsHide: true,
   });
   if (result.status === 0 && result.stdout.trim()) {
-    return result.stdout.trim().split("\n")[0];
+    return result.stdout.trim().split("\n")[0] ?? null;
   }
   return null;
 }

@@ -1,13 +1,12 @@
-import vscode from "vscode";
+import vscode, { commands, ExtensionContext } from "vscode";
 
-import { Command } from "../../core/command";
 import { showError } from "../../components/error";
-import { commands, ExtensionContext } from "vscode";
-
-import { ScoutViewManager } from "./scanview-view";
+import { Command } from "../../core/command";
 import { ListingMRU } from "../../core/listing-mru";
 import { selectDirectory } from "../../core/select";
 import { WorkspaceEnvManager } from "../workspace/workspace-env-provider";
+
+import { ScoutViewManager } from "./scanview-view";
 
 export function scanviewCommands(
   context: ExtensionContext,

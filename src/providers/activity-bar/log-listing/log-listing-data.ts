@@ -1,15 +1,16 @@
 import * as path from "path";
 
 import { TreeItem, TreeItemCollapsibleState } from "vscode";
-
 import * as vscode from "vscode";
-import {
-  LogNode,
-  LogListingTreeDataProvider,
-  formatPrettyDateTime,
-} from "./log-listing";
-import { InspectViewServer } from "../../inspect/inspect-view-server";
+
 import { EvalLog } from "../../../@types/log";
+import { InspectViewServer } from "../../inspect/inspect-view-server";
+
+import {
+  formatPrettyDateTime,
+  LogListingTreeDataProvider,
+  LogNode,
+} from "./log-listing";
 import { evalSummary } from "./log-listing-server-queue";
 
 export class LogTreeDataProvider extends LogListingTreeDataProvider {
@@ -92,7 +93,7 @@ export class LogTreeDataProvider extends LogListingTreeDataProvider {
       ]);
       if (headers !== undefined) {
         const evalLog = (JSON.parse(headers) as EvalLog[])[0];
-        if (evalLog.version === 2) {
+        if (evalLog && evalLog.version === 2) {
           item.tooltip = evalSummary(evalLog);
         }
       }
@@ -103,7 +104,7 @@ export class LogTreeDataProvider extends LogListingTreeDataProvider {
 
 function parseLogDate(logName: string) {
   // Take only first bit
-  const logDate = logName.split("_")[0];
+  const logDate = logName.split("_")[0] ?? "";
 
   // Input validation
   if (!logDate.match(/^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}[+-]\d{2}-\d{2}$/)) {

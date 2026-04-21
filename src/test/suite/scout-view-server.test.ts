@@ -1,5 +1,7 @@
 import * as assert from "assert";
+
 import { Uri } from "vscode";
+
 import { ScoutViewServer } from "../../providers/scout/scout-view-server";
 
 // Mock fetch global for HTTP API testing

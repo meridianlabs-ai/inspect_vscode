@@ -1,5 +1,7 @@
 import * as assert from "assert";
+
 import { Uri } from "vscode";
+
 import { InspectViewServer } from "../../providers/inspect/inspect-view-server";
 
 suite("InspectViewServer Test Suite", () => {
@@ -308,7 +310,9 @@ suite("InspectViewServer Test Suite", () => {
 
       assert.strictEqual(result.log_dir, "");
       assert.strictEqual(result.files.length, 1);
-      assert.strictEqual(result.files[0].name, logFile.toString(true));
+      const [firstFile] = result.files;
+      assert.ok(firstFile, "Expected at least one file");
+      assert.strictEqual(firstFile.name, logFile.toString(true));
     });
 
     test("should use toString(true) for log file path", () => {
@@ -502,7 +506,7 @@ suite("InspectViewServer Test Suite", () => {
       ];
 
       assert.ok(jsonEndpoints.length > 0);
-      jsonEndpoints.forEach(endpoint => {
+      jsonEndpoints.forEach((endpoint) => {
         assert.ok(typeof endpoint === "string");
       });
     });
@@ -511,7 +515,7 @@ suite("InspectViewServer Test Suite", () => {
       const binaryEndpoints = ["evalLogBytes"];
 
       assert.ok(binaryEndpoints.length > 0);
-      binaryEndpoints.forEach(endpoint => {
+      binaryEndpoints.forEach((endpoint) => {
         assert.ok(typeof endpoint === "string");
       });
     });

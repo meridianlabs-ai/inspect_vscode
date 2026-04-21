@@ -1,11 +1,14 @@
-import { Uri } from "vscode";
-import { AbsolutePath } from "../core/path";
-import { runProcess } from "../core/process";
-import { inspectBinPath } from "./props";
 import { createReadStream } from "fs";
 import { createInterface } from "readline";
-import { withMinimumInspectVersion } from "./version";
+
+import { Uri } from "vscode";
+
+import { AbsolutePath } from "../core/path";
+import { runProcess } from "../core/process";
 import { kInspectMaxLogFileSizeVersion } from "../providers/inspect/inspect-constants";
+
+import { inspectBinPath } from "./props";
+import { withMinimumInspectVersion } from "./version";
 
 export function inspectEvalLogs(
   cwd: AbsolutePath,
@@ -98,7 +101,7 @@ export function inspectLogInfo(file: Uri): Promise<InspectLogInfo> {
 
     // Process each line
     let lineCount = 0;
-    rl.on("line", line => {
+    rl.on("line", (line) => {
       // Perform additional processing on each line here
       if (!state.hasStatusKey) {
         const match = line.match(/\s*"status":\s*"(\S+)"/);

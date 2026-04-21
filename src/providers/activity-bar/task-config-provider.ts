@@ -1,24 +1,26 @@
+import { basename } from "path";
+
 import {
+  commands,
   Disposable,
   Uri,
   Webview,
   WebviewView,
   WebviewViewProvider,
-  commands,
 } from "vscode";
+
+import { DocumentTaskInfo } from "../../components/task";
 import { getNonce } from "../../core/nonce";
-import {
-  DocumentState,
-  WorkspaceStateManager,
-} from "../workspace/workspace-state-provider";
+import { PackageManager } from "../../core/package/manager";
+import { inspectVersion } from "../../inspect";
 import {
   ActiveTaskChangedEvent,
   ActiveTaskManager,
 } from "../active-task/active-task-provider";
-import { basename } from "path";
-import { inspectVersion } from "../../inspect";
-import { DocumentTaskInfo } from "../../components/task";
-import { PackageManager } from "../../core/package/manager";
+import {
+  DocumentState,
+  WorkspaceStateManager,
+} from "../workspace/workspace-state-provider";
 
 export type SetActiveTaskCommand = {
   type: "setActiveTask";
@@ -90,12 +92,12 @@ export class TaskConfigurationProvider implements WebviewViewProvider {
         activeTaskInfo.activeTask?.name
       );
       const keysToRemove = Object.keys(currentState.params || {}).filter(
-        key => {
+        (key) => {
           return !activeTaskInfo.activeTask?.params.includes(key);
         }
       );
       if (keysToRemove.length > 0) {
-        keysToRemove.forEach(key => {
+        keysToRemove.forEach((key) => {
           if (currentState.params) {
             delete currentState.params[key];
           }
@@ -161,7 +163,7 @@ export class TaskConfigurationProvider implements WebviewViewProvider {
     };
 
     this.disposables_.push(
-      this.taskManager_.onActiveTaskChanged(async e => {
+      this.taskManager_.onActiveTaskChanged(async (e) => {
         await updateSidebarState(e.activeTaskInfo);
         await updateTaskInfo(e.activeTaskInfo);
       })
@@ -237,7 +239,7 @@ export class TaskConfigurationProvider implements WebviewViewProvider {
   }
   private disposables_: Disposable[] = [];
   private dispose() {
-    this.disposables_.forEach(disposable => {
+    this.disposables_.forEach((disposable) => {
       disposable.dispose();
     });
   }

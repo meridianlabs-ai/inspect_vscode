@@ -1,4 +1,5 @@
 import * as path from "path";
+
 import { runTests } from "@vscode/test-electron";
 
 async function main() {
@@ -10,6 +11,11 @@ async function main() {
     // The path to the extension test runner script
     // Passed to --extensionTestsPath
     const extensionTestsPath = path.resolve(__dirname, "./suite/index");
+
+    // Unset ELECTRON_RUN_AS_NODE so the VS Code binary launches as
+    // Electron rather than plain Node.js. This var is inherited when
+    // tests are run from a VS Code integrated terminal.
+    delete process.env.ELECTRON_RUN_AS_NODE;
 
     // Download VS Code, unzip it and run the integration test
     await runTests({
@@ -27,7 +33,7 @@ async function main() {
 }
 
 // Handle promise rejection properly to satisfy ESLint
-void main().catch(err => {
+void main().catch((err) => {
   console.error("Failed to run tests:", err);
   process.exit(1);
 });

@@ -2,10 +2,11 @@
  * Tests for workspace-state-provider.ts - WorkspaceStateManager
  */
 import * as assert from "assert";
+
 import {
-  WorkspaceStateManager,
   DocumentState,
   ModelState,
+  WorkspaceStateManager,
 } from "../../providers/workspace/workspace-state-provider";
 
 /**

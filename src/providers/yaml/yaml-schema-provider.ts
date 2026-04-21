@@ -131,12 +131,12 @@ export async function activateYamlSchemaProvider(
         switch (uri.path) {
           case "/project":
             log.info(
-              `YAML schema: returning project schema (${schemas.project.length} bytes)`
+              `YAML schema: returning project schema (${schemas.project?.length ?? 0} bytes)`
             );
             return schemas.project;
           case "/scanjob":
             log.info(
-              `YAML schema: returning scanjob schema (${schemas.scanjob.length} bytes)`
+              `YAML schema: returning scanjob schema (${schemas.scanjob?.length ?? 0} bytes)`
             );
             return schemas.scanjob;
           default:

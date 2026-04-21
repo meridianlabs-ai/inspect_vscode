@@ -30,11 +30,11 @@ export const readTemplate = async (
   let templateContent = textDecoder.decode(templateRaw);
 
   // Replace variables
-  Object.keys(variables).forEach(key => {
-    templateContent = templateContent.replaceAll(
-      `{{<${key}>}}`,
-      variables[key]
-    );
+  Object.keys(variables).forEach((key) => {
+    const value = variables[key];
+    if (value !== undefined) {
+      templateContent = templateContent.replaceAll(`{{<${key}>}}`, value);
+    }
   });
 
   return templateContent;

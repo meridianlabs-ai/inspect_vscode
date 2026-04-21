@@ -1,8 +1,9 @@
-import { scoutVersionDescriptor } from "./props";
 import {
   hasMinimumPackageVersion,
   withMinimumPackageVersion,
 } from "../core/package/version";
+
+import { scoutVersionDescriptor } from "./props";
 
 export function withMinimumScoutVersion(
   version: string,

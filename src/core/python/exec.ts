@@ -1,8 +1,10 @@
 import { existsSync } from "node:fs";
+import { dirname, join } from "path";
+
 import { AbsolutePath, toAbsolutePath } from "../path";
 import { runProcess, spawnProcess } from "../process";
+
 import { PythonInterpreter, pythonInterpreter } from "./interpreter";
-import { dirname, join } from "path";
 
 export function runPythonModule(
   module: string,
@@ -27,7 +29,7 @@ export function pythonBinaryPath(
   }
 
   // We couldn't find it, so now look around based upon heuristics
-  const path = platformPaths(interpreter, binary).find(path => {
+  const path = platformPaths(interpreter, binary).find((path) => {
     return existsSync(path);
   });
   if (path) {
@@ -45,7 +47,7 @@ const platformPaths = (interpreter: PythonInterpreter, binary: string) => {
   // find the folder that contained the python bin
   const binDir =
     interpreter.execCommand && interpreter.execCommand.length > 0
-      ? dirname(interpreter.execCommand[0])
+      ? dirname(interpreter.execCommand[0] ?? "")
       : "";
 
   // Check in the bin dir next to the python interpreter (on all platforms)
@@ -67,7 +69,11 @@ export function runPython(args: string[], cwd?: AbsolutePath) {
   const execCommand = pythonInterpreter().execCommand;
   if (execCommand) {
     args = [...execCommand.slice(1), ...args];
-    return runProcess(execCommand[0], args, cwd);
+    const [cmd] = execCommand;
+    if (!cmd) {
+      throw new Error("Python exec command is empty.");
+    }
+    return runProcess(cmd, args, cwd);
   } else {
     throw new Error("No active Python interpreter available.");
   }
@@ -87,7 +93,10 @@ export function spawnPython(
 ) {
   const execCommand = pythonInterpreter().execCommand;
   if (execCommand) {
-    const cmd = execCommand[0];
+    const [cmd] = execCommand;
+    if (!cmd) {
+      throw new Error("Python exec command is empty.");
+    }
     args = [...execCommand.slice(1), ...args];
     return spawnProcess(cmd, args, { cwd: cwd.path }, io, lifecycle);
   } else {

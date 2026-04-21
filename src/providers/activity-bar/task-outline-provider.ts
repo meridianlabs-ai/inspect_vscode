@@ -1,43 +1,46 @@
+import { basename, relative, sep } from "path";
+
+import { throttle } from "lodash";
 import {
+  commands,
+  Disposable,
   Event,
   EventEmitter,
+  ExtensionContext,
+  ThemeIcon,
   TreeDataProvider,
   TreeItem,
   TreeItemCollapsibleState,
-  window,
-  Command as VsCodeCommand,
-  workspace,
-  ThemeIcon,
-  commands,
-  ExtensionContext,
-  Disposable,
   TreeView,
   TreeViewVisibilityChangeEvent,
   Uri,
+  Command as VsCodeCommand,
+  window,
+  workspace,
 } from "vscode";
-import {
-  RunSelectedEvalCommand,
-  DebugSelectedEvalCommand,
-  EditSelectedTaskCommand,
-  ShowTaskList,
-  ShowTaskTree,
-  CreateTaskCommand,
-} from "./task-outline-commands";
-import { AbsolutePath, activeWorkspacePath } from "../../core/path";
+
+import { DocumentTaskInfo } from "../../components/task";
 import { Command } from "../../core/command";
+import { ExecManager } from "../../core/package/exec-manager";
+import { PackageManager } from "../../core/package/manager";
+import { AbsolutePath, activeWorkspacePath } from "../../core/path";
+import { inspectVersion } from "../../inspect";
+import { ActiveTaskManager } from "../active-task/active-task-provider";
+import { InspectViewManager } from "../logview/logview-view";
 import {
   TaskPath,
   TasksChangedEvent,
   WorkspaceTaskManager,
 } from "../workspace/workspace-task-provider";
-import { basename, relative, sep } from "path";
-import { ActiveTaskManager } from "../active-task/active-task-provider";
-import { throttle } from "lodash";
-import { inspectVersion } from "../../inspect";
-import { InspectViewManager } from "../logview/logview-view";
-import { DocumentTaskInfo } from "../../components/task";
-import { PackageManager } from "../../core/package/manager";
-import { ExecManager } from "../../core/package/exec-manager";
+
+import {
+  CreateTaskCommand,
+  DebugSelectedEvalCommand,
+  EditSelectedTaskCommand,
+  RunSelectedEvalCommand,
+  ShowTaskList,
+  ShowTaskTree,
+} from "./task-outline-commands";
 
 // Activation function for the task outline
 export async function activateTaskOutline(
@@ -137,7 +140,7 @@ const activateTaskTracking = async (
   activeTaskManager: ActiveTaskManager
 ) => {
   // Listen for changes to the active task and drive the tree to the item
-  const activeTaskChanged = activeTaskManager.onActiveTaskChanged(async e => {
+  const activeTaskChanged = activeTaskManager.onActiveTaskChanged(async (e) => {
     await showTreeItem(treeDataProvider, tree, e.activeTaskInfo);
   });
 
@@ -264,7 +267,7 @@ export class TaskOutLineTreeDataProvider
 
   private disposables_: Disposable[] = [];
   dispose() {
-    this.disposables_.forEach(disposable => {
+    this.disposables_.forEach((disposable) => {
       disposable.dispose();
     });
   }
@@ -314,14 +317,14 @@ export class TaskOutLineTreeDataProvider
       workspace.getConfiguration("inspect_ai").get("taskListView") || "tree";
 
     if (mode === "tree") {
-      return tree.map(node => new TaskTreeItem(node, this.command_, parent));
+      return tree.map((node) => new TaskTreeItem(node, this.command_, parent));
     } else {
       const getTasks = (node: TaskPath): TaskPath[] => {
         if (node.type === "task") {
           return [node];
         } else {
           return (
-            node.children?.flatMap(node => {
+            node.children?.flatMap((node) => {
               return getTasks(node);
             }) || []
           );
@@ -331,11 +334,11 @@ export class TaskOutLineTreeDataProvider
       const workspacePath = activeWorkspacePath();
 
       return tree
-        .flatMap(node => getTasks(node))
+        .flatMap((node) => getTasks(node))
         .sort((a, b) => {
           return a.name.localeCompare(b.name);
         })
-        .map(taskPath => {
+        .map((taskPath) => {
           return new TaskListItem(
             taskPath,
             describeRelativePath(taskPath.path, workspacePath),

@@ -1,4 +1,5 @@
 import * as assert from "assert";
+
 import { shQuote } from "../../core/string";
 
 suite("String Utilities Test Suite", () => {

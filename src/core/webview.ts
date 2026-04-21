@@ -1,9 +1,11 @@
 import { readFileSync } from "fs";
-import { env, Disposable, MessageItem, Uri, window } from "vscode";
+
+import { Disposable, env, MessageItem, Uri, window } from "vscode";
 
 import { HostWebviewPanel } from "../hooks";
-import { AbsolutePath, workspacePath } from "./path";
+
 import { getNonce } from "./nonce";
+import { AbsolutePath, workspacePath } from "./path";
 
 export function getWebviewPanelHtml(
   viewDir: AbsolutePath | null,

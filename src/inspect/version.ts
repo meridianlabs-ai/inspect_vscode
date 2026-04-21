@@ -1,8 +1,9 @@
-import { inspectVersionDescriptor } from "./props";
 import {
   hasMinimumPackageVersion,
   withMinimumPackageVersion,
 } from "../core/package/version";
+
+import { inspectVersionDescriptor } from "./props";
 
 export function withMinimumInspectVersion(
   version: string,

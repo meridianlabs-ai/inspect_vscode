@@ -25,7 +25,7 @@ export class FocusManager {
   private initialize(context: ExtensionContext) {
     // Track editor focus changes
     context.subscriptions.push(
-      window.onDidChangeActiveTextEditor(editor => {
+      window.onDidChangeActiveTextEditor((editor) => {
         if (editor) {
           this.lastFocused = "editor";
         }
@@ -34,7 +34,7 @@ export class FocusManager {
 
     // Track terminal focus changes
     context.subscriptions.push(
-      window.onDidOpenTerminal(async terminal => {
+      window.onDidOpenTerminal(async (terminal) => {
         const pid = await terminal.processId;
         if (window.activeTerminal?.processId === pid) {
           this.lastFocused = "terminal";
@@ -44,7 +44,7 @@ export class FocusManager {
 
     // Handle terminal focus changes (when terminal is in focus and user types)
     context.subscriptions.push(
-      window.onDidChangeTerminalState(terminal => {
+      window.onDidChangeTerminalState((terminal) => {
         if (terminal.state.isInteractedWith) {
           this.lastFocused = "terminal";
         }
@@ -53,7 +53,7 @@ export class FocusManager {
 
     // Handle when terminal becomes active
     context.subscriptions.push(
-      window.onDidChangeActiveTerminal(terminal => {
+      window.onDidChangeActiveTerminal((terminal) => {
         if (terminal) {
           this.lastFocused = "terminal";
         }
@@ -62,7 +62,7 @@ export class FocusManager {
 
     // Track when window focus changes to ensure robustness
     context.subscriptions.push(
-      window.onDidChangeWindowState(windowState => {
+      window.onDidChangeWindowState((windowState) => {
         if (windowState.focused) {
           if (window.activeTextEditor) {
             this.lastFocused = "editor";
@@ -75,7 +75,7 @@ export class FocusManager {
 
     // Track when editors gain or lose focus
     context.subscriptions.push(
-      window.onDidChangeTextEditorSelection(e => {
+      window.onDidChangeTextEditorSelection((e) => {
         if (e.textEditor === window.activeTextEditor) {
           this.lastFocused = "editor";
         }
@@ -84,7 +84,7 @@ export class FocusManager {
 
     // Track notebook editor focus changes
     context.subscriptions.push(
-      window.onDidChangeActiveNotebookEditor(notebookEditor => {
+      window.onDidChangeActiveNotebookEditor((notebookEditor) => {
         if (notebookEditor) {
           this.lastFocused = "notebook";
         }

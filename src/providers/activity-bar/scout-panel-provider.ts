@@ -1,10 +1,10 @@
 import {
+  commands,
   Disposable,
   Uri,
   Webview,
   WebviewView,
   WebviewViewProvider,
-  commands,
 } from "vscode";
 
 import { getNonce } from "../../core/nonce";
@@ -12,6 +12,7 @@ import {
   PackageChangedEvent,
   PackageManager,
 } from "../../core/package/manager";
+
 import { headHTML } from "./env-config-provider";
 
 type NavigateCommand = {

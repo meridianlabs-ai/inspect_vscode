@@ -1,10 +1,10 @@
+import { HostWebviewPanel } from ".";
 import {
-  window,
+  ViewColumn,
   WebviewOptions,
   WebviewPanelOptions,
-  ViewColumn,
+  window,
 } from "vscode";
-import { HostWebviewPanel } from ".";
 
 export function createPreviewPanel(
   viewType: string,

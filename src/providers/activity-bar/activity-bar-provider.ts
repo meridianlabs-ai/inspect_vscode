@@ -1,22 +1,24 @@
 import { ExtensionContext, window } from "vscode";
-import { InspectConfigurationProvider } from "./env-config-inspect-provider";
-import { activateTaskOutline } from "./task-outline-provider";
+
+import { end, start } from "../../core/log";
+import { ExecManager } from "../../core/package/exec-manager";
+import { PackageManager } from "../../core/package/manager";
+import { OutputWatcher } from "../../core/package/output-watcher";
 import { ActiveTaskManager } from "../active-task/active-task-provider";
-import { WorkspaceTaskManager } from "../workspace/workspace-task-provider";
+import { InspectViewServer } from "../inspect/inspect-view-server";
+import { InspectViewManager } from "../logview/logview-view";
 import { WorkspaceEnvManager } from "../workspace/workspace-env-provider";
 import { WorkspaceStateManager } from "../workspace/workspace-state-provider";
-import { TaskConfigurationProvider } from "./task-config-provider";
+import { WorkspaceTaskManager } from "../workspace/workspace-task-provider";
+
+import { InspectConfigurationProvider } from "./env-config-inspect-provider";
+import { activateLogListing } from "./log-listing/log-listing-provider";
 import {
   DebugConfigTaskCommand,
   RunConfigTaskCommand,
 } from "./task-config-commands";
-import { InspectViewManager } from "../logview/logview-view";
-import { activateLogListing } from "./log-listing/log-listing-provider";
-import { InspectViewServer } from "../inspect/inspect-view-server";
-import { OutputWatcher } from "../../core/package/output-watcher";
-import { end, start } from "../../core/log";
-import { PackageManager } from "../../core/package/manager";
-import { ExecManager } from "../../core/package/exec-manager";
+import { TaskConfigurationProvider } from "./task-config-provider";
+import { activateTaskOutline } from "./task-outline-provider";
 
 export async function activateActivityBar(
   inspectManager: PackageManager,

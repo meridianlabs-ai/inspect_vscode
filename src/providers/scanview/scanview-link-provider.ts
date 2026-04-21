@@ -1,15 +1,17 @@
+import { existsSync } from "fs";
+
 import {
   commands,
   ExtensionContext,
   MessageItem,
+  TerminalLink,
+  TerminalLinkContext,
   Uri,
   window,
   workspace,
 } from "vscode";
 
-import { TerminalLink, TerminalLinkContext } from "vscode";
 import { workspacePath } from "../../core/path";
-import { existsSync } from "fs";
 
 const kScanResultPattern =
   /([^\s"]*scan_id=[23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]{22})/g;
@@ -24,20 +26,25 @@ export const scanviewTerminalLinkProvider = (_context: ExtensionContext) => {
       const matches = [...context.line.matchAll(kScanResultPattern)];
       if (matches.length > 0) {
         // Forward matches
-        const result = matches.map(match => {
-          // The path from the terminal.
-          const path = match[1];
+        const result = matches
+          .map((match) => {
+            // The path from the terminal.
+            const path = match[1];
+            if (!path) {
+              return undefined;
+            }
 
-          // Sort out the decoration range for the link
-          const line = context.line;
-          const startIndex = line.indexOf(path);
-          return {
-            startIndex,
-            length: path.length,
-            tooltip: "View Scan Results",
-            data: path,
-          } as ScanViewTerminalLink;
-        });
+            // Sort out the decoration range for the link
+            const line = context.line;
+            const startIndex = line.indexOf(path);
+            return {
+              startIndex,
+              length: path.length,
+              tooltip: "View Scan Results",
+              data: path,
+            } as ScanViewTerminalLink;
+          })
+          .filter((link) => link !== undefined);
         return result;
       }
 
@@ -84,7 +91,11 @@ export const resolveScanDirLink = async (link: string) => {
         if (filesInDir.length > 0) {
           // Found at least one file in a matching scan_id directory
           // Extract the directory path
-          const foundFilePath = filesInDir[0].path;
+          const [foundFile] = filesInDir;
+          if (!foundFile) {
+            return undefined;
+          }
+          const foundFilePath = foundFile.path;
           const scanIdIndex = foundFilePath.lastIndexOf(scanIdDir);
           if (scanIdIndex !== -1) {
             const dirPath = foundFilePath.substring(

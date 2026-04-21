@@ -1,23 +1,24 @@
 import { ExtensionContext, Uri, ViewColumn } from "vscode";
 
+import { showError } from "../../components/error";
 import {
   InspectWebview,
   InspectWebviewManager,
 } from "../../components/webview";
-import { inspectViewPath } from "../../inspect/props";
-import { LogviewState } from "./logview-state";
-import { HostWebviewPanel } from "../../hooks";
-import { showError } from "../../components/error";
-import { InspectViewServer } from "../inspect/inspect-view-server";
-import { WorkspaceEnvManager } from "../workspace/workspace-env-provider";
-import { LogviewPanel } from "./logview-panel";
-import { selectLogDirectory } from "../activity-bar/log-listing/log-directory-selector";
-import { dirname, getRelativeUri } from "../../core/uri";
-import { OutputWatcher } from "../../core/package/output-watcher";
 import {
   PackageChangedEvent,
   PackageManager,
 } from "../../core/package/manager";
+import { OutputWatcher } from "../../core/package/output-watcher";
+import { dirname, getRelativeUri } from "../../core/uri";
+import { HostWebviewPanel } from "../../hooks";
+import { inspectViewPath } from "../../inspect/props";
+import { selectLogDirectory } from "../activity-bar/log-listing/log-directory-selector";
+import { InspectViewServer } from "../inspect/inspect-view-server";
+import { WorkspaceEnvManager } from "../workspace/workspace-env-provider";
+
+import { LogviewPanel } from "./logview-panel";
+import { LogviewState } from "./logview-state";
 
 const kLogViewId = "inspect.logview";
 
@@ -29,7 +30,7 @@ export class InspectViewManager {
     outputWatcher: OutputWatcher
   ) {
     this.context_.subscriptions.push(
-      outputWatcher.onInspectLogCreated(async e => {
+      outputWatcher.onInspectLogCreated(async (e) => {
         // if this log is contained in the directory currently being viewed
         // then do a background refresh on it
         if (this.webViewManager_.hasWebview()) {
@@ -246,7 +247,7 @@ export class InspectViewWebviewManager extends InspectWebviewManager<
     );
     if (data) {
       return {
-        log_dir: Uri.parse(data["log_dir"]),
+        log_dir: Uri.parse(data["log_dir"] ?? ""),
         log_file: data["log_file"] ? Uri.parse(data["log_file"]) : undefined,
         background_refresh: !!data["background_refresh"],
       };

@@ -3,21 +3,21 @@
   "tasks": [
     {
       "type": "npm",
-      "script": "compile",
+      "script": "build",
       "group": {
         "kind": "build",
         "isDefault": true
       },
       "problemMatcher": "$tsc",
-      "label": "npm: compile",
+      "label": "npm: build",
       "detail": "webpack"
     },
     {
       "type": "npm",
-      "script": "watch",
+      "script": "dev",
       "problemMatcher": "$tsc-watch",
       "isBackground": true,
-      "label": "npm: watch",
+      "label": "npm: dev",
       "detail": "webpack --watch"
     }
   ]

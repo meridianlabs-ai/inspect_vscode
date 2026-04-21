@@ -1,15 +1,16 @@
 import * as vscode from "vscode";
 import { Uri } from "vscode";
-import { inspectViewPath } from "../../inspect/props";
-import { LogviewPanel } from "./logview-panel";
-import { InspectViewServer } from "../inspect/inspect-view-server";
-import { HostWebviewPanel } from "../../hooks";
-import { log } from "../../core/log";
-import { LogviewState } from "./logview-state";
-import { dirname } from "../../core/uri";
 
+import { log } from "../../core/log";
+import { dirname } from "../../core/uri";
+import { HostWebviewPanel } from "../../hooks";
+import { inspectViewPath } from "../../inspect/props";
 import { hasMinimumInspectVersion } from "../../inspect/version";
 import { kInspectEvalLogFormatVersion } from "../inspect/inspect-constants";
+import { InspectViewServer } from "../inspect/inspect-view-server";
+
+import { LogviewPanel } from "./logview-panel";
+import { LogviewState } from "./logview-state";
 
 export const kInspectLogViewType = "inspect-ai.log-editor";
 

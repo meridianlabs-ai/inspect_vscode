@@ -66,7 +66,10 @@ export function showProviderHelp(vscode: any) {
           );
           labelContainerEl?.appendChild(modelHelpEl);
           modelHelpEl.addEventListener("click", () => {
-            openUrl(vscode, kModelInfo[getProviderText()]);
+            const url = kModelInfo[getProviderText()];
+            if (url) {
+              openUrl(vscode, url);
+            }
           });
         }
       } else {

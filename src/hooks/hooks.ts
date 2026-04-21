@@ -1,8 +1,7 @@
-import * as vscode from "vscode";
-import * as hooks from "positron";
-
 import { ExtensionHost, HostWebviewPanel } from ".";
+import * as hooks from "positron";
 import { PreviewPanelOnDidChangeViewStateEvent } from "positron";
+import * as vscode from "vscode";
 
 declare global {
   function acquirePositronApi(): hooks.PositronApi;

@@ -1,7 +1,5 @@
-import vscode from "vscode";
-import { ExtensionContext, Uri } from "vscode";
-import { HostWebviewPanel } from "../../hooks";
-import { inspectViewPath } from "../../inspect/props";
+import vscode, { ExtensionContext, Uri } from "vscode";
+
 import { Disposable } from "../../core/dispose";
 import {
   kMethodEvalLog,
@@ -16,13 +14,16 @@ import {
   kMethodSampleData,
   webviewPanelJsonRpcServer,
 } from "../../core/jsonrpc";
-import { InspectViewServer } from "../inspect/inspect-view-server";
-import { LogviewState } from "./logview-state";
 import { log } from "../../core/log";
 import {
   getWebviewPanelHtml,
   handleWebviewPanelOpenMessages,
 } from "../../core/webview";
+import { HostWebviewPanel } from "../../hooks";
+import { inspectViewPath } from "../../inspect/props";
+import { InspectViewServer } from "../inspect/inspect-view-server";
+
+import { LogviewState } from "./logview-state";
 
 export class LogviewPanel extends Disposable {
   constructor(

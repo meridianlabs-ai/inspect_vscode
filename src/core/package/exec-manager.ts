@@ -1,24 +1,25 @@
 import {
+  debug,
   DebugConfiguration,
   ExtensionContext,
-  debug,
   window,
   workspace,
 } from "vscode";
-import {
-  AbsolutePath,
-  activeWorkspacePath,
-  workspaceRelativePath,
-} from "../path";
-import { activeWorkspaceFolder } from "../workspace";
-import { findEnvPythonPath } from "../python";
+
 import { sleep } from "../../core/wait";
-import { VersionDescriptor } from "../package/props";
 import { extensionVersion } from "../../providers/environment";
 import {
   DocumentState,
   WorkspaceStateManager,
 } from "../../providers/workspace/workspace-state-provider";
+import { VersionDescriptor } from "../package/props";
+import {
+  AbsolutePath,
+  activeWorkspacePath,
+  workspaceRelativePath,
+} from "../path";
+import { findEnvPythonPath } from "../python";
+import { activeWorkspaceFolder } from "../workspace";
 
 export interface ExecProfile {
   packageName: "inspect-ai" | "inspect-scout";
@@ -113,7 +114,7 @@ const runCommand = async (
 ) => {
   // See if there a non-busy terminal that we can re-use
   const name = profile.terminal;
-  let terminal = window.terminals.find(t => {
+  let terminal = window.terminals.find((t) => {
     return t.name === name;
   });
   if (!terminal) {

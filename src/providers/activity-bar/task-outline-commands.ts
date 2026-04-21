@@ -1,38 +1,39 @@
-import {
-  TreeView,
-  Uri,
-  window,
-  workspace,
-  ConfigurationTarget,
-  ExtensionContext,
-  ViewColumn,
-  commands,
-} from "vscode";
-
-import { Command } from "../../core/command";
-import {
-  TaskOutLineTreeDataProvider,
-  TaskTreeItem,
-} from "./task-outline-provider";
-import { pathExists, toAbsolutePath, workspacePath } from "../../core/path";
 import { writeFileSync } from "fs";
 
-import { readTemplate, templates } from "../../components/templates";
-import { isValidPythonFnName } from "../../core/python";
+import {
+  commands,
+  ConfigurationTarget,
+  ExtensionContext,
+  TreeView,
+  Uri,
+  ViewColumn,
+  window,
+  workspace,
+} from "vscode";
+
 import {
   documentHasTasks,
   firstTaskRangeForDocument,
   taskRangeForDocument,
 } from "../../components/document";
+import { scheduleReturnFocus } from "../../components/focus";
 import {
   firstTaskRangeForNotebook,
   isNotebook,
   taskRangeForNotebook,
 } from "../../components/notebook";
-import { scheduleReturnFocus } from "../../components/focus";
-import { InspectViewManager } from "../logview/logview-view";
-import { ActiveTaskManager } from "../active-task/active-task-provider";
+import { readTemplate, templates } from "../../components/templates";
+import { Command } from "../../core/command";
 import { ExecManager } from "../../core/package/exec-manager";
+import { pathExists, toAbsolutePath, workspacePath } from "../../core/path";
+import { isValidPythonFnName } from "../../core/python";
+import { ActiveTaskManager } from "../active-task/active-task-provider";
+import { InspectViewManager } from "../logview/logview-view";
+
+import {
+  TaskOutLineTreeDataProvider,
+  TaskTreeItem,
+} from "./task-outline-provider";
 
 export class ShowTaskTree implements Command {
   constructor(private readonly provider_: TaskOutLineTreeDataProvider) {}
@@ -102,7 +103,10 @@ export class EditSelectedTaskCommand implements Command {
     }
 
     if (this.tree_.selection.length === 1) {
-      const treeItem = this.tree_.selection[0];
+      const [treeItem] = this.tree_.selection;
+      if (!treeItem) {
+        return;
+      }
       const fileUri = Uri.file(treeItem.taskPath.path);
 
       // If this is a folder, there is no edit action
@@ -114,7 +118,7 @@ export class EditSelectedTaskCommand implements Command {
       const task =
         treeItem.taskPath.type === "task"
           ? treeItem.taskPath.name
-          : treeItem.taskPath.children?.[0].name;
+          : treeItem.taskPath.children?.[0]?.name;
 
       // Note if/where the logview is showing
       const logViewColumn = this.inspectLogviewManager_.viewColumn();
@@ -182,7 +186,7 @@ export const findTargetViewColumn = (logViewColumn?: ViewColumn) => {
   } else {
     // Try to find a source editor which contains a task
     const visibleEditors = window.visibleTextEditors;
-    const targetEditor = visibleEditors.find(editor => {
+    const targetEditor = visibleEditors.find((editor) => {
       return documentHasTasks(editor.document);
     });
     if (targetEditor) {
@@ -192,7 +196,8 @@ export const findTargetViewColumn = (logViewColumn?: ViewColumn) => {
     // There are no editors with tasks, but if there is any active
     // editor, let's use that
     if (visibleEditors.length > 0) {
-      return visibleEditors[0].viewColumn;
+      const [firstEditor] = visibleEditors;
+      return firstEditor?.viewColumn;
     }
   }
 
@@ -216,7 +221,7 @@ export class CreateTaskCommand implements Command {
     const taskName = await window.showInputBox({
       placeHolder: "Name of the task to create",
       prompt: "Task name",
-      validateInput: input => {
+      validateInput: (input) => {
         if (!isValidPythonFnName(input)) {
           return "The task name contains invalid characters.";
         }

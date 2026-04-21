@@ -1,20 +1,21 @@
 import {
-  Uri,
-  ViewColumn,
+  commands,
   EventEmitter,
   ExtensionContext,
-  window,
-  commands,
+  Uri,
+  ViewColumn,
   WebviewPanel,
+  window,
 } from "vscode";
 
 import { Disposable } from "../core/dispose";
-import { getNonce } from "../core/nonce";
-import { HostWebviewPanel } from "../hooks";
-import { isNotebook } from "./notebook";
-import { FocusManager } from "./focus";
 import { log } from "../core/log";
+import { getNonce } from "../core/nonce";
 import { PackageViewServer } from "../core/package/view-server";
+import { HostWebviewPanel } from "../hooks";
+
+import { FocusManager } from "./focus";
+import { isNotebook } from "./notebook";
 
 export interface ShowOptions {
   readonly preserveFocus?: boolean;
@@ -127,7 +128,7 @@ export class InspectWebviewManager<
           () => {
             // Command executed successfully
           },
-          error => {
+          (error) => {
             log.append("Couldn't focus terminal.\n" + error);
           }
         );
@@ -141,7 +142,7 @@ export class InspectWebviewManager<
             // Refocus the active document by calling showTextDocument with the active editor
             window.showTextDocument(editor.document, editor.viewColumn).then(
               () => {},
-              error => {
+              (error) => {
                 log.append("Couldn't focus editor.\n" + error);
               }
             );

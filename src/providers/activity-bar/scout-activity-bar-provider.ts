@@ -1,12 +1,14 @@
 import { ExtensionContext, window } from "vscode";
-import { activateScanListing } from "./log-listing/scan-listing-provider";
+
+import { Command } from "../../core/command";
 import { end, start } from "../../core/log";
 import { PackageManager } from "../../core/package/manager";
-import { ScoutPanelProvider } from "./scout-panel-provider";
-import { Command } from "../../core/command";
-import { ScoutViewServer } from "../scout/scout-view-server";
 import { OutputWatcher } from "../../core/package/output-watcher";
 import { ScoutProjectManager } from "../scout/scout-project";
+import { ScoutViewServer } from "../scout/scout-view-server";
+
+import { activateScanListing } from "./log-listing/scan-listing-provider";
+import { ScoutPanelProvider } from "./scout-panel-provider";
 
 export async function activateScoutActivityBar(
   scoutManager: PackageManager,

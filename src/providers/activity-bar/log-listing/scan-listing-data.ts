@@ -1,10 +1,10 @@
 import { TreeItem, TreeItemCollapsibleState } from "vscode";
-
 import * as vscode from "vscode";
+
 import {
-  LogNode,
-  LogListingTreeDataProvider,
   formatPrettyDateTime,
+  LogListingTreeDataProvider,
+  LogNode,
 } from "./log-listing";
 
 export class ScansTreeDataProvider extends LogListingTreeDataProvider {

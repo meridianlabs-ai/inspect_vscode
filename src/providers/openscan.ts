@@ -1,4 +1,5 @@
-import { ExtensionContext, ViewColumn, Uri, commands } from "vscode";
+import { commands, ExtensionContext, Uri, ViewColumn } from "vscode";
+
 import { kScoutScanViewType } from "./scanview/scanview-editor";
 
 export function activateOpenScan(context: ExtensionContext) {

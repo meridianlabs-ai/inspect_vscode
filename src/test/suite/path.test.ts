@@ -2,6 +2,7 @@
  * Tests for path.ts - Path utilities including AbsolutePath
  */
 import * as assert from "assert";
+
 import { toAbsolutePath } from "../../core/path";
 
 suite("Path Utilities Test Suite", () => {

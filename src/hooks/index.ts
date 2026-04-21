@@ -1,6 +1,7 @@
-import vscode, { WebviewPanelOptions, WebviewOptions } from "vscode";
-import { createPreviewPanel } from "./preview";
+import vscode, { WebviewOptions, WebviewPanelOptions } from "vscode";
+
 import { hasHooks, hooksExtensionHost } from "./hooks";
+import { createPreviewPanel } from "./preview";
 
 export interface HostWebviewPanel extends vscode.Disposable {
   readonly webview: vscode.Webview;

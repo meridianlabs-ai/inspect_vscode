@@ -1,8 +1,8 @@
-import { AbsolutePath, toAbsolutePath } from "../core/path";
-import { Disposable } from "vscode";
 import { join } from "path";
+
+import { Disposable } from "vscode";
+
 import { userDataDir, userRuntimeDir } from "../core/appdirs";
-import { kInspectChangeEvalSignalVersion } from "../providers/inspect/inspect-constants";
 import {
   initPackageProps,
   packageBinPath,
@@ -11,6 +11,8 @@ import {
   packageViewPath,
   VersionDescriptor,
 } from "../core/package/props";
+import { AbsolutePath, toAbsolutePath } from "../core/path";
+import { kInspectChangeEvalSignalVersion } from "../providers/inspect/inspect-constants";
 
 export const kPythonPackageName = "inspect_ai";
 
@@ -43,6 +45,6 @@ export function inspectLastEvalPaths(): AbsolutePath[] {
       : "last-eval-result";
 
   return [userRuntimeDir(kPythonPackageName), userDataDir(kPythonPackageName)]
-    .map(dir => join(dir, "view", fileName))
+    .map((dir) => join(dir, "view", fileName))
     .map(toAbsolutePath);
 }

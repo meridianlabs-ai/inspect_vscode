@@ -3,14 +3,14 @@ import "./env-config-webview.css";
 
 import { EnvConfiguration } from "../env-config-inspect-provider";
 
+import { initEnv } from "./env-utils";
+import { showProviderHelp } from "./env-utils-model";
 import {
   restoreInputState,
   restoreSelectState,
   setEnvWhenKeyup,
   setEnvWhenValueChanged,
 } from "./webview-utils";
-import { showProviderHelp } from "./env-utils-model";
-import { initEnv } from "./env-utils";
 
 const attachListeners = (vscode: any) => {
   setEnvWhenKeyup(vscode, "max-connections", "maxConnections");

@@ -1,4 +1,5 @@
 import { coerce } from "semver";
+
 import { VersionDescriptor } from "./props";
 
 export function withMinimumPackageVersion<T>(

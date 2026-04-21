@@ -176,7 +176,7 @@ suite("Focus Utility Functions Test Suite", () => {
       const startTime = Date.now();
 
       // Simulate scheduled execution
-      await new Promise<void>(resolve => {
+      await new Promise<void>((resolve) => {
         setTimeout(() => {
           executed = true;
           executionTime = Date.now() - startTime;

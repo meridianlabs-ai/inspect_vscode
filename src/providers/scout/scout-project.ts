@@ -1,3 +1,5 @@
+import Ajv, { ValidateFunction } from "ajv";
+import { throttle } from "lodash";
 import {
   Disposable,
   Event,
@@ -9,15 +11,12 @@ import {
   workspace,
 } from "vscode";
 import { parse } from "yaml";
-import Ajv, { ValidateFunction } from "ajv";
-import { throttle } from "lodash";
-
-import { Command } from "../../core/command";
-import { log } from "../../core/log";
-import { activeWorkspacePath } from "../../core/path";
 
 // Import the JSON schema for validation
 import projectSchema from "../../../assets/schemas/project.schema.json";
+import { Command } from "../../core/command";
+import { log } from "../../core/log";
+import { activeWorkspacePath } from "../../core/path";
 
 /**
  * Scout project configuration interface.
@@ -181,7 +180,7 @@ export class ScoutProjectManager implements Disposable {
         let validationErrors: string[] | undefined;
         if (!this.validator_(parsed)) {
           validationErrors = this.validator_.errors?.map(
-            e => `${e.instancePath || "/"} ${e.message}`
+            (e) => `${e.instancePath || "/"} ${e.message}`
           );
           log.warn(
             `Scout project config validation errors: ${validationErrors?.join(", ")}`

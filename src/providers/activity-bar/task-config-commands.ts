@@ -1,8 +1,8 @@
+import { scheduleReturnFocus } from "../../components/focus";
 import { Command } from "../../core/command";
+import { ExecManager } from "../../core/package/exec-manager";
 import { toAbsolutePath } from "../../core/path";
 import { ActiveTaskManager } from "../active-task/active-task-provider";
-import { scheduleReturnFocus } from "../../components/focus";
-import { ExecManager } from "../../core/package/exec-manager";
 
 export class RunConfigTaskCommand implements Command {
   constructor(

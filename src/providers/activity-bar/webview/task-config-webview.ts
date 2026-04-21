@@ -2,20 +2,22 @@ import "./vscode-controls.css";
 import "./task-config-webview.css";
 
 import {
-  provideVSCodeDesignSystem,
-  allComponents,
-} from "@vscode/webview-ui-toolkit";
-import {
   fastCombobox,
   fastOption,
   provideFASTDesignSystem,
 } from "@microsoft/fast-components";
-import { DocumentState } from "../../workspace/workspace-state-provider";
 import {
-  showEmptyPanel,
+  allComponents,
+  provideVSCodeDesignSystem,
+} from "@vscode/webview-ui-toolkit";
+
+import { DocumentState } from "../../workspace/workspace-state-provider";
+
+import {
   restoreInputState,
-  whenChanged,
   setControlsVisible,
+  showEmptyPanel,
+  whenChanged,
 } from "./webview-utils";
 
 // Load the vscode design system
@@ -31,7 +33,7 @@ provideFASTDesignSystem().register(fastCombobox(), fastOption());
 const vscode = acquireVsCodeApi();
 
 // Process messages
-window.addEventListener("message", e => {
+window.addEventListener("message", (e) => {
   switch (e.data.type) {
     case "initialize":
       showEmptyPanel("No task selected", "configuration-controls");
@@ -68,7 +70,7 @@ window.addEventListener("message", e => {
               }
             }
             taskArgContainer.appendChild(textField);
-            whenChanged(id, value => {
+            whenChanged(id, (value) => {
               setStateParam(param, value);
             });
             count++;
@@ -103,32 +105,32 @@ function restoreState(state?: DocumentState) {
 }
 
 function attachListeners() {
-  whenChanged("epochs", value => {
+  whenChanged("epochs", (value) => {
     setStateValue("epochs", value);
   });
 
-  whenChanged("limit", value => {
+  whenChanged("limit", (value) => {
     validateFields();
     setStateValue("limit", value);
   });
 
-  whenChanged("temperature", value => {
+  whenChanged("temperature", (value) => {
     setStateValue("temperature", value);
   });
 
-  whenChanged("max_tokens", value => {
+  whenChanged("max_tokens", (value) => {
     setStateValue("maxTokens", value);
   });
 
-  whenChanged("top_p", value => {
+  whenChanged("top_p", (value) => {
     setStateValue("topP", value);
   });
 
-  whenChanged("top_k", value => {
+  whenChanged("top_k", (value) => {
     setStateValue("topK", value);
   });
 
-  whenChanged("sample_ids", value => {
+  whenChanged("sample_ids", (value) => {
     validateFields();
     setStateValue("sampleIds", value);
   });

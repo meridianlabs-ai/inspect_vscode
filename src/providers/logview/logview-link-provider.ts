@@ -1,17 +1,19 @@
+import { existsSync } from "fs";
+import { basename } from "path";
+
 import {
   commands,
   ExtensionContext,
   MessageItem,
+  TerminalLink,
+  TerminalLinkContext,
   Uri,
   window,
   workspace,
 } from "vscode";
 
-import { workspacePath } from "../../core/path";
-import { TerminalLink, TerminalLinkContext } from "vscode";
-import { existsSync } from "fs";
-import { basename } from "path";
 import { OutputWatcher } from "../../core/package/output-watcher";
+import { workspacePath } from "../../core/path";
 import { isUri } from "../../core/uri";
 
 const kLogFilePattern = /^.*Log: (\S*?\.json|\S*?\.eval)\s*/g;
@@ -29,7 +31,7 @@ export const logviewTerminalLinkProvider = (
   const recentlyCreatedLogs = new Set<Uri>();
 
   context.subscriptions.push(
-    outputWatcher.onInspectLogCreated(e => {
+    outputWatcher.onInspectLogCreated((e) => {
       if (e.externalWorkspace) {
         return;
       }
@@ -52,33 +54,41 @@ export const logviewTerminalLinkProvider = (
       const matches = [...context.line.matchAll(kLogFilePattern)];
       if (matches.length > 0) {
         // Forward matches
-        const result = matches.map(match => {
-          // The path from the terminal.
-          const path = match[1];
+        const result = matches
+          .map((match) => {
+            // The path from the terminal.
+            const path = match[1];
+            if (!path) {
+              return undefined;
+            }
 
-          // Sort out the decoration range for the link
-          const line = context.line;
-          const startIndex = line.indexOf(path);
-          return {
-            startIndex,
-            length: path.length,
-            tooltip: "View Log",
-            data: path,
-          } as LogViewTerminalLink;
-        });
+            // Sort out the decoration range for the link
+            const line = context.line;
+            const startIndex = line.indexOf(path);
+            return {
+              startIndex,
+              length: path.length,
+              tooltip: "View Log",
+              data: path,
+            } as LogViewTerminalLink;
+          })
+          .filter((link) => link !== undefined);
         return result;
       }
 
       const fileOnlyMatches = [...context.line.matchAll(kEvalJsonPattern)];
       const fileOnlyResult = fileOnlyMatches
-        .map(match => {
+        .map((match) => {
           // The path from the terminal.
           const path = match[1];
+          if (!path) {
+            return undefined;
+          }
 
           // If this is a recently created log or a full uri, we can use it
           const fullPath = isUri(path)
             ? path
-            : [...recentlyCreatedLogs].find(logPath =>
+            : [...recentlyCreatedLogs].find((logPath) =>
                 logPath.path.endsWith(path)
               );
 
@@ -97,7 +107,7 @@ export const logviewTerminalLinkProvider = (
             return undefined;
           }
         })
-        .filter(link => link !== undefined);
+        .filter((link) => link !== undefined);
 
       if (fileOnlyResult.length > 0) {
         // Return the file only results
@@ -141,7 +151,8 @@ export const resolveLogFile = async (link: string) => {
       const filename = basename(link);
       const files = await workspace.findFiles(`**/${filename}`);
       if (files.length === 1) {
-        return Uri.file(files[0].path);
+        const [file] = files;
+        return file ? Uri.file(file.path) : undefined;
       } else {
         return undefined;
       }

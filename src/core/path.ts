@@ -1,7 +1,9 @@
-import path, { basename, dirname, join } from "path";
-import { activeWorkspaceFolder } from "./workspace";
 import { existsSync } from "fs";
+import path, { basename, dirname, join } from "path";
+
 import { Uri } from "vscode";
+
+import { activeWorkspaceFolder } from "./workspace";
 
 export type UnknownPath = string;
 

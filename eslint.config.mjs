@@ -1,55 +1,40 @@
-import { defineConfig, globalIgnores } from "eslint/config";
-import typescriptEslint from "@typescript-eslint/eslint-plugin";
-import tsParser from "@typescript-eslint/parser";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 import js from "@eslint/js";
-import { FlatCompat } from "@eslint/eslintrc";
+import prettierConfig from "eslint-config-prettier";
+import importPlugin from "eslint-plugin-import";
+import tseslint from "typescript-eslint";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const compat = new FlatCompat({
-  baseDirectory: __dirname,
-  recommendedConfig: js.configs.recommended,
-  allConfig: js.configs.all,
-});
-
-export default defineConfig([
-  globalIgnores([
-    "**/out",
-    "**/dist",
-    "**/*.d.ts",
-    "src/providers/activity-bar/webview/env-config-webview.ts",
-    "src/providers/activity-bar/webview/scout-panel-webview.ts",
-    "src/providers/activity-bar/webview/env-utils.ts",
-    "src/providers/activity-bar/webview/env-utils-model.ts",
-    "src/providers/activity-bar/webview/task-config-webview.ts",
-    "src/providers/activity-bar/webview/webview-utils.ts",
-    "tools/**/*",
-  ]),
+export default tseslint.config(
   {
-    extends: compat.extends(
-      "eslint:recommended",
-      "plugin:@typescript-eslint/recommended",
-      "plugin:@typescript-eslint/recommended-requiring-type-checking"
-    ),
-
+    ignores: [
+      "out/",
+      "dist/",
+      "**/*.d.ts",
+      "src/providers/activity-bar/webview/env-config-webview.ts",
+      "src/providers/activity-bar/webview/scout-panel-webview.ts",
+      "src/providers/activity-bar/webview/env-utils.ts",
+      "src/providers/activity-bar/webview/env-utils-model.ts",
+      "src/providers/activity-bar/webview/task-config-webview.ts",
+      "src/providers/activity-bar/webview/webview-utils.ts",
+      "tools/",
+    ],
+  },
+  js.configs.recommended,
+  ...tseslint.configs.recommendedTypeChecked,
+  {
+    files: ["**/*.{ts,tsx}"],
     plugins: {
-      "@typescript-eslint": typescriptEslint,
+      import: importPlugin,
     },
-
     languageOptions: {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      parser: tsParser,
-      ecmaVersion: 2020,
-      sourceType: "module",
-
       parserOptions: {
-        project: "./tsconfig.json",
+        projectService: {
+          allowDefaultProject: ["eslint.config.mjs", "webpack.config.js"],
+        },
+        tsconfigRootDir: import.meta.dirname,
       },
     },
-
     rules: {
+      "import/no-duplicates": "error",
       "@typescript-eslint/naming-convention": [
         "warn",
         {
@@ -70,5 +55,12 @@ export default defineConfig([
         },
       ],
     },
+    settings: {
+      "import/resolver": {
+        typescript: true,
+        node: true,
+      },
+    },
   },
-]);
+  prettierConfig
+);

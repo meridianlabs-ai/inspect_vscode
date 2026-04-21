@@ -1,13 +1,13 @@
 import { ExtensionContext } from "vscode";
 
 import { Command } from "../../core/command";
-import { scanviewCommands } from "./commands";
-import { ScoutViewWebviewManager } from "./scanview-view";
-import { ScoutViewManager } from "./scanview-view";
-import { WorkspaceEnvManager } from "../workspace/workspace-env-provider";
-import { activateScanviewEditor } from "./scanview-editor";
 import { PackageManager } from "../../core/package/manager";
 import { ScoutViewServer } from "../scout/scout-view-server";
+import { WorkspaceEnvManager } from "../workspace/workspace-env-provider";
+
+import { scanviewCommands } from "./commands";
+import { activateScanviewEditor } from "./scanview-editor";
+import { ScoutViewManager, ScoutViewWebviewManager } from "./scanview-view";
 
 export function activateScanview(
   scoutManager: PackageManager,

@@ -4,16 +4,17 @@ import {
   InspectWebview,
   InspectWebviewManager,
 } from "../../components/webview";
-import { HostWebviewPanel } from "../../hooks";
+import { ListingMRU } from "../../core/listing-mru";
 import {
   PackageChangedEvent,
   PackageManager,
 } from "../../core/package/manager";
-import { RouteMessage, viewRouteMessage } from "./scanview-message";
-import { ScanviewPanel } from "./scanview-panel";
+import { HostWebviewPanel } from "../../hooks";
 import { scoutViewPath } from "../../scout/props";
 import { ScoutViewServer } from "../scout/scout-view-server";
-import { ListingMRU } from "../../core/listing-mru";
+
+import { RouteMessage, viewRouteMessage } from "./scanview-message";
+import { ScanviewPanel } from "./scanview-panel";
 
 const kScanViewId = "inspect.scanview";
 

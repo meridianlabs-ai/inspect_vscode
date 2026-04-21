@@ -2,6 +2,7 @@
  * Tests for exec-manager.ts - ExecManager
  */
 import * as assert from "assert";
+
 import { ExecProfile } from "../../core/package/exec-manager";
 import { DocumentState } from "../../providers/workspace/workspace-state-provider";
 
@@ -314,7 +315,7 @@ suite("ExecManager Test Suite", () => {
         { name: "bash" },
       ];
 
-      const inspectTerminal = terminals.find(t => t.name === "Inspect Eval");
+      const inspectTerminal = terminals.find((t) => t.name === "Inspect Eval");
       assert.ok(inspectTerminal);
       assert.strictEqual(inspectTerminal.name, "Inspect Eval");
     });
@@ -322,7 +323,7 @@ suite("ExecManager Test Suite", () => {
     test("should not find terminal if not exists", () => {
       const terminals = [{ name: "zsh" }, { name: "bash" }];
 
-      const inspectTerminal = terminals.find(t => t.name === "Inspect Eval");
+      const inspectTerminal = terminals.find((t) => t.name === "Inspect Eval");
       assert.strictEqual(inspectTerminal, undefined);
     });
   });

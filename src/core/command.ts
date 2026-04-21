@@ -1,4 +1,4 @@
-import { Disposable, commands } from "vscode";
+import { commands, Disposable } from "vscode";
 
 export interface Command {
   readonly id: string;

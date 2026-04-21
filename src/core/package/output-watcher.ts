@@ -1,13 +1,14 @@
+import { existsSync, readFileSync, statSync } from "fs";
+
 import { Disposable, Event, EventEmitter, Uri } from "vscode";
 
 import { inspectLastEvalPaths } from "../../inspect/props";
-import { existsSync, readFileSync, statSync } from "fs";
-import { log } from "../log";
-import { WorkspaceStateManager } from "../../providers/workspace/workspace-state-provider";
 import { withMinimumInspectVersion } from "../../inspect/version";
 import { kInspectChangeEvalSignalVersion } from "../../providers/inspect/inspect-constants";
-import { resolveToUri } from "../uri";
+import { WorkspaceStateManager } from "../../providers/workspace/workspace-state-provider";
 import { scoutLastScanPaths } from "../../scout/props";
+import { log } from "../log";
+import { resolveToUri } from "../uri";
 
 export interface InspectLogCreatedEvent {
   log: Uri;
@@ -31,12 +32,12 @@ export class OutputWatcher implements Disposable {
     this.lastScan_ = Date.now();
 
     const evalSignalFiles: SignalFile[] = inspectLastEvalPaths()
-      .map(path => ({
+      .map((path) => ({
         type: "log",
         path: path.path,
       }))
       .concat(
-        scoutLastScanPaths().map(path => ({ type: "scan", path: path.path }))
+        scoutLastScanPaths().map((path) => ({ type: "scan", path: path.path }))
       );
 
     this.watchInterval_ = setInterval(() => {

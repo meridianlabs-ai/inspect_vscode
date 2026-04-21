@@ -1,5 +1,7 @@
 import { existsSync } from "fs";
-import { ExtensionContext, Uri, UriHandler, window, commands } from "vscode";
+
+import { commands, ExtensionContext, Uri, UriHandler, window } from "vscode";
+
 import { showError } from "../components/error";
 
 export function activateProtocolHandler(context: ExtensionContext) {

@@ -1,13 +1,15 @@
 import * as assert from "assert";
+
 import {
   CancellationToken,
+  EndOfLine,
   Position,
   Range,
   TextDocument,
   TextLine,
-  EndOfLine,
   Uri,
 } from "vscode";
+
 import { ScoutCodeLensProvider } from "../../providers/codelens/scout-codelens-provider";
 
 class MockTextLine implements TextLine {
@@ -52,7 +54,7 @@ class MockTextDocument implements TextDocument {
 
   lineAt(lineOrPos: number | Position): TextLine {
     const line = typeof lineOrPos === "number" ? lineOrPos : lineOrPos.line;
-    return new MockTextLine(this.lines[line], line);
+    return new MockTextLine(this.lines[line] ?? "", line);
   }
 
   getText(): string {

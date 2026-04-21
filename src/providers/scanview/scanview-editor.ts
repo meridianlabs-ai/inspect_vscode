@@ -1,11 +1,13 @@
 import * as vscode from "vscode";
 import { Uri } from "vscode";
-import { HostWebviewPanel } from "../../hooks";
-import { ScoutViewServer } from "../scout/scout-view-server";
-import { ScanviewPanel } from "./scanview-panel";
-import { RouteMessage, viewScanRouteMessage } from "./scanview-message";
-import { scoutViewPath } from "../../scout/props";
+
 import { basename, dirname } from "../../core/uri";
+import { HostWebviewPanel } from "../../hooks";
+import { scoutViewPath } from "../../scout/props";
+import { ScoutViewServer } from "../scout/scout-view-server";
+
+import { RouteMessage, viewScanRouteMessage } from "./scanview-message";
+import { ScanviewPanel } from "./scanview-panel";
 
 export const kScoutScanViewType = "inspect-ai.scout-scan-editor";
 

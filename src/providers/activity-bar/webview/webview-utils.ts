@@ -1,4 +1,5 @@
 import { debounce } from "lodash";
+
 export const kBounceInterval = 200;
 
 export const restoreInputState = (id: string, value?: string) => {
@@ -25,7 +26,8 @@ export const whenChanged = (id: string, fn: (value: string) => void) => {
     if (e.target) {
       const index = el.selectedIndex;
       if (index) {
-        const value = index > -1 ? el.options[index].value : el.value;
+        const value =
+          index > -1 ? (el.options[index]?.value ?? el.value) : el.value;
         fn(value);
       } else {
         fn(el.value);
@@ -94,7 +96,8 @@ export const setEnvWhenValueChanged = (
   el.addEventListener("change", (e: Event) => {
     if (e.target) {
       const index = el.selectedIndex;
-      const value = index > -1 ? el.options[index].value : el.value;
+      const value =
+        index > -1 ? (el.options[index]?.value ?? el.value) : el.value;
       setEnvValue(vscode, key, value);
     }
     if (fn) {

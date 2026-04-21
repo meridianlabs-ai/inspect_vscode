@@ -1,9 +1,10 @@
 import {
-  SpawnOptions,
-  SpawnSyncOptionsWithStringEncoding,
   spawn,
+  SpawnOptions,
   spawnSync,
+  SpawnSyncOptionsWithStringEncoding,
 } from "child_process";
+
 import { AbsolutePath } from "./path";
 
 export function runProcess(

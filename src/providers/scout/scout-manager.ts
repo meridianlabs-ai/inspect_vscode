@@ -1,7 +1,8 @@
-import { ExtensionContext } from "vscode";
-import { scoutBinPath, scoutVersionDescriptor } from "../../scout/props";
-import { PackageManager } from "../../core/package/manager";
 import { SemVer } from "semver";
+import { ExtensionContext } from "vscode";
+
+import { PackageManager } from "../../core/package/manager";
+import { scoutBinPath, scoutVersionDescriptor } from "../../scout/props";
 
 // Activates the provider which tracks the availability of Scout
 export function activateScoutManager(context: ExtensionContext) {

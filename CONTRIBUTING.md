@@ -2,8 +2,8 @@
 
 ## Prerequisites
 
-- [Node.js](https://nodejs.org/) >= 20.0.0
-- [Yarn](https://yarnpkg.com/) package manager
+- [Node.js](https://nodejs.org/) >= 22.0.0
+- [pnpm](https://pnpm.io/) package manager
 - [VS Code](https://code.visualstudio.com/) >= 1.85.0
 - Python with [Inspect AI](https://github.com/UKGovernmentBEIS/inspect_ai) and [Scout](https://github.com/UKGovernmentBEIS/inspect_scout) installed
 
@@ -29,28 +29,30 @@ The Inspect Log Viewer and Scout Viewer web applications displayed within the ex
 2. Install dependencies:
 
    ```bash
-   yarn install
+   pnpm install
    ```
 
 3. Build the extension:
    ```bash
-   yarn compile
+   pnpm build
    ```
 
 ## Development Workflow
 
 ### Available Commands
 
-| Command          | Description                                |
-| ---------------- | ------------------------------------------ |
-| `yarn compile`   | Build the extension with webpack           |
-| `yarn watch`     | Build and watch for changes                |
-| `yarn test`      | Run tests (compiles first)                 |
-| `yarn lint`      | Run ESLint                                 |
-| `yarn lint:fix`  | Run ESLint with auto-fix                   |
-| `yarn prettier`  | Format code with Prettier                  |
-| `yarn check-all` | Run lint + prettier + test (CI equivalent) |
-| `yarn package`   | Create production VSIX package             |
+| Command             | Description                                           |
+| ------------------- | ----------------------------------------------------- |
+| `pnpm build`        | Build the extension with webpack                      |
+| `pnpm dev`          | Build and watch for changes                           |
+| `pnpm test`         | Run tests (compiles first)                            |
+| `pnpm lint`         | Run ESLint                                            |
+| `pnpm lint:fix`     | Run ESLint with auto-fix                              |
+| `pnpm format`       | Format code with Prettier                             |
+| `pnpm format:check` | Check formatting without writing                      |
+| `pnpm typecheck`    | Run TypeScript compiler (no emit)                     |
+| `pnpm check`        | Run lint + format:check + typecheck + test (CI equiv) |
+| `pnpm vsce:package` | Create production VSIX package                        |
 
 ### Running the Extension
 
@@ -59,12 +61,12 @@ The Inspect Log Viewer and Scout Viewer web applications displayed within the ex
 3. Make changes to the source code
 4. Use `Cmd+Shift+F5` (Mac) or `Ctrl+Shift+F5` (Windows/Linux) to reload the extension window
 
-For continuous development, run `yarn watch` in a terminal to automatically rebuild on file changes.
+For continuous development, run `pnpm dev` in a terminal to automatically rebuild on file changes.
 
 ### Running Tests
 
 ```bash
-yarn test
+pnpm test
 ```
 
 Tests run in a headless VS Code environment using `@vscode/test-electron`.
@@ -107,7 +109,7 @@ src/
 
 - TypeScript with strict mode enabled
 - ESLint + Prettier for formatting
-- Run `yarn check-all` before submitting PRs
+- Run `pnpm check` before submitting PRs
 
 ## Commit Messages
 
@@ -144,7 +146,7 @@ refactor: Extract webview messaging into separate module
 ## Building for Release
 
 ```bash
-yarn package
+pnpm vsce:package
 ```
 
 This creates a `.vsix` file that can be installed locally or published to the marketplace.

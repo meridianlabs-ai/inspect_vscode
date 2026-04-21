@@ -2,10 +2,11 @@ import * as assert from "assert";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
+
 import { Uri } from "vscode";
 
-import { getWebviewPanelHtml } from "../../core/webview";
 import { toAbsolutePath } from "../../core/path";
+import { getWebviewPanelHtml } from "../../core/webview";
 import { HostWebviewPanel } from "../../hooks";
 
 /**

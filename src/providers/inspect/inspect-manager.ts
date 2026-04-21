@@ -1,11 +1,13 @@
-import { ExtensionContext } from "vscode";
-import { inspectBinPath } from "../../inspect/props";
-import { AbsolutePath } from "../../core/path";
 import { delimiter } from "path";
+
+import { ExtensionContext } from "vscode";
+
 import {
   PackageChangedEvent,
   PackageManager,
 } from "../../core/package/manager";
+import { AbsolutePath } from "../../core/path";
+import { inspectBinPath } from "../../inspect/props";
 
 // Activates the provider which tracks the availability of Inspect
 export function activateInspectManager(context: ExtensionContext) {

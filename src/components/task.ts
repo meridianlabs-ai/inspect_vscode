@@ -1,4 +1,5 @@
 import { TextDocument, Uri } from "vscode";
+
 import { lines } from "../core/text";
 
 // Task information for a document
@@ -44,7 +45,7 @@ export function readTaskData(document: TextDocument): TaskData[] {
         {
           const match = line.match(kFunctionNamePattern);
           if (match) {
-            const fnName = match[1];
+            const fnName = match[1] ?? "";
             const task: TaskData = {
               name: fnName,
               params: [],
@@ -52,7 +53,7 @@ export function readTaskData(document: TextDocument): TaskData[] {
             };
             tasks.push(task);
 
-            const restOfLine = match[2];
+            const restOfLine = match[2] ?? "";
             const keepReading = readParams(restOfLine, task);
             if (keepReading) {
               state = "reading-params";
@@ -65,7 +66,11 @@ export function readTaskData(document: TextDocument): TaskData[] {
         }
         break;
       case "reading-params": {
-        const keepReading = readParams(line, tasks[tasks.length - 1]);
+        const currentTask = tasks[tasks.length - 1];
+        if (!currentTask) {
+          break;
+        }
+        const keepReading = readParams(line, currentTask);
         if (keepReading) {
           state = "reading-params";
         } else {
@@ -85,7 +90,7 @@ const readParams = (line: string, task: TaskData) => {
     const paramsStr = paramsMatch[1];
     if (paramsStr) {
       const params = parseParameters(paramsStr);
-      params.forEach(param => {
+      params.forEach((param) => {
         task.params.push(param.trim());
       });
     }
@@ -102,6 +107,9 @@ const parseParameters = (paramStr: string): string[] => {
   // pay attention to commas outside brackets
   for (let i = 0; i < paramStr.length; i++) {
     const char = paramStr[i];
+    if (!char) {
+      continue;
+    }
 
     if (["[", "(", "{"].includes(char)) {
       bracketDepth++;
@@ -124,10 +132,10 @@ const parseParameters = (paramStr: string): string[] => {
 
   // Extract parameter names
   return params
-    .map(param => {
+    .map((param) => {
       // Get everything before the colon (the parameter name)
       const nameMatch = param.match(/^\s*([a-zA-Z_][a-zA-Z0-9_]*)/);
-      return nameMatch ? nameMatch[1] : "";
+      return nameMatch ? (nameMatch[1] ?? "") : "";
     })
     .filter(Boolean);
 };
