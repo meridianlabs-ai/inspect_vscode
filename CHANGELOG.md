@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.7](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.9.6...v0.9.7) (2026-04-21)
+
+
+### Bug Fixes
+
+* add --no-dependencies to vsce publish in release workflow ([#80](https://github.com/meridianlabs-ai/inspect_vscode/issues/80)) ([5654594](https://github.com/meridianlabs-ai/inspect_vscode/commit/56545942d774bfa599ab039d805b238099f51bcf))
+
 ## [0.9.6](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.9.5...v0.9.6) (2026-04-21)
 
 
