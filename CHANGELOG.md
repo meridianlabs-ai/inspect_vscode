@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.6](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.9.5...v0.9.6) (2026-04-21)
+
+
+### Bug Fixes
+
+* resolve serialize-javascript security vulnerabilities ([#73](https://github.com/meridianlabs-ai/inspect_vscode/issues/73)) ([92d5f83](https://github.com/meridianlabs-ai/inspect_vscode/commit/92d5f83a746f7dcca768f5946e0d70023ef1aa13))
+
 ## [0.9.5](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.9.4...v0.9.5) (2026-04-11)
 
 
