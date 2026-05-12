@@ -1,10 +1,10 @@
 import { ExtensionContext, MessageItem, window } from "vscode";
 
 import { Command, CommandManager } from "./core/command";
-import { end, start } from "./core/log";
+import { end, log, start } from "./core/log";
 import { PackageManager } from "./core/package/manager";
 import { OutputWatcher } from "./core/package/output-watcher";
-import { initPythonInterpreter } from "./core/python";
+import { initPythonInterpreter, pythonInterpreter } from "./core/python";
 import { checkActiveWorkspaceFolder } from "./core/workspace";
 import { initInspectProps } from "./inspect";
 import { inspectBinPath, inspectVersionDescriptor } from "./inspect/props";
@@ -309,5 +309,11 @@ const checkInspectVersion = async () => {
         close
       );
     }
+  } else {
+    log.error("inspect-ai is not installed in the current Python environment.");
+    const envPath = pythonInterpreter().pythonBinDir ?? "unknown";
+    void window.showErrorMessage(
+      `inspect-ai is not installed in the current environment (${envPath}). Please install inspect-ai or switch to a different environment to view .eval files.`
+    );
   }
 };
