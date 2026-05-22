@@ -2,6 +2,7 @@ import vscode, { ExtensionContext, Uri } from "vscode";
 
 import { Disposable } from "../../core/dispose";
 import {
+  kMethodEditLog,
   kMethodEvalLog,
   kMethodEvalLogBytes,
   kMethodEvalLogDir,
@@ -9,6 +10,7 @@ import {
   kMethodEvalLogHeaders,
   kMethodEvalLogs,
   kMethodEvalLogSize,
+  kMethodGetUserInfo,
   kMethodLogMessage,
   kMethodPendingSamples,
   kMethodSampleData,
@@ -85,6 +87,13 @@ export class LogviewPanel extends Disposable {
         log.info(`[CLIENT LOG] (${log_file}): ${message}`);
         await server_.logMessage(log_file, message);
       },
+      [kMethodEditLog]: (params: unknown[]) =>
+        server_.editLog(
+          params[0] as string,
+          params[1],
+          params[2] as string | undefined
+        ),
+      [kMethodGetUserInfo]: () => server_.getUserInfo(),
     });
 
     // serve post message api to webview

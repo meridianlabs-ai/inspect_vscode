@@ -12,6 +12,13 @@ export const kMethodPendingSamples = "eval_log_pending_samples";
 export const kMethodSampleData = "eval_log_sample_data";
 export const kMethodLogMessage = "log_message";
 export const kMethodEvalSet = "eval_set";
+// Log editing (tag + metadata edits) and best-effort author identity
+// for prefilling the edit dialog's Author field. The viewer sends these
+// from `app/log-view/title-view/Edit*Dialog.tsx`; we forward them to
+// the local `inspect view start` server's `/api/log-edit` and
+// `/api/user-info` endpoints.
+export const kMethodEditLog = "edit_log";
+export const kMethodGetUserInfo = "get_user_info";
 
 // constants for Scout json-rpc methods
 export const kMethodGetScans = "get_scans";

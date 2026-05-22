@@ -242,6 +242,83 @@ export class InspectViewServer extends PackageViewServer {
     ).data;
   }
 
+  /**
+   * Forward a `LogUpdate` to the local inspect view server's
+   * `/api/log-edit/{file}` endpoint and return the updated log + new
+   * ETag (S3 only) JSON-encoded as `{ "log": EvalLog, "etag"?: string }`.
+   *
+   * HTTP error codes are surfaced via a thrown `Error` whose `code`
+   * field carries the status — the JSON-RPC layer preserves both
+   * `message` and `code`, and the webview's `edit_log` handler maps
+   * 400/409/412 to the appropriate dialog message.
+   */
+  public async editLog(
+    file: string,
+    update: unknown,
+    ifMatchEtag?: string
+  ): Promise<string> {
+    if (!this.haveInspectEvalLogFormat()) {
+      throw new Error("editLog not implemented");
+    }
+    const headers = new Headers({
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    });
+    if (ifMatchEtag) {
+      headers.set("If-Match", ifMatchEtag);
+    }
+    const path = `/api/log-edit/${encodeURIComponent(file)}`;
+    const result = await this.serverFetch(
+      path,
+      "POST",
+      headers,
+      JSON.stringify(update)
+    );
+    if (result.status >= 400) {
+      const text = typeof result.data === "string" ? result.data : "";
+      // FastAPI wire-encodes HTTPException(detail=...) as
+      // `{"detail": "..."}`. Unwrap so the dialog renders the human
+      // message, not the JSON envelope.
+      let detail = text;
+      try {
+        const parsed = JSON.parse(text) as { detail?: unknown };
+        if (parsed && typeof parsed.detail === "string") {
+          detail = parsed.detail;
+        }
+      } catch {
+        // not JSON; fall through with raw text
+      }
+      const err = new Error(detail || `HTTP ${result.status}`) as Error & {
+        code?: number;
+      };
+      err.code = result.status;
+      throw err;
+    }
+    const text = typeof result.data === "string" ? result.data : "";
+    const log: unknown = JSON.parse(text);
+    const etag = result.headers.get("ETag") ?? undefined;
+    return JSON.stringify({ log, etag });
+  }
+
+  /**
+   * Best-effort identity of the user editing logs (git user.name →
+   * user.email → OS login), forwarded from `/api/user-info`. Returns
+   * an empty object on older inspect_ai versions where the endpoint
+   * doesn't exist (404) so the dialog just leaves Author blank.
+   */
+  public async getUserInfo(): Promise<string> {
+    if (!this.haveInspectEvalLogFormat()) {
+      return JSON.stringify({});
+    }
+    const result = await this.api_json(
+      "/api/user-info",
+      "GET",
+      undefined,
+      (status) => (status === 404 ? JSON.stringify({}) : undefined)
+    );
+    return result.data;
+  }
+
   public async logMessage(log_file: string, message?: string): Promise<void> {
     if (hasMinimumInspectVersion(kInspectLogMessageVersion)) {
       await this.api_json(
