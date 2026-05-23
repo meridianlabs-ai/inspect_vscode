@@ -91,14 +91,14 @@
         "title": "Inspect View...",
         "icon": "$(code-oss)",
         "category": "Inspect",
-        "enablement": "workspaceFolderCount != 0"
+        "enablement": "workspaceFolderCount != 0 && inspect_ai.inspect_ai.installed == true"
       },
       {
         "command": "inspect.inspectViewLog",
         "title": "Open Log File...",
         "icon": "$(code-oss)",
         "category": "Inspect",
-        "enablement": "workspaceFolderCount != 0"
+        "enablement": "workspaceFolderCount != 0 && inspect_ai.inspect_ai.installed == true"
       },
       {
         "command": "inspect.scoutView",
@@ -145,7 +145,7 @@
       {
         "command": "inspect.openLogViewer",
         "title": "Open in Inspect Log Viewer",
-        "enablement": "workspaceFolderCount != 0"
+        "enablement": "workspaceFolderCount != 0 && inspect_ai.inspect_ai.installed == true"
       },
       {
         "command": "inspect.openScanViewer",
@@ -200,14 +200,14 @@
         "title": "Run Task",
         "icon": "$(play)",
         "category": "Inspect",
-        "enablement": "workspaceFolderCount != 0"
+        "enablement": "workspaceFolderCount != 0 && inspect_ai.inspect_ai.installed == true"
       },
       {
         "command": "inspect.debugTask",
         "title": "Debug Task",
         "icon": "$(debug-alt)",
         "category": "Inspect",
-        "enablement": "workspaceFolderCount != 0"
+        "enablement": "workspaceFolderCount != 0 && inspect_ai.inspect_ai.installed == true"
       },
       {
         "command": "inspect.taskOutlineList",
@@ -228,14 +228,14 @@
         "title": "Log Listing...",
         "icon": "$(root-folder-opened)",
         "category": "Inspect",
-        "enablement": "workspaceFolderCount != 0"
+        "enablement": "workspaceFolderCount != 0 && inspect_ai.inspect_ai.installed == true"
       },
       {
         "command": "inspect.logListingRefresh",
         "title": "Refresh Log Listing",
         "icon": "$(refresh)",
         "category": "Inspect",
-        "enablement": "workspaceFolderCount != 0"
+        "enablement": "workspaceFolderCount != 0 && inspect_ai.inspect_ai.installed == true"
       },
       {
         "command": "inspect.logListingRevealInExplorer",
