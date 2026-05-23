@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.8](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.9.7...v0.9.8) (2026-05-23)
+
+
+### Bug Fixes
+
+* Require Inspect AI installation for command enablement ([#85](https://github.com/meridianlabs-ai/inspect_vscode/issues/85)) ([62003ad](https://github.com/meridianlabs-ai/inspect_vscode/commit/62003ad33025d2285317a52f5884c88573699750))
+
 ## [0.9.7](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.9.6...v0.9.7) (2026-04-21)
 
 
