@@ -90,15 +90,20 @@ export class PackageViewServer implements Disposable {
     );
     const { status, headers: responseHeaders } = response;
 
-    const isBinary = responseHeaders
-      .get("Content-Type")
-      ?.includes("application/vnd.apache.arrow");
+    // Treat anything that isn't JSON or text/* as binary. Decoding raw bytes
+    // via response.text() corrupts non-UTF-8 sequences (e.g. zstd-compressed
+    // payloads served as application/octet-stream).
+    const contentType = responseHeaders.get("Content-Type") ?? "";
+    const isText =
+      contentType === "" ||
+      contentType.includes("application/json") ||
+      contentType.startsWith("text/");
 
     return {
       status,
-      data: isBinary
-        ? new Uint8Array(await response.arrayBuffer())
-        : await response.text(),
+      data: isText
+        ? await response.text()
+        : new Uint8Array(await response.arrayBuffer()),
       headers: responseHeaders,
     };
   }
