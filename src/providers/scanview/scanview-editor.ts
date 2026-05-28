@@ -57,14 +57,14 @@ class ScoutScanReadonlyEditor implements vscode.CustomReadonlyEditorProvider {
     _token: vscode.CancellationToken
   ): Promise<void> {
     let scanDir = dirname(document.uri);
-    let scanJob = basename(document.uri);
+    let scanJob = decodeURIComponent(basename(document.uri));
     let scannerName = undefined;
 
     // If the uri ends with a parquet file, clip it off and use the
     // name of the parquet file as scanner
     if (scanJob.endsWith(".parquet")) {
       scannerName = scanJob.replace(/\.parquet$/, "");
-      scanJob = basename(scanDir);
+      scanJob = decodeURIComponent(basename(scanDir));
       scanDir = dirname(scanDir);
     }
 
