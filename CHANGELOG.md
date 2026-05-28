@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.10](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.9.9...v0.9.10) (2026-05-28)
+
+
+### Bug Fixes
+
+* Fix error opening S3 scans ([#89](https://github.com/meridianlabs-ai/inspect_vscode/issues/89)) ([250d36e](https://github.com/meridianlabs-ai/inspect_vscode/commit/250d36e3bb6369c045b0f39cd4862becf73bf4a4))
+
 ## [0.9.9](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.9.8...v0.9.9) (2026-05-26)
 
 
