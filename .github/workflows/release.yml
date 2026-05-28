@@ -64,19 +64,32 @@ jobs:
       - name: Package extension
         run: pnpm vsce:package
 
+      - name: Get version
+        id: version
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+
       - name: Publish to VS Code Marketplace
-        run: pnpm vsce publish --no-dependencies --pat ${{ secrets.VSCE_PAT }}
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: |
+          if npx @vscode/vsce show ukaisi.inspect-ai --json 2>/dev/null | grep -q '"version": "${{ steps.version.outputs.version }}"'; then
+            echo "v${{ steps.version.outputs.version }} already published to VS Code Marketplace, skipping"
+          else
+            pnpm vsce publish --no-dependencies --pat "$VSCE_PAT"
+          fi
 
       - name: Publish to OpenVSIX
-        run: |
-          npm install -g ovsx
-          ovsx publish *.vsix --pat ${{ secrets.OVSX_PAT }}
         env:
           OVSX_PAT: ${{ secrets.OVSX_PAT }}
+        run: |
+          npm install -g ovsx
+          if ovsx get ukaisi.inspect-ai --metadata 2>/dev/null | grep -q '"version": "${{ steps.version.outputs.version }}"'; then
+            echo "v${{ steps.version.outputs.version }} already published to OpenVSIX, skipping"
+          else
+            ovsx publish *.vsix --pat "$OVSX_PAT"
+          fi
 
       - name: Upload VSIX to GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload ${{ needs.release-please.outputs.tag_name }} *.vsix
+        run: gh release upload ${{ needs.release-please.outputs.tag_name }} *.vsix --clobber
