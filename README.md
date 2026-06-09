@@ -1,7 +1,5 @@
 # Inspect AI for VS Code
 
-[![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/ukaisi.inspect-ai?label=VS%20Code%20Marketplace)](https://marketplace.visualstudio.com/items?itemName=ukaisi.inspect-ai)
-[![Installs](https://img.shields.io/visual-studio-marketplace/i/ukaisi.inspect-ai)](https://marketplace.visualstudio.com/items?itemName=ukaisi.inspect-ai)
 [![CI](https://github.com/meridianlabs-ai/inspect_vscode/actions/workflows/ci.yml/badge.svg)](https://github.com/meridianlabs-ai/inspect_vscode/actions/workflows/ci.yml)
 
 VS Code extension for the [Inspect](https://inspect.aisi.org.uk/) framework for large language model evaluations. This extension provides support for developing evaluations using Inspect, including:
