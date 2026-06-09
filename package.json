@@ -13,14 +13,24 @@
   "homepage": "https://inspect.aisi.org.uk/",
   "repository": {
     "type": "git",
-    "url": "https://github.com/meridianlabs-ai/inspect-vscode/"
+    "url": "https://github.com/meridianlabs-ai/inspect_vscode/"
   },
   "bugs": {
-    "url": "https://github.com/meridianlabs-ai/inspect-vscode/issues"
+    "url": "https://github.com/meridianlabs-ai/inspect_vscode/issues"
   },
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=22.0.0"
+  },
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false,
+      "description": "Running and debugging tasks executes commands constructed from workspace contents, so the extension is disabled in untrusted workspaces."
+    },
+    "virtualWorkspaces": {
+      "supported": false,
+      "description": "The extension requires a local Python environment and file system access."
+    }
   },
   "categories": [
     "Machine Learning",
