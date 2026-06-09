@@ -100,11 +100,16 @@ export class ScoutViewWebviewManager extends InspectWebviewManager<
     return this.activeView_?.webviewPanel().viewColumn;
   }
 
-  protected override async onViewStateChanged(): Promise<void> {
-    if (this.isActive()) {
-      await this.updateVisibleView();
-    }
-  }
+  // NOTE: Unlike Inspect View, Scout View intentionally does NOT re-post its
+  // route to the webview on view-state changes (e.g. tabbing away and back).
+  //
+  // The Scout View webview is a self-contained SPA that owns its own routing
+  // and in-app state once loaded. Re-posting the last route on every focus
+  // change forced the app to navigate back to that top-level route, discarding
+  // wherever the user had navigated (open transcript, applied filter, etc.).
+  // Routes are only delivered on initial show (via setOnShow) and on explicit
+  // command-driven navigation (showScoutRoute with "activate"), so the base
+  // class no-op onViewStateChanged() is correct here.
 
   public showViewAndGotoRoute(
     route: RouteMessage,
