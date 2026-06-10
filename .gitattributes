@@ -1,0 +1,20 @@
+# Normalize line endings to LF on checkout everywhere, matching the
+# Prettier endOfLine:"lf" setting. Without this, Windows git clients
+# convert LF→CRLF, causing `pnpm format:check` to fail on the Windows
+# CI runner.
+* text=auto eol=lf
+
+# Binary files — never modify line endings
+*.vsix binary
+*.png  binary
+*.ico  binary
+*.gif  binary
+*.jpg  binary
+*.jpeg binary
+*.ttf  binary
+*.woff binary
+*.woff2 binary
+*.eot  binary
+*.zip  binary
+*.gz   binary
+*.tar  binary
