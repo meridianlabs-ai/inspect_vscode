@@ -694,7 +694,7 @@
   },
   "dependencies": {
     "@microsoft/fast-components": "^2.30.6",
-    "@microsoft/fast-element": "^1.13.0",
+    "@microsoft/fast-element": "^2.10.4",
     "@vscode/webview-ui-toolkit": "^1.4.0",
     "ajv": "^8.20.0",
     "async-lock": "^1.4.1",
