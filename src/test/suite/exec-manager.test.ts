@@ -489,7 +489,8 @@ suite("ExecManager Test Suite", () => {
       const { command, args } = buildRunCommand(profile(), ["eval", hostile]);
       const line = quoteCommandLine([command, ...args], "posix");
 
-      assert.strictEqual(line, `'inspect' 'eval' '${hostile}'`);
+      // "inspect" and "eval" are safe bare; the hostile target gets quoted.
+      assert.strictEqual(line, `inspect eval '${hostile}'`);
     });
   });
 
