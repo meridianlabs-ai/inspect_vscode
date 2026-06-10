@@ -2,6 +2,7 @@ import {
   debug,
   DebugConfiguration,
   ExtensionContext,
+  Terminal,
   window,
   workspace,
 } from "vscode";
@@ -135,53 +136,93 @@ export const buildRunCommand = (
   };
 };
 
+/**
+ * Waits until shell integration becomes active on `terminal`, or until
+ * `timeoutMs` elapses. Returns the integration object if it activated in time,
+ * or `undefined` if it didn't (shell integration disabled or too slow).
+ */
+const waitForShellIntegration = (
+  terminal: Terminal,
+  timeoutMs: number
+): Promise<(typeof terminal)["shellIntegration"]> => {
+  // Already active — no waiting needed (reused terminal or fast startup).
+  if (terminal.shellIntegration) {
+    return Promise.resolve(terminal.shellIntegration);
+  }
+
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      listener.dispose();
+      resolve(undefined);
+    }, timeoutMs);
+
+    const listener = window.onDidChangeTerminalShellIntegration((e) => {
+      if (e.terminal === terminal) {
+        clearTimeout(timer);
+        listener.dispose();
+        resolve(e.shellIntegration);
+      }
+    });
+  });
+};
+
 const runCommand = async (
   profile: ExecProfile,
   args: string[],
   cwd: string,
   python?: AbsolutePath
 ) => {
-  // See if there a non-busy terminal that we can re-use. The integrated
-  // terminal is created by the Python extension's activation hooks, so the
-  // selected interpreter / `inspect` is on PATH — which is why we run here
-  // rather than via the Tasks API.
+  // Reuse a named terminal so the user can see previous runs and so the
+  // Python extension's env-activation hooks have already run.
   const name = profile.terminal;
-  let terminal = window.terminals.find((t) => {
-    return t.name === name;
-  });
+  let terminal = window.terminals.find((t) => t.name === name);
   const reusedTerminal = terminal !== undefined;
   if (!terminal) {
-    // A new terminal's working directory is set natively via the `cwd` option,
-    // so it never passes through the shell.
     terminal = window.createTerminal({ name, cwd });
   }
   terminal.show(true);
 
-  const kRequiredDelay = 1000;
-  const kInterval = 100;
-  let totalSleep = 0;
-  while (!terminal.state.isInteractedWith && totalSleep < kRequiredDelay) {
-    await sleep(kInterval);
-    totalSleep += kInterval;
-  }
+  const { command, args: commandArgs } = buildRunCommand(profile, args, python);
 
-  // Quote everything for the shell this terminal is actually running, so paths,
-  // task targets, and `-T key=value` params that contain spaces or shell
-  // metacharacters are passed as literal tokens. This fixes the space-in-path
-  // bug and closes the command-injection hole left by raw string-joining.
+  // Prefer shell integration (available in VS Code 1.93+): it fires after the
+  // shell's init sequence completes, so the Python env is activated and
+  // `inspect` is on PATH before the command is sent. It also handles quoting
+  // and gives the terminal proper command decorations.
+  //
+  // On a reused terminal integration is usually already active; on a new
+  // terminal we wait up to 10 s for it to activate. If it doesn't (shell
+  // integration disabled, older VS Code build, or the shell doesn't support
+  // it), we fall back to sendText with a fixed delay.
+  const kShellIntegrationTimeoutMs = 10_000;
+  const integration = await waitForShellIntegration(
+    terminal,
+    kShellIntegrationTimeoutMs
+  );
+
   const creationOptions = terminal.creationOptions;
   const shellPath =
     "shellPath" in creationOptions ? creationOptions.shellPath : undefined;
   const shell = detectShellKind(shellPath);
+  const commandLine = quoteCommandLine([command, ...commandArgs], shell);
 
-  // A reused terminal may be sitting in a different directory, so move it to
-  // the workspace directory first (quoted in case the path contains spaces).
-  if (reusedTerminal) {
-    terminal.sendText(`cd ${quoteArg(cwd, shell)}`);
+  if (integration) {
+    // Shell integration is active: the env is ready. Emit a `cd` first on
+    // reused terminals (executeCommand doesn't change the working directory).
+    if (reusedTerminal) {
+      integration.executeCommand(`cd ${quoteArg(cwd, shell)}`);
+    }
+    integration.executeCommand(commandLine);
+  } else {
+    // Fallback: shell integration unavailable. Use sendText with a delay on
+    // new terminals to give the activation scripts time to finish.
+    if (!reusedTerminal) {
+      await sleep(2000);
+    }
+    if (reusedTerminal) {
+      terminal.sendText(`cd ${quoteArg(cwd, shell)}`);
+    }
+    terminal.sendText(commandLine);
   }
-
-  const { command, args: commandArgs } = buildRunCommand(profile, args, python);
-  terminal.sendText(quoteCommandLine([command, ...commandArgs], shell));
 };
 
 const runDebugger = async (
