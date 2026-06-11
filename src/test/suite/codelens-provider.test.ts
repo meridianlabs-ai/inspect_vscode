@@ -83,6 +83,9 @@ class MockTextDocument implements TextDocument {
   get isClosed(): boolean {
     return false;
   }
+  get encoding(): string {
+    return "utf-8";
+  }
   save(): Thenable<boolean> {
     return Promise.resolve(true);
   }
