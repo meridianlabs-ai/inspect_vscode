@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.9.11](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.9.10...v0.9.11) (2026-06-11)
+
+
+### Bug Fixes
+
+* harden webview CSP, URI handler, and nonce generation ([#101](https://github.com/meridianlabs-ai/inspect_vscode/issues/101)) ([9ae866c](https://github.com/meridianlabs-ai/inspect_vscode/commit/9ae866c70908fff88f83bf2fe9d917028a61943f))
+* make detectShellKind fallback test platform-aware ([#109](https://github.com/meridianlabs-ai/inspect_vscode/issues/109)) ([bcf9351](https://github.com/meridianlabs-ai/inspect_vscode/commit/bcf935137654fbc3e61935bfb06dacaae2e70ca5))
+* parse log task name with basename instead of split("/") ([#107](https://github.com/meridianlabs-ai/inspect_vscode/issues/107)) ([c16701c](https://github.com/meridianlabs-ai/inspect_vscode/commit/c16701c91f75878d176f025a2413608c00c07ecd))
+* quote run commands per-shell (fix space-in-path + command injection) ([#95](https://github.com/meridianlabs-ai/inspect_vscode/issues/95)) ([56997fd](https://github.com/meridianlabs-ai/inspect_vscode/commit/56997fdaa03cfc8b2bc92039e86bedbc828100a5))
+* Scout View no longer resets app state when tabbed away ([#91](https://github.com/meridianlabs-ai/inspect_vscode/issues/91)) ([#92](https://github.com/meridianlabs-ai/inspect_vscode/issues/92)) ([4f9a3b0](https://github.com/meridianlabs-ai/inspect_vscode/commit/4f9a3b03ac0884e8fbaf4bb37675e0d8fd72ae1c))
+
 ## [0.9.10](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.9.9...v0.9.10) (2026-05-28)
 
 
