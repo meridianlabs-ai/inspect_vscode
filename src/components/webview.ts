@@ -333,7 +333,7 @@ export abstract class InspectWebview<T> extends Disposable {
                         allowUnsafe ? "'unsafe-eval'" : ""
                       };
             connect-src ${this._webviewPanel.webview.cspSource} ;
-                      frame-src *;
+                      frame-src ${this._webviewPanel.webview.cspSource};
                       ">
   
                   ${headerHtml}
