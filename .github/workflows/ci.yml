@@ -8,7 +8,12 @@ on:
 
 jobs:
   verify-package:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+
+    runs-on: ${{ matrix.os }}
 
     steps:
       - name: Checkout code
@@ -38,18 +43,25 @@ jobs:
       - name: Build extension
         run: pnpm build:production
 
-      - name: Setup virtual display
+      # VS Code's test runner needs a display. On Linux we provide a virtual
+      # one via xvfb; the Windows runner already has a display.
+      - name: Run tests (Linux)
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y xvfb
+          xvfb-run -a pnpm test
 
-      - name: Run tests
-        run: xvfb-run -a pnpm test
+      - name: Run tests (Windows)
+        if: runner.os == 'Windows'
+        run: pnpm test
 
       - name: Package extension
         run: pnpm vsce:package
 
       - name: Upload extension artifact
+        # Only one OS needs to publish the .vsix artifact.
+        if: runner.os == 'Linux'
         uses: actions/upload-artifact@v7
         with:
           name: vscode-extension

@@ -2,6 +2,7 @@
  * Tests for path.ts - Path utilities including AbsolutePath
  */
 import * as assert from "assert";
+import * as path from "path";
 
 import { toAbsolutePath } from "../../core/path";
 
@@ -115,13 +116,16 @@ suite("Path Utilities Test Suite", () => {
     test("should join child path to parent", () => {
       const absPath = toAbsolutePath("/home/user");
       const child = absPath.child("project");
-      assert.strictEqual(child.path, "/home/user/project");
+      assert.strictEqual(child.path, path.join("/home/user", "project"));
     });
 
     test("should handle nested children", () => {
       const absPath = toAbsolutePath("/home");
       const nested = absPath.child("user").child("project").child("file.py");
-      assert.strictEqual(nested.path, "/home/user/project/file.py");
+      assert.strictEqual(
+        nested.path,
+        path.join("/home", "user", "project", "file.py")
+      );
     });
 
     test("should handle child with subdirectories", () => {
@@ -144,13 +148,13 @@ suite("Path Utilities Test Suite", () => {
     test("should handle empty child name", () => {
       const absPath = toAbsolutePath("/home/user");
       const child = absPath.child("");
-      assert.strictEqual(child.path, "/home/user");
+      assert.strictEqual(child.path, path.join("/home/user", ""));
     });
 
     test("should handle child with special characters", () => {
       const absPath = toAbsolutePath("/home/user");
       const child = absPath.child("file (1).py");
-      assert.strictEqual(child.path, "/home/user/file (1).py");
+      assert.strictEqual(child.path, path.join("/home/user", "file (1).py"));
     });
   });
 
@@ -158,7 +162,7 @@ suite("Path Utilities Test Suite", () => {
     test("should support dirname then child", () => {
       const absPath = toAbsolutePath("/home/user/project/old");
       const sibling = absPath.dirname().child("new");
-      assert.strictEqual(sibling.path, "/home/user/project/new");
+      assert.strictEqual(sibling.path, path.join("/home/user/project", "new"));
     });
 
     test("should support child then dirname then filename", () => {
@@ -174,12 +178,12 @@ suite("Path Utilities Test Suite", () => {
     test("should maintain immutability", () => {
       const original = toAbsolutePath("/home/user");
       const child = original.child("project");
-      const dirname = original.dirname();
+      const dirn = original.dirname();
 
       // Original should be unchanged
       assert.strictEqual(original.path, "/home/user");
-      assert.strictEqual(child.path, "/home/user/project");
-      assert.strictEqual(dirname.path, "/home");
+      assert.strictEqual(child.path, path.join("/home/user", "project"));
+      assert.strictEqual(dirn.path, path.dirname("/home/user"));
     });
   });
 

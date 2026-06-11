@@ -88,8 +88,14 @@ suite("URI Utilities Test Suite", () => {
       const uri = Uri.file("/test.txt");
       const parent = dirname(uri);
       assert.strictEqual(parent.scheme, "file");
-      // Parent of /test.txt should be /
-      assert.ok(parent.fsPath === "/" || parent.fsPath.match(/^[A-Z]:\\?$/));
+      // Parent of /test.txt should be a root: "/" on POSIX, a drive root or
+      // bare backslash root on Windows.
+      assert.ok(
+        parent.fsPath === "/" ||
+          parent.fsPath === "\\" ||
+          !!parent.fsPath.match(/^[A-Z]:\\?$/i),
+        `Expected root, got: ${parent.fsPath}`
+      );
     });
 
     test("should handle http URI", () => {

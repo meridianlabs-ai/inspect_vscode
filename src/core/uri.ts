@@ -46,8 +46,15 @@ export function basename(uri: Uri): string {
 
 export function prettyUriPath(uri: Uri): string {
   if (uri.scheme === "file") {
-    const path = uri.fsPath;
-    return path.replace(os.homedir(), "~");
+    const fsPath = uri.fsPath;
+    const home = os.homedir();
+    // On Windows, drive letters can differ in case between os.homedir() and
+    // the URI fsPath. Use a case-insensitive replace.
+    if (os.platform() === "win32") {
+      const escapedHome = home.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      return fsPath.replace(new RegExp(escapedHome, "i"), "~");
+    }
+    return fsPath.replace(home, "~");
   } else {
     return uri.toString(true);
   }
@@ -95,6 +102,8 @@ export function normalizeWindowsUri(uri: string) {
 }
 
 export function isUri(str: string): boolean {
-  const uriPattern = /^[a-zA-Z][a-zA-Z0-9+.-]*:/;
+  // A single letter before the colon is a Windows drive letter (e.g. C:\),
+  // not a URI scheme. URI schemes must be at least 2 characters long.
+  const uriPattern = /^[a-zA-Z][a-zA-Z0-9+.-]+:/;
   return uriPattern.test(str);
 }
