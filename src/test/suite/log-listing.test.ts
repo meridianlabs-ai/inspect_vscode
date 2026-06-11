@@ -3,6 +3,8 @@
  */
 import * as assert from "assert";
 
+import { relativeLogPath } from "../../providers/activity-bar/log-listing/log-listing";
+
 /**
  * Mock LogItem for testing
  */
@@ -608,6 +610,87 @@ suite("LogListing Test Suite", () => {
       );
 
       assert.strictEqual(normalized, "2024-01-15T14:30:45-08:00");
+    });
+  });
+
+  suite("relativeLogPath", () => {
+    test("strips a file:// log dir prefix from a file:// location", () => {
+      assert.strictEqual(
+        relativeLogPath(
+          "file:///Users/me/project/scans",
+          "file:///Users/me/project/scans/scan_id=abc"
+        ),
+        "scan_id=abc"
+      );
+    });
+
+    test("strips a log dir that already ends with a slash", () => {
+      assert.strictEqual(
+        relativeLogPath(
+          "file:///Users/me/project/scans/",
+          "file:///Users/me/project/scans/scan_id=abc"
+        ),
+        "scan_id=abc"
+      );
+    });
+
+    test("strips an s3 log dir prefix from an s3 location", () => {
+      assert.strictEqual(
+        relativeLogPath(
+          "s3://bucket/scans",
+          "s3://bucket/scans/2024/scan_id=abc"
+        ),
+        "2024/scan_id=abc"
+      );
+    });
+
+    test("relativizes a plain absolute path against a file:// log dir", () => {
+      // scout's /api/v2/scans returns plain absolute paths for local scan
+      // dirs even when the requested dir is a file:// URI
+      assert.strictEqual(
+        relativeLogPath(
+          "file:///Users/me/project/scans",
+          "/Users/me/project/scans/scan_id=abc"
+        ),
+        "scan_id=abc"
+      );
+    });
+
+    test("relativizes a nested plain absolute path", () => {
+      assert.strictEqual(
+        relativeLogPath(
+          "file:///Users/me/project/scans",
+          "/Users/me/project/scans/2024/06/scan_id=abc"
+        ),
+        "2024/06/scan_id=abc"
+      );
+    });
+
+    test("tolerates percent-encoding differences between dir and location", () => {
+      assert.strictEqual(
+        relativeLogPath(
+          "file:///Users/me/my%20project/scans",
+          "file:///Users/me/my project/scans/scan_id=abc"
+        ),
+        "scan_id=abc"
+      );
+    });
+
+    test("leaves a location outside of the log dir unchanged", () => {
+      assert.strictEqual(
+        relativeLogPath(
+          "file:///Users/me/project/scans",
+          "/Users/me/elsewhere/scan_id=abc"
+        ),
+        "/Users/me/elsewhere/scan_id=abc"
+      );
+    });
+
+    test("leaves an already-relative location unchanged", () => {
+      assert.strictEqual(
+        relativeLogPath("file:///Users/me/project/scans", "2024/scan_id=abc"),
+        "2024/scan_id=abc"
+      );
     });
   });
 

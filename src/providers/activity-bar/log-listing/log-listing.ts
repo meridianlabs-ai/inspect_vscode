@@ -1,3 +1,5 @@
+import path from "path";
+
 import { format, isThisYear, isToday } from "date-fns";
 import { throttle } from "lodash";
 import vscode, {
@@ -12,7 +14,12 @@ import vscode, {
 
 import { ListingMRU } from "../../../core/listing-mru";
 import { log } from "../../../core/log";
-import { normalizeWindowsUri } from "../../../core/uri";
+import {
+  getRelativeUri,
+  isUri,
+  normalizeWindowsUri,
+  resolveToUri,
+} from "../../../core/uri";
 
 export type LogNode =
   | ({
@@ -43,6 +50,37 @@ export interface LogItem {
 export interface Logs {
   log_dir: string;
   items: LogItem[];
+}
+
+/**
+ * Computes a log-dir-relative path for a listing item location.
+ *
+ * Listings historically used an exact string-prefix strip, which assumes the
+ * server returns locations in exactly the same form as the requested log dir.
+ * That isn't guaranteed — e.g. scout returns plain absolute paths for local
+ * scan dirs even when the requested dir is a file:// URI — so fall back to
+ * URI-aware relativization when the string prefix doesn't match. Locations
+ * outside the log dir are returned unchanged.
+ */
+export function relativeLogPath(logDir: string, location: string): string {
+  const dirWithSlash = logDir.endsWith("/") ? logDir : `${logDir}/`;
+  if (location.startsWith(dirWithSlash)) {
+    return location.slice(dirWithSlash.length);
+  }
+  try {
+    if (isUri(location) || path.isAbsolute(location)) {
+      const relative = getRelativeUri(
+        resolveToUri(logDir),
+        resolveToUri(location)
+      );
+      if (relative !== null) {
+        return relative;
+      }
+    }
+  } catch {
+    // unparseable dir or location — leave the location unchanged
+  }
+  return location;
 }
 
 export class LogListing {
@@ -123,11 +161,9 @@ export class LogListing {
     try {
       const logs = await this.logsFetcher_(this.logDir_);
       if (logs) {
-        const log_dir = normalizeWindowsUri(
-          logs.log_dir.endsWith("/") ? logs.log_dir : `${logs.log_dir}/`
-        );
+        const log_dir = normalizeWindowsUri(logs.log_dir);
         for (const file of logs.items) {
-          file.name = normalizeWindowsUri(file.name).replace(`${log_dir}`, "");
+          file.name = relativeLogPath(log_dir, normalizeWindowsUri(file.name));
         }
         const tree = buildLogTree(logs.items);
         return tree;
