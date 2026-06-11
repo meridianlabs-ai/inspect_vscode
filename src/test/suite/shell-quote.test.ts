@@ -1,4 +1,5 @@
 import * as assert from "assert";
+import * as os from "os";
 
 import {
   detectShellKind,
@@ -39,9 +40,12 @@ suite("Shell Quote Test Suite", () => {
       );
     });
 
-    test("falls back to posix on non-win32 when unknown", () => {
-      // On the test host (darwin/linux) an unknown/undefined shell is posix.
-      assert.strictEqual(detectShellKind(undefined), "posix");
+    test("falls back to the platform default when the shell is unknown", () => {
+      // An unknown/undefined shell falls back to the platform default:
+      // powershell on Windows, posix elsewhere.
+      const expected = os.platform() === "win32" ? "powershell" : "posix";
+      assert.strictEqual(detectShellKind(undefined), expected);
+      assert.strictEqual(detectShellKind("/some/unknown/shell"), expected);
     });
   });
 
