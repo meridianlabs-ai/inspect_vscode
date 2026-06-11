@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.12](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.9.11...v0.9.12) (2026-06-11)
+
+
+### Bug Fixes
+
+* relativize log listing locations tolerantly (URI vs plain path) ([#110](https://github.com/meridianlabs-ai/inspect_vscode/issues/110)) ([1ba97e5](https://github.com/meridianlabs-ai/inspect_vscode/commit/1ba97e50ae364323230fb10967bb64888ab360d7))
+
 ## [0.9.11](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.9.10...v0.9.11) (2026-06-11)
 
 
