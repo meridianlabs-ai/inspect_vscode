@@ -7,8 +7,8 @@ export function resolveToUri(pathOrUri: string): Uri {
   if (isUri(pathOrUri)) {
     try {
       return Uri.parse(pathOrUri);
-    } catch (_error) {
-      throw new Error(`Invalid URI format: ${pathOrUri}`);
+    } catch (error) {
+      throw new Error(`Invalid URI format: ${pathOrUri}`, { cause: error });
     }
   } else {
     try {
@@ -16,8 +16,8 @@ export function resolveToUri(pathOrUri: string): Uri {
         ? pathOrUri
         : path.resolve(pathOrUri);
       return Uri.file(absolutePath);
-    } catch (_error) {
-      throw new Error(`Invalid file path: ${pathOrUri}`);
+    } catch (error) {
+      throw new Error(`Invalid file path: ${pathOrUri}`, { cause: error });
     }
   }
 }

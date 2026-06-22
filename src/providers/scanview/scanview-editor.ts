@@ -48,7 +48,7 @@ class ScoutScanReadonlyEditor implements vscode.CustomReadonlyEditorProvider {
     return {
       uri: uri,
       dispose: () => {},
-    } as vscode.CustomDocument & { scanner?: string; transcript_id?: string };
+    };
   }
 
   async resolveCustomEditor(
