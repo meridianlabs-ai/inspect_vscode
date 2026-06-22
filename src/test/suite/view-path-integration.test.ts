@@ -100,7 +100,7 @@ function createMockPanel(): HostWebviewPanel {
     onDidChangeViewState: () => ({ dispose: () => {} }),
     onDidDispose: () => ({ dispose: () => {} }),
     dispose: () => {},
-  } as unknown as HostWebviewPanel;
+  };
 }
 
 suite("View Path Integration Tests", () => {

@@ -1,9 +1,4 @@
-import {
-  commands,
-  ExtensionContext,
-  TextDocumentShowOptions,
-  Uri,
-} from "vscode";
+import { commands, ExtensionContext, Uri } from "vscode";
 
 import { withEditorAssociation } from "../core/vscode/association";
 import { hasMinimumInspectVersion } from "../inspect/version";
@@ -24,9 +19,7 @@ export function activateOpenLog(
 
         // function to open using defualt editor in preview mode
         const openLogViewer = async () => {
-          await commands.executeCommand("vscode.open", uri, <
-            TextDocumentShowOptions
-          >{ preview: true });
+          await commands.executeCommand("vscode.open", uri, { preview: true });
         };
 
         if (hasMinimumInspectVersion(kInspectEvalLogFormatVersion)) {

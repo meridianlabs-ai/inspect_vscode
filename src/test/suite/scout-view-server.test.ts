@@ -20,8 +20,6 @@ let fetchCallLog: Array<{ url: string; options: RequestInit }> = [];
 const originalFetch = global.fetch;
 
 suite("ScoutViewServer Test Suite", () => {
-  let server: ScoutViewServer | undefined;
-
   setup(() => {
     // Reset fetch mock
     fetchCallLog = [];
@@ -64,10 +62,6 @@ suite("ScoutViewServer Test Suite", () => {
   teardown(() => {
     // Restore original fetch
     global.fetch = originalFetch;
-
-    if (server) {
-      server.dispose();
-    }
   });
 
   test("ScoutViewServer should be instantiable", () => {

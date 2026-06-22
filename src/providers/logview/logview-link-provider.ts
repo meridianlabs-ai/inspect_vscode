@@ -70,7 +70,7 @@ export const logviewTerminalLinkProvider = (
               length: path.length,
               tooltip: "View Log",
               data: path,
-            } as LogViewTerminalLink;
+            };
           })
           .filter((link) => link !== undefined);
         return result;
@@ -101,7 +101,7 @@ export const logviewTerminalLinkProvider = (
               length: path.length,
               tooltip: "View Log",
               data: fullPath.toString(),
-            } as LogViewTerminalLink;
+            };
           } else {
             // This is not a recently created log, so we don't link it
             return undefined;

@@ -42,7 +42,7 @@ export const scanviewTerminalLinkProvider = (_context: ExtensionContext) => {
               length: path.length,
               tooltip: "View Scan Results",
               data: path,
-            } as ScanViewTerminalLink;
+            };
           })
           .filter((link) => link !== undefined);
         return result;

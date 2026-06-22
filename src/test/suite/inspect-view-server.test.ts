@@ -5,16 +5,8 @@ import { Uri } from "vscode";
 import { InspectViewServer } from "../../providers/inspect/inspect-view-server";
 
 suite("InspectViewServer Test Suite", () => {
-  let server: InspectViewServer | undefined;
-
   setup(() => {
     // Note: Full instantiation requires mocking more dependencies
-  });
-
-  teardown(() => {
-    if (server) {
-      server.dispose();
-    }
   });
 
   test("InspectViewServer should be instantiable", () => {

@@ -115,14 +115,12 @@ export class ActiveTaskManager {
   }
 
   private async updateTask(activeTaskInfo?: DocumentTaskInfo) {
-    let taskActive = false;
     if (activeTaskInfo) {
       this.setActiveTaskInfo(activeTaskInfo);
-      taskActive = activeTaskInfo !== undefined;
       await commands.executeCommand(
         "setContext",
         "inspect_ai.activeTask",
-        taskActive
+        true
       );
     }
   }

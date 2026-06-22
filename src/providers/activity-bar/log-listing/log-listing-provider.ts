@@ -171,9 +171,9 @@ export async function activateLogListing(
       async (node: LogNode) => {
         const logUri = treeDataProvider.getLogListing()?.uriForNode(node);
         if (logUri) {
-          await vscode.commands.executeCommand("vscode.open", logUri, <
-            vscode.TextDocumentShowOptions
-          >{ preview: true });
+          await vscode.commands.executeCommand("vscode.open", logUri, {
+            preview: true,
+          });
         }
       }
     )

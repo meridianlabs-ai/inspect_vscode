@@ -258,10 +258,11 @@ suite("OutputWatcher Test Suite", () => {
 
   suite("Watch Interval Management", () => {
     test("should track interval state", () => {
-      let watchInterval: ReturnType<typeof setInterval> | null = null;
-
       // Start watching
-      watchInterval = setInterval(() => {}, 500);
+      let watchInterval: ReturnType<typeof setInterval> | null = setInterval(
+        () => {},
+        500
+      );
       assert.ok(watchInterval !== null);
 
       // Stop watching
