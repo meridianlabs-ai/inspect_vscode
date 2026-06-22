@@ -79,10 +79,12 @@ Please update to a newer version of ${packageName} to view this content.
     const resourceUri = (path: string) =>
       panel.webview.asWebviewUri(Uri.joinPath(viewDirUri, path)).toString();
 
-    // nonces for scripts
+    // nonces for scripts. Match the `<script` start tag followed by a tag
+    // boundary (whitespace or `>`) so we don't accidentally match tags like
+    // `<scripting>`. Case-insensitive and covers all whitespace forms.
     indexHtml = indexHtml.replace(
-      /<script([ >])/g,
-      `<script nonce="${nonce}"$1`
+      /<script(?=[\s>])/gi,
+      (match) => `${match} nonce="${nonce}"`
     );
 
     // Determine whether this is the old index.html format (before bundling),
