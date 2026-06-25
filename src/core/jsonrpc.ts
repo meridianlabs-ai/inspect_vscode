@@ -19,6 +19,15 @@ export const kMethodEvalSet = "eval_set";
 // `/api/user-info` endpoints.
 export const kMethodEditLog = "edit_log";
 export const kMethodGetUserInfo = "get_user_info";
+// Installed inspect / scout versions, forwarded from `/api/app-config`.
+export const kMethodAppConfig = "app_config";
+// Transcript search, forwarded to the inspect view server's /api/scout/*
+// endpoints (inspect_scout's search router). Only reachable when scout is
+// installed (the viewer gates the search panel on a non-null scout version
+// from app_config).
+export const kMethodListSearches = "list_searches";
+export const kMethodPostSearch = "post_search";
+export const kMethodGetSearchResult = "get_search_result";
 
 // constants for Scout json-rpc methods
 export const kMethodGetScans = "get_scans";

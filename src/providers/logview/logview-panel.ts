@@ -2,6 +2,7 @@ import vscode, { ExtensionContext, Uri } from "vscode";
 
 import { Disposable } from "../../core/dispose";
 import {
+  kMethodAppConfig,
   kMethodEditLog,
   kMethodEvalLog,
   kMethodEvalLogBytes,
@@ -10,9 +11,12 @@ import {
   kMethodEvalLogHeaders,
   kMethodEvalLogs,
   kMethodEvalLogSize,
+  kMethodGetSearchResult,
   kMethodGetUserInfo,
+  kMethodListSearches,
   kMethodLogMessage,
   kMethodPendingSamples,
+  kMethodPostSearch,
   kMethodSampleData,
   webviewPanelJsonRpcServer,
 } from "../../core/jsonrpc";
@@ -94,6 +98,18 @@ export class LogviewPanel extends Disposable {
           params[2] as string | undefined
         ),
       [kMethodGetUserInfo]: () => server_.getUserInfo(),
+      [kMethodAppConfig]: () => server_.getAppConfig(),
+      [kMethodListSearches]: (params: unknown[]) =>
+        server_.listSearches(params[0] as string, params[1] as number),
+      [kMethodPostSearch]: (params: unknown[]) =>
+        server_.postSearch(params[0] as string, params[1] as string, params[2]),
+      [kMethodGetSearchResult]: (params: unknown[]) =>
+        server_.getSearchResult(
+          params[0] as string,
+          params[1] as string,
+          params[2] as string,
+          params[3] as { events?: string; messages?: string } | undefined
+        ),
     });
 
     // serve post message api to webview
