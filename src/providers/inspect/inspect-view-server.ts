@@ -28,6 +28,15 @@ import {
 const kNotFoundSignal = "NotFound";
 const kNotModifiedSignal = "NotModified";
 
+/**
+ * Base64url-encode a string (RFC 4648 §5: url-safe alphabet, no padding) to
+ * match the viewer's `encodeBase64Url` so transcript dirs round-trip through
+ * the scout search routes identically across the browser and vscode clients.
+ */
+function encodeBase64Url(value: string): string {
+  return Buffer.from(value, "utf-8").toString("base64url");
+}
+
 export class InspectViewServer extends PackageViewServer {
   constructor(context: ExtensionContext, inspectManager: PackageManager) {
     super(
@@ -339,6 +348,87 @@ export class InspectViewServer extends PackageViewServer {
       (status) => (status === 404 ? fallback : undefined)
     );
     return result.data;
+  }
+
+  /**
+   * Transcript search, forwarded to inspect_scout's search router (mounted by
+   * inspect_ai under `/api/scout/*`). These mirror the view server's HTTP
+   * client (`api-view-server.ts`): the transcript dir is base64url-encoded
+   * into the path and the transcript id is URL-encoded.
+   *
+   * Only reachable when scout is installed — the viewer gates the search panel
+   * on a non-null scout version from `/api/app-config`. When the underlying
+   * server is too old to host these routes the requests 404; `getSearchResult`
+   * treats that as "no result yet" (view-server parity) while the others
+   * surface the error.
+   */
+  public async listSearches(
+    search_type: string,
+    count: number
+  ): Promise<string> {
+    const params = new URLSearchParams();
+    params.append("type", search_type);
+    params.append("count", String(count));
+    return (await this.api_json(`/api/scout/searches?${params.toString()}`))
+      .data;
+  }
+
+  public async postSearch(
+    transcriptDir: string,
+    transcriptId: string,
+    request: unknown
+  ): Promise<string> {
+    const headers = new Headers({
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    });
+    const path =
+      `/api/scout/transcripts/${encodeBase64Url(transcriptDir)}` +
+      `/${encodeURIComponent(transcriptId)}/search`;
+    // POST carries a body, so use serverFetch (api()/api_json don't forward one)
+    // and map HTTP error codes onto the thrown Error's `code`, matching editLog.
+    const result = await this.serverFetch(
+      path,
+      "POST",
+      headers,
+      JSON.stringify(request)
+    );
+    if (result.status >= 400) {
+      const text = typeof result.data === "string" ? result.data : "";
+      const err = new Error(text || `HTTP ${result.status}`) as Error & {
+        code?: number;
+      };
+      err.code = result.status;
+      throw err;
+    }
+    return typeof result.data === "string" ? result.data : "";
+  }
+
+  public async getSearchResult(
+    transcriptDir: string,
+    transcriptId: string,
+    searchId: string,
+    scope: { events?: string; messages?: string } | undefined
+  ): Promise<string> {
+    const params = new URLSearchParams();
+    if (scope?.messages) {
+      params.set("messages", scope.messages);
+    }
+    if (scope?.events) {
+      params.set("events", scope.events);
+    }
+    const query = params.toString();
+    const path =
+      `/api/scout/transcripts/${encodeBase64Url(transcriptDir)}` +
+      `/${encodeURIComponent(transcriptId)}/searches/${encodeURIComponent(searchId)}` +
+      (query ? `?${query}` : "");
+    // A result that isn't ready yet is a 404; return the JSON literal `null`
+    // so the viewer reads it as "keep polling" rather than an error.
+    return (
+      await this.api_json(path, "GET", undefined, (status) =>
+        status === 404 ? "null" : undefined
+      )
+    ).data;
   }
 
   public async logMessage(log_file: string, message?: string): Promise<void> {
