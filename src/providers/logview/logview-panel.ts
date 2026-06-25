@@ -102,11 +102,7 @@ export class LogviewPanel extends Disposable {
       [kMethodListSearches]: (params: unknown[]) =>
         server_.listSearches(params[0] as string, params[1] as number),
       [kMethodPostSearch]: (params: unknown[]) =>
-        server_.postSearch(
-          params[0] as string,
-          params[1] as string,
-          params[2]
-        ),
+        server_.postSearch(params[0] as string, params[1] as string, params[2]),
       [kMethodGetSearchResult]: (params: unknown[]) =>
         server_.getSearchResult(
           params[0] as string,
