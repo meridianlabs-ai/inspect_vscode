@@ -319,6 +319,28 @@ export class InspectViewServer extends PackageViewServer {
     return result.data;
   }
 
+  /**
+   * Installed inspect / scout versions, forwarded from `/api/app-config`.
+   * Older inspect_ai versions lack the endpoint (404) — return a placeholder
+   * so the viewer's startup config gate still resolves and renders.
+   */
+  public async getAppConfig(): Promise<string> {
+    const fallback = JSON.stringify({
+      inspect_version: "unknown",
+      scout_version: null,
+    });
+    if (!this.haveInspectEvalLogFormat()) {
+      return fallback;
+    }
+    const result = await this.api_json(
+      "/api/app-config",
+      "GET",
+      undefined,
+      (status) => (status === 404 ? fallback : undefined)
+    );
+    return result.data;
+  }
+
   public async logMessage(log_file: string, message?: string): Promise<void> {
     if (hasMinimumInspectVersion(kInspectLogMessageVersion)) {
       await this.api_json(

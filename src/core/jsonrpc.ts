@@ -19,6 +19,8 @@ export const kMethodEvalSet = "eval_set";
 // `/api/user-info` endpoints.
 export const kMethodEditLog = "edit_log";
 export const kMethodGetUserInfo = "get_user_info";
+// Installed inspect / scout versions, forwarded from `/api/app-config`.
+export const kMethodAppConfig = "app_config";
 
 // constants for Scout json-rpc methods
 export const kMethodGetScans = "get_scans";
