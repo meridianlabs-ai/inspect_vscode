@@ -155,12 +155,18 @@ export class LogviewPanel extends Disposable {
         )}</script>`
       : "";
 
+    // Advertise the generic http_request proxy to the viewer. Older extensions
+    // inject nothing, so the viewer falls back to the named-RPC API.
+    const capabilitiesScript = `<script id="inspect-host-capabilities" type="application/json">${JSON.stringify(
+      [kMethodHttpRequest]
+    )}</script>`;
+
     return getWebviewPanelHtml(
       viewDir,
       this.panel_,
       this.getExtensionVersion(),
       overrideCssPath,
-      stateScript,
+      stateScript + capabilitiesScript,
       "Inspect AI"
     );
   }
