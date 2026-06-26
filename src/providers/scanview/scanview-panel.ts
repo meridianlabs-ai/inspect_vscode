@@ -9,16 +9,14 @@ import {
   kMethodHttpRequest,
   webviewPanelJsonRpcServer,
 } from "../../core/jsonrpc";
+import { HttpProxyRpcRequest } from "../../core/package/view-server";
 import {
   getWebviewPanelHtml,
   handleWebviewPanelOpenMessages,
 } from "../../core/webview";
 import { HostWebviewPanel } from "../../hooks";
 import { scoutViewPath } from "../../scout/props";
-import {
-  HttpProxyRpcRequest,
-  ScoutViewServer,
-} from "../scout/scout-view-server";
+import { ScoutViewServer } from "../scout/scout-view-server";
 
 import { RouteMessage } from "./scanview-message";
 
