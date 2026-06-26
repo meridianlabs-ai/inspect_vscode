@@ -1,12 +1,17 @@
 import * as assert from "assert";
+import { mkdir, mkdtemp, rm, symlink, writeFile } from "fs/promises";
 import * as os from "os";
+import path from "path";
 
 import { Uri } from "vscode";
 
 import {
+  directoryViewPathScope,
   dirname,
+  fileViewPathScope,
   getRelativeUri,
   normalizeWindowsUri,
+  pathIsInViewScope,
   prettyUriPath,
   resolveToUri,
 } from "../../core/uri";
@@ -196,6 +201,123 @@ suite("URI Utilities Test Suite", () => {
       const child = Uri.file("/home/user/project2/file.txt");
       const relative = getRelativeUri(parent, child);
       assert.strictEqual(relative, null);
+    });
+
+    test("should return null for prefix sibling paths", () => {
+      const parent = Uri.file("/home/user/logs");
+      const child = Uri.file("/home/user/logs-archive/file.txt");
+      assert.strictEqual(getRelativeUri(parent, child), null);
+    });
+
+    test("should require the same remote authority", () => {
+      const parent = Uri.parse("s3://bucket/logs");
+      const child = Uri.parse("s3://other/logs/file.txt");
+      assert.strictEqual(getRelativeUri(parent, child), null);
+    });
+  });
+
+  suite("view path scopes", () => {
+    let tempDir: string;
+
+    setup(async () => {
+      tempDir = await mkdtemp(path.join(os.tmpdir(), "inspect-view-scope-"));
+    });
+
+    teardown(async () => {
+      await rm(tempDir, { recursive: true, force: true });
+    });
+
+    test("allows canonical local descendants and rejects siblings", async () => {
+      const root = path.join(tempDir, "logs");
+      const nested = path.join(root, "nested");
+      const selected = path.join(nested, "run.eval");
+      const sibling = path.join(tempDir, "logs-archive", "run.eval");
+      await mkdir(nested, { recursive: true });
+      await mkdir(path.dirname(sibling), { recursive: true });
+      await writeFile(selected, "selected");
+      await writeFile(sibling, "sibling");
+
+      const scope = directoryViewPathScope(Uri.file(root));
+      assert.strictEqual(await pathIsInViewScope(scope, selected), true);
+      assert.strictEqual(await pathIsInViewScope(scope, sibling), false);
+    });
+
+    test("resolves a selected symlink root and rejects nested escapes", async function () {
+      if (os.platform() === "win32") {
+        this.skip();
+        return;
+      }
+      const target = path.join(tempDir, "target");
+      const selected = path.join(tempDir, "selected");
+      const outside = path.join(tempDir, "outside");
+      await mkdir(target);
+      await mkdir(outside);
+      await symlink(target, selected, "dir");
+      await symlink(outside, path.join(target, "escape"), "dir");
+      const allowed = path.join(selected, "run.eval");
+      const rejected = path.join(selected, "escape", "secret.eval");
+      await writeFile(path.join(target, "run.eval"), "selected");
+      await writeFile(path.join(outside, "secret.eval"), "secret");
+
+      const scope = directoryViewPathScope(Uri.file(selected));
+      assert.strictEqual(await pathIsInViewScope(scope, allowed), true);
+      assert.strictEqual(await pathIsInViewScope(scope, rejected), false);
+    });
+
+    test("uses exact file scopes", async () => {
+      const selected = path.join(tempDir, "selected.eval");
+      const sibling = path.join(tempDir, "sibling.eval");
+      await writeFile(selected, "selected");
+      await writeFile(sibling, "sibling");
+
+      const scope = fileViewPathScope(Uri.file(selected));
+      assert.strictEqual(await pathIsInViewScope(scope, selected), true);
+      assert.strictEqual(await pathIsInViewScope(scope, sibling), false);
+    });
+
+    test("contains remote descendants by components and authority", async () => {
+      const scope = directoryViewPathScope(Uri.parse("s3://bucket/logs"));
+      assert.strictEqual(
+        await pathIsInViewScope(scope, "s3://bucket/logs/run.eval"),
+        true
+      );
+      assert.strictEqual(
+        await pathIsInViewScope(scope, "s3://bucket/logs-archive/run.eval"),
+        false
+      );
+      assert.strictEqual(
+        await pathIsInViewScope(scope, "s3://other/logs/run.eval"),
+        false
+      );
+      assert.strictEqual(
+        await pathIsInViewScope(scope, "s3://bucket/logs/%2e%2e/secret"),
+        false
+      );
+    });
+
+    test("allows HTTP only as an exact file scope", async () => {
+      const selected = "https://example.test/run.eval";
+      assert.strictEqual(
+        await pathIsInViewScope(
+          fileViewPathScope(Uri.parse(selected)),
+          selected
+        ),
+        true
+      );
+      assert.strictEqual(
+        await pathIsInViewScope(
+          fileViewPathScope(Uri.parse(selected)),
+          "https://example.test/other.eval"
+        ),
+        false
+      );
+      assert.strictEqual(
+        await pathIsInViewScope(
+          directoryViewPathScope(Uri.parse("https://example.test/logs")),
+          selected
+        ),
+        false
+      );
     });
   });
 

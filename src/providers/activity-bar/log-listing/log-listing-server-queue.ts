@@ -5,6 +5,7 @@ import { MarkdownString } from "vscode";
 import { stringify } from "yaml";
 
 import { EvalLog, EvalResults } from "../../../@types/log";
+import { directoryViewPathScope, ViewPathScope } from "../../../core/uri";
 import { sleep } from "../../../core/wait";
 
 import { LogListing, LogNode } from "./log-listing";
@@ -25,7 +26,10 @@ export class LogElementQueueProcessor {
 
   constructor(
     private readonly viewServer: {
-      evalLogHeaders: (uris: string[]) => Promise<string | undefined>;
+      evalLogHeaders: (
+        uris: string[],
+        scope: ViewPathScope
+      ) => Promise<string | undefined>;
     },
     private readonly logListing: () => LogListing | undefined,
     private readonly context: vscode.ExtensionContext,
@@ -98,7 +102,14 @@ export class LogElementQueueProcessor {
 
       if (uris.length > 0) {
         // Fetch headers
-        const headers = await this.viewServer.evalLogHeaders(uris);
+        const listing = this.logListing();
+        if (!listing) {
+          return;
+        }
+        const headers = await this.viewServer.evalLogHeaders(
+          uris,
+          directoryViewPathScope(listing.logDir())
+        );
 
         if (headers !== undefined) {
           const evalLogs = JSON.parse(headers) as EvalLog[];

@@ -4,6 +4,7 @@ import { TreeItem, TreeItemCollapsibleState } from "vscode";
 import * as vscode from "vscode";
 
 import { EvalLog } from "../../../@types/log";
+import { directoryViewPathScope } from "../../../core/uri";
 import { InspectViewServer } from "../../inspect/inspect-view-server";
 
 import {
@@ -86,11 +87,13 @@ export class LogTreeDataProvider extends LogListingTreeDataProvider {
       return Promise.resolve(item);
     }
 
-    const nodeUri = this.logListing_?.uriForNode(element);
-    if (nodeUri) {
-      const headers = await this.viewServer_.evalLogHeaders([
-        nodeUri.toString(),
-      ]);
+    const listing = this.logListing_;
+    const nodeUri = listing?.uriForNode(element);
+    if (listing && nodeUri) {
+      const headers = await this.viewServer_.evalLogHeaders(
+        [nodeUri.toString()],
+        directoryViewPathScope(listing.logDir())
+      );
       if (headers !== undefined) {
         const evalLog = (JSON.parse(headers) as EvalLog[])[0];
         if (evalLog && evalLog.version === 2) {

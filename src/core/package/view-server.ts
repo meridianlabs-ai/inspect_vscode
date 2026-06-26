@@ -9,8 +9,22 @@ import { AbsolutePath, activeWorkspacePath } from "../../core/path";
 import { findOpenPort } from "../../core/port";
 import { spawnProcess } from "../../core/process";
 import { shQuote } from "../../core/string";
+import { ViewPathScope } from "../../core/uri";
 
 import { PackageManager } from "./manager";
+
+export const kViewScopeHeader = "X-Inspect-View-Scope";
+export const kViewScopeKindHeader = "X-Inspect-View-Scope-Kind";
+
+export function addViewScopeHeaders(
+  headers: Headers,
+  scope?: ViewPathScope
+): void {
+  if (scope) {
+    headers.set(kViewScopeHeader, scope.uri.toString());
+    headers.set(kViewScopeKindHeader, scope.kind);
+  }
+}
 
 export class PackageViewServer implements Disposable {
   constructor(
@@ -38,13 +52,25 @@ export class PackageViewServer implements Disposable {
     );
   }
 
+  protected viewArgs(): string[] {
+    return this.viewArgs_;
+  }
+
   protected async api_json(
     path: string,
     method: "GET" | "POST" | "PUT" | "DELETE" = "GET",
     headers?: Record<string, string>,
-    handleError?: (status: number) => string | undefined
+    handleError?: (status: number) => string | undefined,
+    scope?: ViewPathScope
   ): Promise<{ data: string; headers: Headers }> {
-    const result = await this.api(path, method, headers, false, handleError);
+    const result = await this.api(
+      path,
+      method,
+      headers,
+      false,
+      handleError,
+      scope
+    );
     return {
       data: result.data as string,
       headers: result.headers,
@@ -53,9 +79,10 @@ export class PackageViewServer implements Disposable {
 
   protected async api_bytes(
     path: string,
-    method: "GET" | "POST" | "PUT" | "DELETE" = "GET"
+    method: "GET" | "POST" | "PUT" | "DELETE" = "GET",
+    scope?: ViewPathScope
   ): Promise<{ data: Uint8Array; headers: Headers }> {
-    const result = await this.api(path, method, {}, true);
+    const result = await this.api(path, method, {}, true, undefined, scope);
     return {
       data: result.data as Uint8Array,
       headers: result.headers,
@@ -70,7 +97,8 @@ export class PackageViewServer implements Disposable {
     path: string,
     method: "GET" | "POST" | "PUT" | "DELETE",
     headers: Headers,
-    body?: string
+    body?: string,
+    scope?: ViewPathScope
   ): Promise<{
     status: number;
     data: string | Uint8Array;
@@ -83,6 +111,7 @@ export class PackageViewServer implements Disposable {
     requestHeaders.set("Pragma", "no-cache");
     requestHeaders.set("Expires", "0");
     requestHeaders.set("Cache-Control", "no-cache");
+    addViewScopeHeaders(requestHeaders, scope);
 
     const response = await fetch(
       `http://localhost:${this.serverPort_}${path}`,
@@ -113,7 +142,8 @@ export class PackageViewServer implements Disposable {
     method: "GET" | "POST" | "PUT" | "DELETE" = "GET",
     headers: Record<string, string> = {},
     binary: boolean = false,
-    handleError?: (status: number) => string | undefined
+    handleError?: (status: number) => string | undefined,
+    scope?: ViewPathScope
   ): Promise<{ data: string | Uint8Array; headers: Headers }> {
     // ensure the server is started and ready
     await this.ensureRunning();
@@ -127,6 +157,10 @@ export class PackageViewServer implements Disposable {
       Expires: "0",
       ["Cache-Control"]: "no-cache",
     };
+    if (scope) {
+      headers[kViewScopeHeader] = scope.uri.toString();
+      headers[kViewScopeKindHeader] = scope.kind;
+    }
 
     // make request
     const response = await fetch(
@@ -210,7 +244,7 @@ export class PackageViewServer implements Disposable {
               "--port",
               String(this.serverPort_),
               ...(this.logLevel_ ? ["--log-level", this.logLevel_] : []),
-            ].concat(this.viewArgs_);
+            ].concat(this.viewArgs());
             this.serverProcess_ = spawnProcess(
               quote(inspect.path),
               args.map(quote),

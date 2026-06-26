@@ -48,7 +48,10 @@ export class InspectViewManager {
     }
     if (log_dir) {
       // Show the log view for the log dir (or the workspace)
-      await this.webViewManager_.showLogview({ log_dir }, "activate");
+      await this.webViewManager_.showLogview(
+        { log_dir, scope_kind: "directory" },
+        "activate"
+      );
     }
   }
 
@@ -108,7 +111,10 @@ export class InspectViewWebviewManager extends InspectWebviewManager<
     // Get the directory name using posix path methods
     const log_dir = dirname(uri);
 
-    await this.showLogview({ log_file: uri, log_dir }, activation);
+    await this.showLogview(
+      { log_file: uri, log_dir, scope_kind: "file" },
+      activation
+    );
   }
 
   public logFileIsWithinLogDir(log_file: Uri) {
@@ -126,6 +132,7 @@ export class InspectViewWebviewManager extends InspectWebviewManager<
         await this.displayLogFile({
           log_file: log_file,
           log_dir: state?.log_dir,
+          scope_kind: state.scope_kind ?? "directory",
           background_refresh: true,
         });
       }
@@ -250,6 +257,11 @@ export class InspectViewWebviewManager extends InspectWebviewManager<
         log_dir: Uri.parse(data["log_dir"] ?? ""),
         log_file: data["log_file"] ? Uri.parse(data["log_file"]) : undefined,
         background_refresh: !!data["background_refresh"],
+        scope_kind:
+          data["scope_kind"] === "file" ||
+          (!data["scope_kind"] && data["log_file"])
+            ? "file"
+            : "directory",
       };
     } else {
       return this.lastState_;
@@ -261,6 +273,7 @@ export class InspectViewWebviewManager extends InspectWebviewManager<
       log_dir: state.log_dir.toString(),
       log_file: state.log_file?.toString(),
       background_refresh: state.background_refresh,
+      scope_kind: state.scope_kind,
     });
   }
 
@@ -270,6 +283,9 @@ export class InspectViewWebviewManager extends InspectWebviewManager<
 }
 
 const logStateEquals = (a: LogviewState, b: LogviewState) => {
+  if ((a.scope_kind ?? "directory") !== (b.scope_kind ?? "directory")) {
+    return false;
+  }
   if (a.log_dir.toString() !== b.log_dir.toString()) {
     return false;
   }
@@ -295,12 +311,14 @@ class InspectViewWebview extends InspectWebview<LogviewState> {
   ) {
     super(context, webviewPanel);
 
+    const scopeKind =
+      state.scope_kind ?? (state.log_file ? "file" : "directory");
     this.logviewPanel_ = new LogviewPanel(
       webviewPanel,
       context,
       server,
-      "dir",
-      state.log_dir
+      scopeKind === "file" ? "file" : "dir",
+      scopeKind === "file" && state.log_file ? state.log_file : state.log_dir
     );
     this._register(this.logviewPanel_);
 
@@ -310,15 +328,19 @@ class InspectViewWebview extends InspectWebview<LogviewState> {
           switch (e.type) {
             case "displayLogFile":
               {
-                if (e.log_dir && this._manager) {
+                const logFile = await this.logviewPanel_.resolve(e.url);
+                if (this._manager && logFile) {
+                  const scope = this.logviewPanel_.scope();
                   const state: LogviewState = {
-                    log_file: Uri.parse(e.url),
-                    log_dir: Uri.parse(e.log_dir as string),
+                    log_file: logFile,
+                    log_dir:
+                      scope.kind === "directory" ? scope.uri : dirname(logFile),
+                    scope_kind: scope.kind,
                   };
                   await this._manager.displayLogFile(state, "open");
                 } else {
                   await showError(
-                    "Unable to display log file because of a missing log_dir or manager. This is an unexpected error, please report it."
+                    "Unable to display a log file outside the selected viewer scope."
                   );
                 }
               }

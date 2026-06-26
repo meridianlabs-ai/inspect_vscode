@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import { Uri } from "vscode";
 
 import { log } from "../../core/log";
-import { dirname } from "../../core/uri";
+import { dirname, fileViewPathScope } from "../../core/uri";
 import { HostWebviewPanel } from "../../hooks";
 import { inspectViewPath } from "../../inspect/props";
 import { hasMinimumInspectVersion } from "../../inspect/version";
@@ -77,7 +77,10 @@ class InspectLogReadonlyEditor implements vscode.CustomReadonlyEditorProvider {
     let useLogViewer = hasMinimumInspectVersion(kInspectEvalLogFormatVersion);
     if (useLogViewer) {
       if (docUriStr.endsWith(".json")) {
-        const fileSize = await this.server_.evalLogSize(docUriStr);
+        const fileSize = await this.server_.evalLogSize(
+          docUriStr,
+          fileViewPathScope(docUriNoParams)
+        );
         if (fileSize > 1024 * 1000 * 100) {
           log.info(
             `JSON log file ${document.uri.path} is to large for Inspect View, opening in text editor.`

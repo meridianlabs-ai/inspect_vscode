@@ -22,6 +22,11 @@ import {
 } from "../../core/jsonrpc";
 import { log } from "../../core/log";
 import {
+  pathIsInViewScope,
+  resolveViewPathCandidate,
+  ViewPathScope,
+} from "../../core/uri";
+import {
   getWebviewPanelHtml,
   handleWebviewPanelOpenMessages,
 } from "../../core/webview";
@@ -40,48 +45,61 @@ export class LogviewPanel extends Disposable {
     uri: Uri
   ) {
     super();
+    this.scope_ = {
+      kind: type === "dir" ? "directory" : "file",
+      uri,
+    };
 
     // serve eval log api to webview
     this._rpcDisconnect = webviewPanelJsonRpcServer(panel_, {
-      [kMethodEvalLogDir]: async () => {
+      [kMethodEvalLogDir]: () => {
         if (type === "dir") {
-          return JSON.stringify({ log_dir: uri.toString() });
+          return Promise.resolve(JSON.stringify({ log_dir: uri.toString() }));
         }
-        const result = await server_.evalLogDir();
-        return result;
+        return Promise.resolve(JSON.stringify({ log_dir: "" }));
       },
       [kMethodEvalLogFiles]: async (params: unknown[]) =>
         type === "dir"
           ? server_.evalLogFiles(
               uri.toString(),
               params[0] as number,
-              params[1] as number
+              params[1] as number,
+              this.scope_
             )
           : Promise.resolve(undefined),
       [kMethodEvalLogs]: async () =>
-        type === "dir" ? server_.evalLogs(uri) : server_.evalLogsSolo(uri),
+        type === "dir"
+          ? server_.evalLogs(uri, this.scope_)
+          : server_.evalLogsSolo(uri),
       [kMethodEvalLog]: (params: unknown[]) =>
-        server_.evalLog(params[0] as string, params[1] as number | boolean),
+        server_.evalLog(
+          params[0] as string,
+          params[1] as number | boolean,
+          this.scope_
+        ),
       [kMethodEvalLogSize]: (params: unknown[]) =>
-        server_.evalLogSize(params[0] as string),
+        server_.evalLogSize(params[0] as string, this.scope_),
       [kMethodEvalLogBytes]: (params: unknown[]) =>
         server_.evalLogBytes(
           params[0] as string,
           params[1] as number,
-          params[2] as number
+          params[2] as number,
+          this.scope_
         ),
       [kMethodEvalLogHeaders]: (params: unknown[]) =>
-        server_.evalLogHeaders(params[0] as string[]),
+        server_.evalLogHeaders(params[0] as string[], this.scope_),
       [kMethodPendingSamples]: (params: unknown[]) =>
         server_.evalLogPendingSamples(
           params[0] as string,
-          params[1] as string | undefined
+          params[1] as string | undefined,
+          this.scope_
         ),
       [kMethodSampleData]: (params: unknown[]) =>
         server_.evalLogSampleData(
           params[0] as string,
           params[1] as string | number,
           params[2] as number,
+          this.scope_,
           params[3] as number | undefined,
           params[4] as number | undefined
         ),
@@ -89,26 +107,33 @@ export class LogviewPanel extends Disposable {
         const log_file = params[0] as string;
         const message = params[1] as string | undefined;
         log.info(`[CLIENT LOG] (${log_file}): ${message}`);
-        await server_.logMessage(log_file, message);
+        await server_.logMessage(log_file, message, this.scope_);
       },
       [kMethodEditLog]: (params: unknown[]) =>
         server_.editLog(
           params[0] as string,
           params[1],
-          params[2] as string | undefined
+          params[2] as string | undefined,
+          this.scope_
         ),
       [kMethodGetUserInfo]: () => server_.getUserInfo(),
       [kMethodAppConfig]: () => server_.getAppConfig(),
       [kMethodListSearches]: (params: unknown[]) =>
         server_.listSearches(params[0] as string, params[1] as number),
       [kMethodPostSearch]: (params: unknown[]) =>
-        server_.postSearch(params[0] as string, params[1] as string, params[2]),
+        server_.postSearch(
+          params[0] as string,
+          params[1] as string,
+          params[2],
+          this.scope_
+        ),
       [kMethodGetSearchResult]: (params: unknown[]) =>
         server_.getSearchResult(
           params[0] as string,
           params[1] as string,
           params[2] as string,
-          params[3] as { events?: string; messages?: string } | undefined
+          params[3] as { events?: string; messages?: string } | undefined,
+          this.scope_
         ),
     });
 
@@ -119,6 +144,20 @@ export class LogviewPanel extends Disposable {
   public override dispose() {
     this._rpcDisconnect();
     this._pmUnsubcribe.dispose();
+  }
+
+  public scope(): ViewPathScope {
+    return this.scope_;
+  }
+
+  public allows(location: string | Uri): Promise<boolean> {
+    return pathIsInViewScope(this.scope_, location);
+  }
+
+  public async resolve(location: string | Uri): Promise<Uri | null> {
+    return (await this.allows(location))
+      ? resolveViewPathCandidate(this.scope_, location)
+      : null;
   }
 
   public async getHtml(state: LogviewState): Promise<string> {
@@ -174,4 +213,5 @@ export class LogviewPanel extends Disposable {
 
   private _rpcDisconnect: VoidFunction;
   private _pmUnsubcribe: vscode.Disposable;
+  private readonly scope_: ViewPathScope;
 }

@@ -3,7 +3,11 @@ import { Uri } from "vscode";
 
 import { Command } from "../../../core/command";
 import { OutputWatcher } from "../../../core/package/output-watcher";
-import { getRelativeUri, prettyUriPath } from "../../../core/uri";
+import {
+  directoryViewPathScope,
+  getRelativeUri,
+  prettyUriPath,
+} from "../../../core/uri";
 import { activeWorkspaceFolder } from "../../../core/workspace";
 import { hasMinimumInspectVersion } from "../../../inspect/version";
 import { kInspectEvalLogFormatVersion } from "../../inspect/inspect-constants";
@@ -49,7 +53,10 @@ export async function activateLogListing(
 
     // create a logs fetcher
     const logsFetcher = async (uri: Uri): Promise<Logs | undefined> => {
-      const logsJSON = await viewServer.evalLogs(uri);
+      const logsJSON = await viewServer.evalLogs(
+        uri,
+        directoryViewPathScope(uri)
+      );
       if (logsJSON) {
         const logs = JSON.parse(logsJSON) as {
           log_dir: string;
@@ -197,7 +204,14 @@ export async function activateLogListing(
           );
 
           if (result?.title === "Delete") {
-            await viewServer.evalLogDelete(logUri.toString());
+            const treeLogDir = treeDataProvider.getLogListing()?.logDir();
+            if (!treeLogDir) {
+              return;
+            }
+            await viewServer.evalLogDelete(
+              logUri.toString(),
+              directoryViewPathScope(treeLogDir)
+            );
             treeDataProvider.refresh();
           }
         }

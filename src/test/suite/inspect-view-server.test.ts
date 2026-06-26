@@ -2,6 +2,12 @@ import * as assert from "assert";
 
 import { Uri } from "vscode";
 
+import {
+  addViewScopeHeaders,
+  kViewScopeHeader,
+  kViewScopeKindHeader,
+} from "../../core/package/view-server";
+import { directoryViewPathScope } from "../../core/uri";
 import { InspectViewServer } from "../../providers/inspect/inspect-view-server";
 
 suite("InspectViewServer Test Suite", () => {
@@ -389,6 +395,17 @@ suite("InspectViewServer Test Suite", () => {
       const protocol = "http";
       assert.strictEqual(protocol, "http");
     });
+
+    test("scope headers carry the host-selected directory capability", () => {
+      const headers = new Headers();
+      addViewScopeHeaders(
+        headers,
+        directoryViewPathScope(Uri.parse("s3://bucket/logs"))
+      );
+
+      assert.strictEqual(headers.get(kViewScopeKindHeader), "directory");
+      assert.strictEqual(headers.get(kViewScopeHeader), "s3://bucket/logs");
+    });
   });
 
   suite("URI Encoding Edge Cases", () => {
@@ -473,6 +490,33 @@ suite("InspectViewServer Test Suite", () => {
   });
 
   suite("Integration Concepts", () => {
+    test("rejects an out-of-scope file before contacting the server", async () => {
+      const server = Object.create(
+        InspectViewServer.prototype
+      ) as InspectViewServer;
+      await assert.rejects(
+        server.evalLog(
+          "s3://other/logs/run.eval",
+          false,
+          directoryViewPathScope(Uri.parse("s3://bucket/logs"))
+        ),
+        /outside the selected directory scope/
+      );
+    });
+
+    test("rejects a batch when any file is outside scope", async () => {
+      const server = Object.create(
+        InspectViewServer.prototype
+      ) as InspectViewServer;
+      await assert.rejects(
+        server.evalLogHeaders(
+          ["s3://bucket/logs/run.eval", "s3://other/logs/private.eval"],
+          directoryViewPathScope(Uri.parse("s3://bucket/logs"))
+        ),
+        /outside the selected directory scope/
+      );
+    });
+
     test("should call ensureRunning before API requests", async () => {
       let ensureRunningCalled = false;
 
