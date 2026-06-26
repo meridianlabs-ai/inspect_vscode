@@ -13,6 +13,7 @@ import {
   kMethodEvalLogSize,
   kMethodGetSearchResult,
   kMethodGetUserInfo,
+  kMethodHttpRequest,
   kMethodListSearches,
   kMethodLogMessage,
   kMethodPendingSamples,
@@ -21,6 +22,7 @@ import {
   webviewPanelJsonRpcServer,
 } from "../../core/jsonrpc";
 import { log } from "../../core/log";
+import { HttpProxyRpcRequest } from "../../core/package/view-server";
 import {
   getWebviewPanelHtml,
   handleWebviewPanelOpenMessages,
@@ -110,6 +112,8 @@ export class LogviewPanel extends Disposable {
           params[2] as string,
           params[3] as { events?: string; messages?: string } | undefined
         ),
+      [kMethodHttpRequest]: async (params: unknown[]) =>
+        server_.proxyRpcRequest(params[0] as HttpProxyRpcRequest),
     });
 
     // serve post message api to webview
