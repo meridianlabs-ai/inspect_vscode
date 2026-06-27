@@ -68,7 +68,7 @@ export class InspectProtocolHandler implements UriHandler {
           }
 
           // Execute the open command
-          await commands.executeCommand("inspect.openLogViewer", logUri);
+          await commands.executeCommand("inspect.openLogViewer", logFile);
         }
       }
     }

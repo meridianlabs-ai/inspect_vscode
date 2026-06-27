@@ -2,6 +2,17 @@ import * as assert from "assert";
 
 import { Uri } from "vscode";
 
+import {
+  addViewScopeHeaders,
+  HttpProxyRpcRequest,
+  kViewScopeHeader,
+  kViewScopeKindHeader,
+} from "../../core/package/view-server";
+import {
+  directoryViewPathScope,
+  fileViewPathScope,
+  viewPathUriString,
+} from "../../core/uri";
 import { InspectViewServer } from "../../providers/inspect/inspect-view-server";
 
 suite("InspectViewServer Test Suite", () => {
@@ -297,19 +308,19 @@ suite("InspectViewServer Test Suite", () => {
       const logFile = Uri.file("/test/log.json");
       const result = {
         log_dir: "",
-        files: [{ name: logFile.toString(true) }],
+        files: [{ name: viewPathUriString(logFile) }],
       };
 
       assert.strictEqual(result.log_dir, "");
       assert.strictEqual(result.files.length, 1);
       const [firstFile] = result.files;
       assert.ok(firstFile, "Expected at least one file");
-      assert.strictEqual(firstFile.name, logFile.toString(true));
+      assert.strictEqual(firstFile.name, viewPathUriString(logFile));
     });
 
-    test("should use toString(true) for log file path", () => {
+    test("should use canonical view path serialization", () => {
       const logFile = Uri.file("/test/log.json");
-      const name = logFile.toString(true);
+      const name = viewPathUriString(logFile);
 
       assert.ok(name.includes("file:"));
     });
@@ -388,6 +399,31 @@ suite("InspectViewServer Test Suite", () => {
     test("should use http protocol", () => {
       const protocol = "http";
       assert.strictEqual(protocol, "http");
+    });
+
+    test("scope headers carry the host-selected directory capability", async () => {
+      const headers = new Headers();
+      await addViewScopeHeaders(
+        headers,
+        directoryViewPathScope(Uri.parse("s3://bucket/logs"))
+      );
+
+      assert.strictEqual(headers.get(kViewScopeKindHeader), "directory");
+      assert.strictEqual(headers.get(kViewScopeHeader), "s3://bucket/logs");
+    });
+
+    test("scope headers preserve canonical signed query parameters", async () => {
+      const headers = new Headers();
+      const location =
+        "https://example.test/run.eval?" +
+        "token=a%26b&credential=team%2Fmember";
+      await addViewScopeHeaders(
+        headers,
+        fileViewPathScope(Uri.parse(location), location)
+      );
+
+      assert.strictEqual(headers.get(kViewScopeKindHeader), "file");
+      assert.strictEqual(headers.get(kViewScopeHeader), location);
     });
   });
 
@@ -473,6 +509,102 @@ suite("InspectViewServer Test Suite", () => {
   });
 
   suite("Integration Concepts", () => {
+    const proxyRequest: HttpProxyRpcRequest = {
+      method: "GET",
+      path: "/api/logs",
+    };
+
+    test("rejects the generic proxy on older Inspect versions", async () => {
+      const server = Object.create(
+        InspectViewServer.prototype
+      ) as InspectViewServer;
+      server.supportsScopedHttpProxy = () => false;
+
+      await assert.rejects(
+        server.proxyRpcRequest(
+          proxyRequest,
+          directoryViewPathScope(Uri.parse("s3://bucket/logs"))
+        ),
+        /require scoped authorization support/
+      );
+    });
+
+    test("requires a scope for generic Inspect requests", async () => {
+      const server = Object.create(
+        InspectViewServer.prototype
+      ) as InspectViewServer;
+      server.supportsScopedHttpProxy = () => true;
+
+      await assert.rejects(
+        server.proxyRpcRequest(proxyRequest),
+        /require scoped authorization support/
+      );
+    });
+
+    test("forwards the panel scope through the generic proxy", async () => {
+      const server = Object.create(
+        InspectViewServer.prototype
+      ) as InspectViewServer;
+      const scope = directoryViewPathScope(Uri.parse("s3://bucket/logs"));
+      let forwardedScope: unknown;
+      const testServer = server as unknown as {
+        ensureRunning: () => Promise<void>;
+        serverFetch: (
+          path: string,
+          method: "GET" | "POST" | "PUT" | "DELETE",
+          headers: Headers,
+          body?: string,
+          scope?: unknown
+        ) => Promise<{ status: number; data: string; headers: Headers }>;
+      };
+      server.supportsScopedHttpProxy = () => true;
+      testServer.ensureRunning = () => Promise.resolve();
+      testServer.serverFetch = (
+        _path,
+        _method,
+        _headers,
+        _body,
+        requestScope
+      ) => {
+        forwardedScope = requestScope;
+        return Promise.resolve({
+          status: 200,
+          data: "{}",
+          headers: new Headers(),
+        });
+      };
+
+      await server.proxyRpcRequest(proxyRequest, scope);
+      assert.strictEqual(forwardedScope, scope);
+    });
+
+    test("rejects an out-of-scope file before contacting the server", async () => {
+      const server = Object.create(
+        InspectViewServer.prototype
+      ) as InspectViewServer;
+      await assert.rejects(
+        server.evalLog(
+          "s3://other/logs/run.eval",
+          false,
+          directoryViewPathScope(Uri.parse("s3://bucket/logs"))
+        ),
+        /outside the selected directory scope/
+      );
+    });
+
+    test("rejects a batch when any file is outside scope", async () => {
+      const server = Object.create(
+        InspectViewServer.prototype
+      ) as InspectViewServer;
+      await assert.rejects(
+        server.evalLogHeaders(
+          ["s3://bucket/logs/run.eval", "s3://other/logs/private.eval"],
+          directoryViewPathScope(Uri.parse("s3://bucket/logs"))
+        ),
+        /outside the selected directory scope/
+      );
+    });
+
     test("should call ensureRunning before API requests", async () => {
       let ensureRunningCalled = false;
 

@@ -2,7 +2,13 @@ import * as vscode from "vscode";
 import { Uri } from "vscode";
 
 import { log } from "../../core/log";
-import { dirname } from "../../core/uri";
+import {
+  canonicalViewPathLocationFromUri,
+  dirname,
+  fileViewPathScope,
+  viewPathLocationFromUri,
+  viewPathUriString,
+} from "../../core/uri";
 import { HostWebviewPanel } from "../../hooks";
 import { inspectViewPath } from "../../inspect/props";
 import { hasMinimumInspectVersion } from "../../inspect/version";
@@ -13,6 +19,49 @@ import { LogviewPanel } from "./logview-panel";
 import { LogviewState } from "./logview-state";
 
 export const kInspectLogViewType = "inspect-ai.log-editor";
+
+interface InspectLogDocument extends vscode.CustomDocument {
+  resourceUri: Uri;
+  resourceLocation: string;
+  canonicalLocation: boolean;
+  sample_id?: string;
+  epoch?: string;
+}
+
+export function resolveLogDocumentLocation(uri: Uri): {
+  resourceUri: Uri;
+  resourceLocation: string;
+  canonicalLocation: boolean;
+  sample_id?: string;
+  epoch?: string;
+} {
+  const canonicalLocation = canonicalViewPathLocationFromUri(uri);
+  const opaqueLocation = viewPathLocationFromUri(uri);
+  const queryParams = new URLSearchParams(uri.query);
+  const sampleIds = queryParams.getAll("sample_id");
+  const epochs = queryParams.getAll("epoch");
+  const isViewStateQuery =
+    !canonicalLocation &&
+    !opaqueLocation &&
+    sampleIds.length === 1 &&
+    epochs.length === 1 &&
+    [...queryParams.keys()].every(
+      (key) => key === "sample_id" || key === "epoch"
+    );
+
+  const resourceUri = uri.with({
+    query: isViewStateQuery ? "" : uri.query,
+    fragment: "",
+  });
+  return {
+    resourceUri,
+    resourceLocation:
+      canonicalLocation ?? opaqueLocation ?? viewPathUriString(resourceUri),
+    canonicalLocation: canonicalLocation !== undefined,
+    sample_id: isViewStateQuery ? sampleIds[0] : undefined,
+    epoch: isViewStateQuery ? epochs[0] : undefined,
+  };
+}
 
 class InspectLogReadonlyEditor implements vscode.CustomReadonlyEditorProvider {
   static register(
@@ -44,18 +93,14 @@ class InspectLogReadonlyEditor implements vscode.CustomReadonlyEditorProvider {
     _openContext: vscode.CustomDocumentOpenContext,
     _token: vscode.CancellationToken
   ): Promise<vscode.CustomDocument> {
-    // Parse any params from the Uri
-    const queryParams = new URLSearchParams(uri.query);
-    const sample_id = queryParams.get("sample_id");
-    const epoch = queryParams.get("epoch");
+    const location = resolveLogDocumentLocation(uri);
 
     // Return the document with additional info attached to payload
     return {
       uri: uri,
       dispose: () => {},
-      sample_id,
-      epoch,
-    } as vscode.CustomDocument & { sample_id?: string; epoch?: string };
+      ...location,
+    } satisfies InspectLogDocument;
   }
 
   async resolveCustomEditor(
@@ -63,21 +108,26 @@ class InspectLogReadonlyEditor implements vscode.CustomReadonlyEditorProvider {
     webviewPanel: vscode.WebviewPanel,
     _token: vscode.CancellationToken
   ): Promise<void> {
-    const doc = document as vscode.CustomDocument & {
-      sample_id?: string;
-      epoch?: string;
-    };
+    const doc = document as InspectLogDocument;
     const sample_id = doc.sample_id;
     const epoch = doc.epoch;
 
-    const docUriNoParams = document.uri.with({ query: "", fragment: "" });
-    const docUriStr = docUriNoParams.toString();
+    const resourceUri = doc.resourceUri;
+    const resourceLocation = doc.resourceLocation;
+    const canonicalLocation = doc.canonicalLocation;
 
     // check if we should use the log viewer (version check + size threshold)
     let useLogViewer = hasMinimumInspectVersion(kInspectEvalLogFormatVersion);
     if (useLogViewer) {
-      if (docUriStr.endsWith(".json")) {
-        const fileSize = await this.server_.evalLogSize(docUriStr);
+      if (resourceUri.path.endsWith(".json")) {
+        const fileSize = await this.server_.evalLogSize(
+          resourceLocation,
+          fileViewPathScope(
+            resourceUri,
+            canonicalLocation ? undefined : resourceLocation,
+            canonicalLocation ? resourceLocation : undefined
+          )
+        );
         if (fileSize > 1024 * 1000 * 100) {
           log.info(
             `JSON log file ${document.uri.path} is to large for Inspect View, opening in text editor.`
@@ -88,6 +138,13 @@ class InspectLogReadonlyEditor implements vscode.CustomReadonlyEditorProvider {
     }
 
     if (useLogViewer) {
+      const pathScope = fileViewPathScope(
+        resourceUri,
+        canonicalLocation ? undefined : resourceLocation,
+        canonicalLocation ? resourceLocation : undefined
+      );
+      await pathScope.canonicalUri;
+
       // local resource roots
       const localResourceRoots: Uri[] = [];
       const viewDir = inspectViewPath();
@@ -108,14 +165,15 @@ class InspectLogReadonlyEditor implements vscode.CustomReadonlyEditorProvider {
         webviewPanel as HostWebviewPanel,
         this.context_,
         this.server_,
-        "file",
-        docUriNoParams
+        pathScope
       );
 
       // set html
       const logViewState: LogviewState = {
-        log_file: docUriNoParams,
-        log_dir: dirname(docUriNoParams),
+        log_file: resourceUri,
+        log_location: resourceLocation,
+        canonical_location: canonicalLocation,
+        log_dir: dirname(resourceUri),
         sample:
           sample_id && epoch
             ? {
@@ -130,7 +188,7 @@ class InspectLogReadonlyEditor implements vscode.CustomReadonlyEditorProvider {
       const viewColumn = webviewPanel.viewColumn;
       await vscode.commands.executeCommand(
         "vscode.openWith",
-        document.uri,
+        resourceUri,
         "default",
         viewColumn
       );

@@ -15,3 +15,4 @@ export const kInspectOpenInspectViewVersion = "0.3.16";
 export const kInspectMaxLogFileSizeVersion = "0.3.26";
 export const kInspectEvalLogFormatVersion = "0.3.43";
 export const kInspectLogMessageVersion = "0.3.105";
+export const kInspectScopedAuthorizationVersion = "0.3.242";
