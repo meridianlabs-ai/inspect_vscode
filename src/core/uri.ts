@@ -242,7 +242,13 @@ interface CanonicalRemoteUri {
 }
 
 function canonicalRemoteUri(uri: Uri): CanonicalRemoteUri | null {
-  if (!uri.scheme || uri.scheme === "file" || !uri.authority || uri.fragment) {
+  if (
+    !uri.scheme ||
+    uri.scheme === "file" ||
+    !uri.authority ||
+    uri.authority.includes("@") ||
+    uri.fragment
+  ) {
     return null;
   }
   let decodedPath: string;

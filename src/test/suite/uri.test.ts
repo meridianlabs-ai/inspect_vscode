@@ -347,6 +347,11 @@ suite("URI Utilities Test Suite", () => {
         await pathIsInViewScope(scope, "s3://bucket/logs/%2e%2e/secret"),
         false
       );
+      assert.throws(
+        () =>
+          directoryViewPathScope(Uri.parse("s3://user:password@bucket/logs")),
+        /Invalid viewer directory scope/
+      );
     });
 
     test("allows signed HTTP URLs only as an exact file scope", async () => {
