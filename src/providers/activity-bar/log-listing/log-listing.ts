@@ -18,6 +18,7 @@ import {
   getRelativeUri,
   isUri,
   normalizeWindowsUri,
+  pathIsInViewScope,
   resolveToUri,
   ViewPathScope,
 } from "../../../core/uri";
@@ -51,6 +52,16 @@ export interface LogItem {
 export interface Logs {
   log_dir: string;
   items: LogItem[];
+}
+
+export async function filterLogItemsToViewScope(
+  scope: ViewPathScope,
+  items: LogItem[]
+): Promise<LogItem[]> {
+  const allowed = await Promise.all(
+    items.map((item) => pathIsInViewScope(scope, item.name))
+  );
+  return items.filter((_item, index) => allowed[index]);
 }
 
 /**

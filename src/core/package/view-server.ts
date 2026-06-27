@@ -9,7 +9,7 @@ import { AbsolutePath, activeWorkspacePath } from "../../core/path";
 import { findOpenPort } from "../../core/port";
 import { spawnProcess } from "../../core/process";
 import { shQuote } from "../../core/string";
-import { ViewPathScope } from "../../core/uri";
+import { ViewPathScope, viewPathUriString } from "../../core/uri";
 
 import { PackageManager } from "./manager";
 
@@ -21,7 +21,7 @@ export async function addViewScopeHeaders(
   scope?: ViewPathScope
 ): Promise<void> {
   if (scope) {
-    headers.set(kViewScopeHeader, (await scope.canonicalUri).toString());
+    headers.set(kViewScopeHeader, viewPathUriString(await scope.canonicalUri));
     headers.set(kViewScopeKindHeader, scope.kind);
   }
 }
@@ -217,7 +217,7 @@ export class PackageViewServer implements Disposable {
       ["Cache-Control"]: "no-cache",
     };
     if (scope) {
-      headers[kViewScopeHeader] = (await scope.canonicalUri).toString();
+      headers[kViewScopeHeader] = viewPathUriString(await scope.canonicalUri);
       headers[kViewScopeKindHeader] = scope.kind;
     }
 

@@ -8,7 +8,11 @@ import {
   kViewScopeHeader,
   kViewScopeKindHeader,
 } from "../../core/package/view-server";
-import { directoryViewPathScope } from "../../core/uri";
+import {
+  directoryViewPathScope,
+  fileViewPathScope,
+  viewPathUriString,
+} from "../../core/uri";
 import { InspectViewServer } from "../../providers/inspect/inspect-view-server";
 
 suite("InspectViewServer Test Suite", () => {
@@ -304,19 +308,19 @@ suite("InspectViewServer Test Suite", () => {
       const logFile = Uri.file("/test/log.json");
       const result = {
         log_dir: "",
-        files: [{ name: logFile.toString(true) }],
+        files: [{ name: viewPathUriString(logFile) }],
       };
 
       assert.strictEqual(result.log_dir, "");
       assert.strictEqual(result.files.length, 1);
       const [firstFile] = result.files;
       assert.ok(firstFile, "Expected at least one file");
-      assert.strictEqual(firstFile.name, logFile.toString(true));
+      assert.strictEqual(firstFile.name, viewPathUriString(logFile));
     });
 
-    test("should use toString(true) for log file path", () => {
+    test("should use canonical view path serialization", () => {
       const logFile = Uri.file("/test/log.json");
-      const name = logFile.toString(true);
+      const name = viewPathUriString(logFile);
 
       assert.ok(name.includes("file:"));
     });
@@ -406,6 +410,26 @@ suite("InspectViewServer Test Suite", () => {
 
       assert.strictEqual(headers.get(kViewScopeKindHeader), "directory");
       assert.strictEqual(headers.get(kViewScopeHeader), "s3://bucket/logs");
+    });
+
+    test("scope headers preserve canonical signed query parameters", async () => {
+      const headers = new Headers();
+      await addViewScopeHeaders(
+        headers,
+        fileViewPathScope(
+          Uri.parse(
+            "https://example.test/run.eval?" +
+              "credential=team%2Fmember&label=hello%20world"
+          )
+        )
+      );
+
+      assert.strictEqual(headers.get(kViewScopeKindHeader), "file");
+      assert.strictEqual(
+        headers.get(kViewScopeHeader),
+        "https://example.test/run.eval?" +
+          "credential=team%2Fmember&label=hello%20world"
+      );
     });
   });
 

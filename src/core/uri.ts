@@ -25,27 +25,43 @@ export function viewPathScopesEqual(
   right: ViewPathScope
 ): boolean {
   return (
-    left.kind === right.kind && left.uri.toString() === right.uri.toString()
+    left.kind === right.kind &&
+    viewPathUriString(left.uri) === viewPathUriString(right.uri)
   );
+}
+
+export function viewPathUriString(uri: Uri): string {
+  const base = uri.with({ query: "", fragment: "" }).toString();
+  const query = canonicalRemoteQuery(uri.query);
+  return query ? `${base}?${query}` : base;
 }
 
 export async function assertPathInViewScope(
   scope: ViewPathScope,
   candidate: string | Uri
-): Promise<void> {
-  if (!(await pathIsInViewScope(scope, candidate))) {
+): Promise<Uri> {
+  const resolved = await resolvePathInViewScope(scope, candidate);
+  if (!resolved) {
     const location =
       typeof candidate === "string" ? candidate : candidate.toString();
     throw new Error(
       `Viewer path is outside the selected ${scope.kind} scope: ${location}`
     );
   }
+  return resolved;
 }
 
 export async function pathIsInViewScope(
   scope: ViewPathScope,
   candidate: string | Uri
 ): Promise<boolean> {
+  return (await resolvePathInViewScope(scope, candidate)) !== null;
+}
+
+export async function resolvePathInViewScope(
+  scope: ViewPathScope,
+  candidate: string | Uri
+): Promise<Uri | null> {
   const candidateUri = resolveViewPathCandidate(scope, candidate);
   if (scope.uri.scheme === "file") {
     const [scopeUri, candidatePath] = await Promise.all([
@@ -53,43 +69,56 @@ export async function pathIsInViewScope(
       canonicalLocalPath(candidateUri),
     ]);
     if (!candidatePath) {
-      return false;
+      return null;
     }
     const scopePath = scopeUri.fsPath;
     if (scope.kind === "file") {
-      return localPathsEqual(candidatePath, scopePath);
+      return localPathsEqual(candidatePath, scopePath)
+        ? Uri.file(candidatePath)
+        : null;
     }
-    return localPathContains(scopePath, candidatePath);
+    return localPathContains(scopePath, candidatePath)
+      ? Uri.file(candidatePath)
+      : null;
   }
 
   const scopeRemote = canonicalRemoteUri(await scope.canonicalUri);
   const candidateRemote = canonicalRemoteUri(candidateUri);
   if (!scopeRemote || !candidateRemote) {
-    return false;
+    return null;
   }
   if (
     scopeRemote.scheme !== candidateRemote.scheme ||
     scopeRemote.authority !== candidateRemote.authority
   ) {
-    return false;
+    return null;
   }
   if (
     scope.kind === "directory" &&
     (scopeRemote.scheme === "http" || scopeRemote.scheme === "https")
   ) {
-    return false;
+    return null;
   }
+  const resolved = candidateUri.with({
+    scheme: candidateRemote.scheme,
+    authority: candidateRemote.authority,
+    path: candidateRemote.path,
+    query: candidateUri.query,
+    fragment: "",
+  });
   if (scope.kind === "file") {
     // Signed URL queries are part of the exact-file capability.
-    return (
-      candidateRemote.path === scopeRemote.path &&
+    return candidateRemote.path === scopeRemote.path &&
       candidateRemote.query === scopeRemote.query
-    );
+      ? resolved
+      : null;
   }
   if (scopeRemote.query || candidateRemote.query) {
-    return false;
+    return null;
   }
-  return remotePathContains(scopeRemote.path, candidateRemote.path);
+  return remotePathContains(scopeRemote.path, candidateRemote.path)
+    ? resolved
+    : null;
 }
 
 export function resolveViewPathCandidate(
@@ -131,7 +160,7 @@ function createViewPathScope(kind: ViewPathScopeKind, uri: Uri): ViewPathScope {
         scheme: remote.scheme,
         authority: remote.authority,
         path: remote.path,
-        query: remote.query,
+        query: uri.query,
         fragment: "",
       })
     : null;
@@ -264,8 +293,32 @@ function canonicalRemoteUri(uri: Uri): CanonicalRemoteUri | null {
     scheme: uri.scheme.toLowerCase(),
     authority: uri.authority.toLowerCase(),
     path: path.posix.normalize(`/${decodedPath.replace(/^\/+/, "")}`),
-    query: uri.query,
+    query: canonicalRemoteQuery(uri.query),
   };
+}
+
+function canonicalRemoteQuery(query: string): string {
+  if (!query) {
+    return "";
+  }
+
+  const encode = (value: string) =>
+    encodeURIComponent(value).replace(
+      /[!'()*]/g,
+      (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`
+    );
+
+  return query
+    .split("&")
+    .map((field) => {
+      const separator = field.indexOf("=");
+      return separator === -1
+        ? encode(field)
+        : `${encode(field.slice(0, separator))}=${encode(
+            field.slice(separator + 1)
+          )}`;
+    })
+    .join("&");
 }
 
 function remotePathContains(parent: string, child: string): boolean {

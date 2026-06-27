@@ -3,7 +3,13 @@
  */
 import * as assert from "assert";
 
-import { relativeLogPath } from "../../providers/activity-bar/log-listing/log-listing";
+import { Uri } from "vscode";
+
+import { directoryViewPathScope } from "../../core/uri";
+import {
+  filterLogItemsToViewScope,
+  relativeLogPath,
+} from "../../providers/activity-bar/log-listing/log-listing";
 
 /**
  * Mock LogItem for testing
@@ -29,6 +35,35 @@ interface LogDirectory {
 type LogNode =
   | ({ type: "dir"; parent?: LogNode } & LogDirectory)
   | ({ type: "file"; parent?: LogNode } & LogItem);
+
+suite("Log Listing Scope", () => {
+  test("drops traversal entries before they can become file grants", async () => {
+    const items: LogItem[] = [
+      {
+        name: "s3://bucket/logs/allowed.eval",
+        mtime: 1,
+        display_name: "allowed",
+        item_id: "allowed",
+      },
+      {
+        name: "s3://bucket/logs/../secret.eval",
+        mtime: 1,
+        display_name: "secret",
+        item_id: "secret",
+      },
+    ];
+
+    const filtered = await filterLogItemsToViewScope(
+      directoryViewPathScope(Uri.parse("s3://bucket/logs")),
+      items
+    );
+
+    assert.deepStrictEqual(
+      filtered.map((item) => item.name),
+      ["s3://bucket/logs/allowed.eval"]
+    );
+  });
+});
 
 /**
  * Build a log tree from flat list of items

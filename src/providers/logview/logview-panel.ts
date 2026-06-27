@@ -25,8 +25,9 @@ import { log } from "../../core/log";
 import { HttpProxyRpcRequest } from "../../core/package/view-server";
 import {
   pathIsInViewScope,
-  resolveViewPathCandidate,
+  resolvePathInViewScope,
   ViewPathScope,
+  viewPathUriString,
 } from "../../core/uri";
 import {
   getWebviewPanelHtml,
@@ -170,9 +171,7 @@ export class LogviewPanel extends Disposable {
   }
 
   public async resolve(location: string | Uri): Promise<Uri | null> {
-    return (await this.allows(location))
-      ? resolveViewPathCandidate(this.scope_, location)
-      : null;
+    return await resolvePathInViewScope(this.scope_, location);
   }
 
   public async getHtml(state: LogviewState): Promise<string> {
@@ -197,7 +196,7 @@ export class LogviewPanel extends Disposable {
     // message being sent before the view itself is configured to receive messages)
     const stateMsg = {
       type: "updateState",
-      url: state.log_file?.toString(),
+      url: state.log_file ? viewPathUriString(state.log_file) : undefined,
       sample_id: state.sample?.id,
       sample_epoch: state.sample?.epoch,
     };

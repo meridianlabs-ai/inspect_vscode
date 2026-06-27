@@ -10,7 +10,12 @@ import {
   PackageManager,
 } from "../../core/package/manager";
 import { OutputWatcher } from "../../core/package/output-watcher";
-import { dirname, ViewPathScope, viewPathScopesEqual } from "../../core/uri";
+import {
+  dirname,
+  ViewPathScope,
+  viewPathScopesEqual,
+  viewPathUriString,
+} from "../../core/uri";
 import { HostWebviewPanel } from "../../hooks";
 import { inspectViewPath } from "../../inspect/props";
 import { selectLogDirectory } from "../activity-bar/log-listing/log-directory-selector";
@@ -168,7 +173,7 @@ export class InspectViewWebviewManager extends InspectWebviewManager<
           // or to check whether the view is focused and call us back to
           // display a log file
           await this.activeView_?.backgroundUpdate(
-            state.log_file.toString(),
+            viewPathUriString(state.log_file),
             state.log_dir.toString()
           );
         }
@@ -223,7 +228,7 @@ export class InspectViewWebviewManager extends InspectWebviewManager<
         this.revealWebview(activation !== "activate");
       } else if (state.log_file) {
         await this.activeView_?.backgroundUpdate(
-          state.log_file.toString(),
+          viewPathUriString(state.log_file),
           state.log_dir.toString()
         );
       }
@@ -276,7 +281,7 @@ export class InspectViewWebviewManager extends InspectWebviewManager<
   protected setWorkspaceState(state: LogviewState) {
     void this.context_.workspaceState.update(this.kInspectViewState, {
       log_dir: state.log_dir.toString(),
-      log_file: state.log_file?.toString(),
+      log_file: state.log_file ? viewPathUriString(state.log_file) : undefined,
       background_refresh: state.background_refresh,
       scope_kind: state.scope_kind,
     });
@@ -300,7 +305,7 @@ const logStateEquals = (a: LogviewState, b: LogviewState) => {
   } else if (a.log_file && !b.log_file) {
     return false;
   } else if (a.log_file && b.log_file) {
-    return a.log_file.toString() === b.log_file.toString();
+    return viewPathUriString(a.log_file) === viewPathUriString(b.log_file);
   }
   return true;
 };
@@ -365,7 +370,7 @@ class InspectViewWebview extends InspectWebview<LogviewState> {
   public async update(state: LogviewState) {
     await this._webviewPanel.webview.postMessage({
       type: "updateState",
-      url: state.log_file?.toString(),
+      url: state.log_file ? viewPathUriString(state.log_file) : undefined,
     });
   }
 

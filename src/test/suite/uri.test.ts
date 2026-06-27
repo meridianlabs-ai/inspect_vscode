@@ -13,7 +13,9 @@ import {
   normalizeWindowsUri,
   pathIsInViewScope,
   prettyUriPath,
+  resolvePathInViewScope,
   resolveToUri,
+  viewPathUriString,
 } from "../../core/uri";
 
 suite("URI Utilities Test Suite", () => {
@@ -347,10 +349,40 @@ suite("URI Utilities Test Suite", () => {
         await pathIsInViewScope(scope, "s3://bucket/logs/%2e%2e/secret"),
         false
       );
+      assert.strictEqual(
+        await pathIsInViewScope(scope, "s3://bucket/logs/../secret"),
+        false
+      );
       assert.throws(
         () =>
           directoryViewPathScope(Uri.parse("s3://user:password@bucket/logs")),
         /Invalid viewer directory scope/
+      );
+    });
+
+    test("resolves remote aliases to the authorized resource", async () => {
+      const scope = fileViewPathScope(Uri.parse("memory://bucket/logs/secret"));
+      const resolved = await resolvePathInViewScope(
+        scope,
+        "memory://bucket/logs//secret"
+      );
+
+      assert.strictEqual(
+        resolved?.toString(true),
+        "memory://bucket/logs/secret"
+      );
+    });
+
+    test("serializes signed query values using canonical RFC3986 encoding", () => {
+      const uri = Uri.parse(
+        "https://example.test/run.eval?" +
+          "credential=team%2Fmember&label=hello%20world"
+      );
+
+      assert.strictEqual(
+        viewPathUriString(uri),
+        "https://example.test/run.eval?" +
+          "credential=team%2Fmember&label=hello%20world"
       );
     });
 

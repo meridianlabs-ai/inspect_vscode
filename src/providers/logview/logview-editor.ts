@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import { Uri } from "vscode";
 
 import { log } from "../../core/log";
-import { dirname, fileViewPathScope } from "../../core/uri";
+import { dirname, fileViewPathScope, viewPathUriString } from "../../core/uri";
 import { HostWebviewPanel } from "../../hooks";
 import { inspectViewPath } from "../../inspect/props";
 import { hasMinimumInspectVersion } from "../../inspect/version";
@@ -95,7 +95,7 @@ class InspectLogReadonlyEditor implements vscode.CustomReadonlyEditorProvider {
     const epoch = doc.epoch;
 
     const resourceUri = doc.resourceUri;
-    const resourceUriString = resourceUri.toString();
+    const resourceUriString = viewPathUriString(resourceUri);
 
     // check if we should use the log viewer (version check + size threshold)
     let useLogViewer = hasMinimumInspectVersion(kInspectEvalLogFormatVersion);
