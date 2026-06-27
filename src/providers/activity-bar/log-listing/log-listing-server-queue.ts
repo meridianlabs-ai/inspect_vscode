@@ -108,7 +108,7 @@ export class LogElementQueueProcessor {
         }
         const headers = await this.viewServer.evalLogHeaders(
           uris,
-          directoryViewPathScope(listing.logDir())
+          listing.pathScope() ?? directoryViewPathScope(listing.logDir())
         );
 
         if (headers !== undefined) {

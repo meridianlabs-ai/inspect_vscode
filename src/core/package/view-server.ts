@@ -16,12 +16,12 @@ import { PackageManager } from "./manager";
 export const kViewScopeHeader = "X-Inspect-View-Scope";
 export const kViewScopeKindHeader = "X-Inspect-View-Scope-Kind";
 
-export function addViewScopeHeaders(
+export async function addViewScopeHeaders(
   headers: Headers,
   scope?: ViewPathScope
-): void {
+): Promise<void> {
   if (scope) {
-    headers.set(kViewScopeHeader, scope.uri.toString());
+    headers.set(kViewScopeHeader, (await scope.canonicalUri).toString());
     headers.set(kViewScopeKindHeader, scope.kind);
   }
 }
@@ -111,7 +111,7 @@ export class PackageViewServer implements Disposable {
     requestHeaders.set("Pragma", "no-cache");
     requestHeaders.set("Expires", "0");
     requestHeaders.set("Cache-Control", "no-cache");
-    addViewScopeHeaders(requestHeaders, scope);
+    await addViewScopeHeaders(requestHeaders, scope);
 
     const response = await fetch(
       `http://localhost:${this.serverPort_}${path}`,
@@ -158,7 +158,7 @@ export class PackageViewServer implements Disposable {
       ["Cache-Control"]: "no-cache",
     };
     if (scope) {
-      headers[kViewScopeHeader] = scope.uri.toString();
+      headers[kViewScopeHeader] = (await scope.canonicalUri).toString();
       headers[kViewScopeKindHeader] = scope.kind;
     }
 

@@ -19,6 +19,7 @@ import {
   isUri,
   normalizeWindowsUri,
   resolveToUri,
+  ViewPathScope,
 } from "../../../core/uri";
 
 export type LogNode =
@@ -87,11 +88,16 @@ export class LogListing {
   constructor(
     private readonly logDir_: Uri,
     private readonly mru_: ListingMRU,
-    private readonly logsFetcher_: (uri: Uri) => Promise<Logs | undefined>
+    private readonly logsFetcher_: (uri: Uri) => Promise<Logs | undefined>,
+    private readonly pathScope_?: ViewPathScope
   ) {}
 
   public logDir(): Uri {
     return this.logDir_;
+  }
+
+  public pathScope(): ViewPathScope | undefined {
+    return this.pathScope_;
   }
 
   public async ls(parent?: LogDirectory): Promise<LogNode[]> {

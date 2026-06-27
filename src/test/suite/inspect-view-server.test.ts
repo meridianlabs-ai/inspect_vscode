@@ -396,9 +396,9 @@ suite("InspectViewServer Test Suite", () => {
       assert.strictEqual(protocol, "http");
     });
 
-    test("scope headers carry the host-selected directory capability", () => {
+    test("scope headers carry the host-selected directory capability", async () => {
       const headers = new Headers();
-      addViewScopeHeaders(
+      await addViewScopeHeaders(
         headers,
         directoryViewPathScope(Uri.parse("s3://bucket/logs"))
       );

@@ -44,19 +44,18 @@ export async function activateLogListing(
   });
 
   // update the tree based on the current preferred log dir
-  const updateTree = () => {
+  const updateTree = async () => {
     // see what the active log dir is
     const preferredLogDir = context.workspaceState.get<string>(kLogListingDir);
     const logDir = preferredLogDir
       ? Uri.parse(preferredLogDir)
       : envManager.getDefaultLogDir();
+    const listingScope = directoryViewPathScope(logDir);
+    await listingScope.canonicalUri;
 
     // create a logs fetcher
     const logsFetcher = async (uri: Uri): Promise<Logs | undefined> => {
-      const logsJSON = await viewServer.evalLogs(
-        uri,
-        directoryViewPathScope(uri)
-      );
+      const logsJSON = await viewServer.evalLogs(uri, listingScope);
       if (logsJSON) {
         const logs = JSON.parse(logsJSON) as {
           log_dir: string;
@@ -83,7 +82,12 @@ export async function activateLogListing(
 
     // set it
     treeDataProvider.setLogListing(
-      new LogListing(logDir, new LogListingMRU(context), logsFetcher)
+      new LogListing(
+        logDir,
+        new LogListingMRU(context),
+        logsFetcher,
+        listingScope
+      )
     );
 
     // show a workspace relative path if this is in the workspace,
@@ -97,13 +101,13 @@ export async function activateLogListing(
   };
 
   // initial tree update
-  updateTree();
+  await updateTree();
 
   // update tree if the environment changes and we are tracking the workspace log dir
   disposables.push(
     envManager.onEnvironmentChanged(() => {
       if (context.workspaceState.get<string>(kLogListingDir) === undefined) {
-        updateTree();
+        void updateTree();
       }
     })
   );
@@ -120,7 +124,7 @@ export async function activateLogListing(
         );
 
         // trigger update
-        updateTree();
+        await updateTree();
 
         // reveal
         await revealLogListing();
@@ -154,7 +158,7 @@ export async function activateLogListing(
   // Register update command (for when the log directory changes )
   disposables.push(
     vscode.commands.registerCommand("inspect.logListingUpdate", () => {
-      updateTree();
+      void updateTree();
     })
   );
 
@@ -204,14 +208,13 @@ export async function activateLogListing(
           );
 
           if (result?.title === "Delete") {
-            const treeLogDir = treeDataProvider.getLogListing()?.logDir();
-            if (!treeLogDir) {
+            const listing = treeDataProvider.getLogListing();
+            const treeLogDir = listing?.logDir();
+            const scope = listing?.pathScope();
+            if (!treeLogDir || !scope) {
               return;
             }
-            await viewServer.evalLogDelete(
-              logUri.toString(),
-              directoryViewPathScope(treeLogDir)
-            );
+            await viewServer.evalLogDelete(logUri.toString(), scope);
             treeDataProvider.refresh();
           }
         }

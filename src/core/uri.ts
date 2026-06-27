@@ -1,4 +1,4 @@
-import { realpath } from "fs/promises";
+import { lstat, realpath } from "fs/promises";
 import * as os from "os";
 import path from "path";
 
@@ -9,14 +9,24 @@ export type ViewPathScopeKind = "directory" | "file";
 export interface ViewPathScope {
   kind: ViewPathScopeKind;
   uri: Uri;
+  canonicalUri: Promise<Uri>;
 }
 
 export function directoryViewPathScope(uri: Uri): ViewPathScope {
-  return { kind: "directory", uri };
+  return createViewPathScope("directory", uri);
 }
 
 export function fileViewPathScope(uri: Uri): ViewPathScope {
-  return { kind: "file", uri };
+  return createViewPathScope("file", uri);
+}
+
+export function viewPathScopesEqual(
+  left: ViewPathScope,
+  right: ViewPathScope
+): boolean {
+  return (
+    left.kind === right.kind && left.uri.toString() === right.uri.toString()
+  );
 }
 
 export async function assertPathInViewScope(
@@ -38,26 +48,21 @@ export async function pathIsInViewScope(
 ): Promise<boolean> {
   const candidateUri = resolveViewPathCandidate(scope, candidate);
   if (scope.uri.scheme === "file") {
-    if (candidateUri.scheme !== "file") {
+    const [scopeUri, candidatePath] = await Promise.all([
+      scope.canonicalUri,
+      canonicalLocalPath(candidateUri),
+    ]);
+    if (!candidatePath) {
       return false;
     }
-    try {
-      const [scopePath, candidatePath] = await Promise.all([
-        realpath(scope.uri.fsPath),
-        realpath(candidateUri.fsPath),
-      ]);
-      if (scope.kind === "file") {
-        return (
-          normalizeLocalPath(candidatePath) === normalizeLocalPath(scopePath)
-        );
-      }
-      return localPathContains(scopePath, candidatePath);
-    } catch {
-      return false;
+    const scopePath = scopeUri.fsPath;
+    if (scope.kind === "file") {
+      return localPathsEqual(candidatePath, scopePath);
     }
+    return localPathContains(scopePath, candidatePath);
   }
 
-  const scopeRemote = canonicalRemoteUri(scope.uri);
+  const scopeRemote = canonicalRemoteUri(await scope.canonicalUri);
   const candidateRemote = canonicalRemoteUri(candidateUri);
   if (!scopeRemote || !candidateRemote) {
     return false;
@@ -75,7 +80,14 @@ export async function pathIsInViewScope(
     return false;
   }
   if (scope.kind === "file") {
-    return candidateRemote.path === scopeRemote.path;
+    // Signed URL queries are part of the exact-file capability.
+    return (
+      candidateRemote.path === scopeRemote.path &&
+      candidateRemote.query === scopeRemote.query
+    );
+  }
+  if (scopeRemote.query || candidateRemote.query) {
+    return false;
   }
   return remotePathContains(scopeRemote.path, candidateRemote.path);
 }
@@ -95,9 +107,118 @@ export function resolveViewPathCandidate(
     : Uri.joinPath(scope.uri, candidate);
 }
 
+function createViewPathScope(kind: ViewPathScopeKind, uri: Uri): ViewPathScope {
+  if (uri.scheme === "file") {
+    let canonicalUri: Promise<Uri> | undefined;
+    return {
+      kind,
+      uri,
+      get canonicalUri() {
+        canonicalUri ??= canonicalLocalPath(uri).then((canonicalPath) => {
+          if (!canonicalPath) {
+            throw new Error(`Invalid viewer ${kind} scope: ${uri.toString()}`);
+          }
+          return Uri.file(canonicalPath);
+        });
+        return canonicalUri;
+      },
+    };
+  }
+
+  const remote = canonicalRemoteUri(uri);
+  let canonicalUri = remote
+    ? uri.with({
+        scheme: remote.scheme,
+        authority: remote.authority,
+        path: remote.path,
+        query: remote.query,
+        fragment: "",
+      })
+    : null;
+  if (
+    kind === "directory" &&
+    remote &&
+    (remote.query || remote.scheme === "http" || remote.scheme === "https")
+  ) {
+    canonicalUri = null;
+  }
+  if (!canonicalUri) {
+    throw new Error(`Invalid viewer ${kind} scope: ${uri.toString()}`);
+  }
+  return { kind, uri, canonicalUri: Promise.resolve(canonicalUri) };
+}
+
+async function canonicalLocalPath(uri: Uri): Promise<string | null> {
+  if (
+    uri.scheme !== "file" ||
+    uri.query ||
+    uri.fragment ||
+    !isSupportedLocalFileAuthority(uri.authority)
+  ) {
+    return null;
+  }
+  return await realpathAllowMissing(uri.fsPath);
+}
+
+function isSupportedLocalFileAuthority(authority: string): boolean {
+  if (!authority || authority.toLowerCase() === "localhost") {
+    return true;
+  }
+  return (
+    os.platform() === "win32" &&
+    !authority.includes("@") &&
+    !authority.includes(":")
+  );
+}
+
+async function realpathAllowMissing(value: string): Promise<string | null> {
+  let current = path.resolve(value);
+  const missing: string[] = [];
+
+  while (true) {
+    try {
+      return path.join(await realpath(current), ...missing);
+    } catch (error) {
+      if (errorCode(error) !== "ENOENT") {
+        return null;
+      }
+    }
+
+    try {
+      if ((await lstat(current)).isSymbolicLink()) {
+        return null;
+      }
+    } catch (error) {
+      if (errorCode(error) !== "ENOENT") {
+        return null;
+      }
+    }
+
+    const parent = path.dirname(current);
+    if (parent === current) {
+      return null;
+    }
+    missing.unshift(path.basename(current));
+    current = parent;
+  }
+}
+
+function errorCode(error: unknown): string | undefined {
+  return error instanceof Error && "code" in error
+    ? String((error as NodeJS.ErrnoException).code)
+    : undefined;
+}
+
 function normalizeLocalPath(value: string): string {
   const normalized = path.normalize(value);
   return os.platform() === "win32" ? normalized.toLowerCase() : normalized;
+}
+
+function localPathsEqual(left: string, right: string): boolean {
+  return (
+    normalizeLocalPath(path.resolve(left)) ===
+    normalizeLocalPath(path.resolve(right))
+  );
 }
 
 function localPathContains(parent: string, child: string): boolean {
@@ -117,16 +238,11 @@ interface CanonicalRemoteUri {
   scheme: string;
   authority: string;
   path: string;
+  query: string;
 }
 
 function canonicalRemoteUri(uri: Uri): CanonicalRemoteUri | null {
-  if (
-    !uri.scheme ||
-    uri.scheme === "file" ||
-    !uri.authority ||
-    uri.query ||
-    uri.fragment
-  ) {
+  if (!uri.scheme || uri.scheme === "file" || !uri.authority || uri.fragment) {
     return null;
   }
   let decodedPath: string;
@@ -142,6 +258,7 @@ function canonicalRemoteUri(uri: Uri): CanonicalRemoteUri | null {
     scheme: uri.scheme.toLowerCase(),
     authority: uri.authority.toLowerCase(),
     path: path.posix.normalize(`/${decodedPath.replace(/^\/+/, "")}`),
+    query: uri.query,
   };
 }
 

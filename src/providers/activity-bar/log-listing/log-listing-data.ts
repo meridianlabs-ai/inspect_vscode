@@ -92,7 +92,7 @@ export class LogTreeDataProvider extends LogListingTreeDataProvider {
     if (listing && nodeUri) {
       const headers = await this.viewServer_.evalLogHeaders(
         [nodeUri.toString()],
-        directoryViewPathScope(listing.logDir())
+        listing.pathScope() ?? directoryViewPathScope(listing.logDir())
       );
       if (headers !== undefined) {
         const evalLog = (JSON.parse(headers) as EvalLog[])[0];

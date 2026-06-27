@@ -1,5 +1,5 @@
 import * as assert from "assert";
-import { mkdir, mkdtemp, rm, symlink, writeFile } from "fs/promises";
+import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from "fs/promises";
 import * as os from "os";
 import path from "path";
 
@@ -74,6 +74,17 @@ suite("URI Utilities Test Suite", () => {
       const uri = resolveToUri("https://example.com/path#section");
       assert.strictEqual(uri.scheme, "https");
       assert.strictEqual(uri.fragment, "section");
+    });
+
+    test("should preserve a Windows UNC authority", function () {
+      if (os.platform() !== "win32") {
+        this.skip();
+        return;
+      }
+      const uri = resolveToUri("\\\\server\\share\\logs\\run.eval");
+      assert.strictEqual(uri.scheme, "file");
+      assert.strictEqual(uri.authority.toLowerCase(), "server");
+      assert.ok(uri.fsPath.toLowerCase().startsWith("\\\\server\\share\\"));
     });
   });
 
@@ -242,6 +253,17 @@ suite("URI Utilities Test Suite", () => {
       assert.strictEqual(await pathIsInViewScope(scope, sibling), false);
     });
 
+    test("allows a selected local directory before it exists", async () => {
+      const root = path.join(tempDir, "new-logs");
+      const scope = directoryViewPathScope(Uri.file(root));
+
+      assert.strictEqual(await pathIsInViewScope(scope, Uri.file(root)), true);
+      assert.strictEqual(
+        await pathIsInViewScope(scope, path.join(root, "run.eval")),
+        true
+      );
+    });
+
     test("resolves a selected symlink root and rejects nested escapes", async function () {
       if (os.platform() === "win32") {
         this.skip();
@@ -262,6 +284,38 @@ suite("URI Utilities Test Suite", () => {
       const scope = directoryViewPathScope(Uri.file(selected));
       assert.strictEqual(await pathIsInViewScope(scope, allowed), true);
       assert.strictEqual(await pathIsInViewScope(scope, rejected), false);
+    });
+
+    test("retains the selected symlink target as an immutable scope", async function () {
+      if (os.platform() === "win32") {
+        this.skip();
+        return;
+      }
+      const firstTarget = path.join(tempDir, "first");
+      const secondTarget = path.join(tempDir, "second");
+      const selected = path.join(tempDir, "selected");
+      await mkdir(firstTarget);
+      await mkdir(secondTarget);
+      await writeFile(path.join(firstTarget, "allowed.eval"), "allowed");
+      await writeFile(path.join(secondTarget, "secret.eval"), "secret");
+      await symlink(firstTarget, selected, "dir");
+
+      const scope = directoryViewPathScope(Uri.file(selected));
+      assert.strictEqual(
+        (await scope.canonicalUri).fsPath,
+        await realpath(firstTarget)
+      );
+      await rm(selected);
+      await symlink(secondTarget, selected, "dir");
+
+      assert.strictEqual(
+        await pathIsInViewScope(scope, path.join(selected, "allowed.eval")),
+        false
+      );
+      assert.strictEqual(
+        await pathIsInViewScope(scope, path.join(selected, "secret.eval")),
+        false
+      );
     });
 
     test("uses exact file scopes", async () => {
@@ -295,8 +349,9 @@ suite("URI Utilities Test Suite", () => {
       );
     });
 
-    test("allows HTTP only as an exact file scope", async () => {
-      const selected = "https://example.test/run.eval";
+    test("allows signed HTTP URLs only as an exact file scope", async () => {
+      const selected =
+        "https://example.test/run.eval?expires=60&signature=selected";
       assert.strictEqual(
         await pathIsInViewScope(
           fileViewPathScope(Uri.parse(selected)),
@@ -307,16 +362,27 @@ suite("URI Utilities Test Suite", () => {
       assert.strictEqual(
         await pathIsInViewScope(
           fileViewPathScope(Uri.parse(selected)),
-          "https://example.test/other.eval"
+          "https://example.test/run.eval?expires=60&signature=other"
         ),
         false
       );
       assert.strictEqual(
         await pathIsInViewScope(
-          directoryViewPathScope(Uri.parse("https://example.test/logs")),
-          selected
+          fileViewPathScope(Uri.parse(selected)),
+          "https://example.test/run.eval"
         ),
         false
+      );
+      assert.strictEqual(
+        await pathIsInViewScope(
+          fileViewPathScope(Uri.parse(selected)),
+          "https://example.test/other.eval?expires=60&signature=selected"
+        ),
+        false
+      );
+      assert.throws(
+        () => directoryViewPathScope(Uri.parse("https://example.test/logs")),
+        /Invalid viewer directory scope/
       );
     });
   });

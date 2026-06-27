@@ -41,14 +41,11 @@ export class LogviewPanel extends Disposable {
     private panel_: HostWebviewPanel,
     private context_: ExtensionContext,
     private server_: InspectViewServer,
-    type: "file" | "dir",
-    uri: Uri
+    private readonly scope_: ViewPathScope
   ) {
     super();
-    this.scope_ = {
-      kind: type === "dir" ? "directory" : "file",
-      uri,
-    };
+    const type = scope_.kind === "directory" ? "dir" : "file";
+    const uri = scope_.uri;
 
     // serve eval log api to webview
     this._rpcDisconnect = webviewPanelJsonRpcServer(panel_, {
@@ -161,6 +158,8 @@ export class LogviewPanel extends Disposable {
   }
 
   public async getHtml(state: LogviewState): Promise<string> {
+    await this.scope_.canonicalUri;
+
     // Try to resolve the dist path from the server (handles LFS resolution),
     // falling back to the local scoutViewPath() if the endpoint isn't available.
     const distDir = await this.server_.getDistPath();
@@ -213,5 +212,4 @@ export class LogviewPanel extends Disposable {
 
   private _rpcDisconnect: VoidFunction;
   private _pmUnsubcribe: vscode.Disposable;
-  private readonly scope_: ViewPathScope;
 }
