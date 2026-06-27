@@ -1,7 +1,11 @@
 import { ExtensionContext, Uri } from "vscode";
 
 import { PackageManager } from "../../core/package/manager";
-import { PackageViewServer } from "../../core/package/view-server";
+import {
+  HttpProxyRpcRequest,
+  HttpProxyRpcResponse,
+  PackageViewServer,
+} from "../../core/package/view-server";
 import {
   AbsolutePath,
   activeWorkspacePath,
@@ -54,13 +58,27 @@ export class InspectViewServer extends PackageViewServer {
     );
   }
 
+  public supportsScopedHttpProxy(): boolean {
+    return hasMinimumInspectVersion(kInspectScopedAuthorizationVersion);
+  }
+
   protected override viewArgs(): string[] {
     return [
       ...super.viewArgs(),
-      ...(hasMinimumInspectVersion(kInspectScopedAuthorizationVersion)
-        ? ["--scoped-authorization"]
-        : []),
+      ...(this.supportsScopedHttpProxy() ? ["--scoped-authorization"] : []),
     ];
+  }
+
+  public override async proxyRpcRequest(
+    request: HttpProxyRpcRequest,
+    scope?: ViewPathScope
+  ): Promise<HttpProxyRpcResponse> {
+    if (!this.supportsScopedHttpProxy() || !scope) {
+      throw new Error(
+        "Generic viewer requests require scoped authorization support."
+      );
+    }
+    return await super.proxyRpcRequest(request, scope);
   }
 
   public async evalLogDir(): Promise<string | undefined> {

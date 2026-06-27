@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.13](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.9.12...v0.9.13) (2026-06-27)
+
+
+### Bug Fixes
+
+* harden script-tag nonce injection regex (CodeQL js/bad-tag-filter) ([#119](https://github.com/meridianlabs-ai/inspect_vscode/issues/119)) ([4093d64](https://github.com/meridianlabs-ai/inspect_vscode/commit/4093d64fd2e61f013b33f6813cc91c134cdee594))
+
 ## [0.9.12](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.9.11...v0.9.12) (2026-06-11)
 
 

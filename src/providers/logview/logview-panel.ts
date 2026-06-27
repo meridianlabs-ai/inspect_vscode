@@ -13,6 +13,7 @@ import {
   kMethodEvalLogSize,
   kMethodGetSearchResult,
   kMethodGetUserInfo,
+  kMethodHttpRequest,
   kMethodListSearches,
   kMethodLogMessage,
   kMethodPendingSamples,
@@ -21,6 +22,7 @@ import {
   webviewPanelJsonRpcServer,
 } from "../../core/jsonrpc";
 import { log } from "../../core/log";
+import { HttpProxyRpcRequest } from "../../core/package/view-server";
 import {
   pathIsInViewScope,
   resolveViewPathCandidate,
@@ -36,6 +38,12 @@ import { InspectViewServer } from "../inspect/inspect-view-server";
 
 import { LogviewState } from "./logview-state";
 
+export function logviewHostCapabilities(
+  supportsScopedHttpProxy: boolean
+): string[] {
+  return supportsScopedHttpProxy ? [kMethodHttpRequest] : [];
+}
+
 export class LogviewPanel extends Disposable {
   constructor(
     private panel_: HostWebviewPanel,
@@ -44,6 +52,7 @@ export class LogviewPanel extends Disposable {
     private readonly scope_: ViewPathScope
   ) {
     super();
+    this.supportsScopedHttpProxy_ = server_.supportsScopedHttpProxy();
     const type = scope_.kind === "directory" ? "dir" : "file";
     const uri = scope_.uri;
 
@@ -132,6 +141,15 @@ export class LogviewPanel extends Disposable {
           params[3] as { events?: string; messages?: string } | undefined,
           this.scope_
         ),
+      ...(this.supportsScopedHttpProxy_
+        ? {
+            [kMethodHttpRequest]: async (params: unknown[]) =>
+              server_.proxyRpcRequest(
+                params[0] as HttpProxyRpcRequest,
+                this.scope_
+              ),
+          }
+        : {}),
     });
 
     // serve post message api to webview
@@ -189,12 +207,20 @@ export class LogviewPanel extends Disposable {
         )}</script>`
       : "";
 
+    // Advertise the generic proxy only when the backend enforces path scopes.
+    const hostCapabilities = logviewHostCapabilities(
+      this.supportsScopedHttpProxy_
+    );
+    const capabilitiesScript = `<script id="inspect-host-capabilities" type="application/json">${JSON.stringify(
+      hostCapabilities
+    )}</script>`;
+
     return getWebviewPanelHtml(
       viewDir,
       this.panel_,
       this.getExtensionVersion(),
       overrideCssPath,
-      stateScript,
+      stateScript + capabilitiesScript,
       "Inspect AI"
     );
   }
@@ -212,4 +238,5 @@ export class LogviewPanel extends Disposable {
 
   private _rpcDisconnect: VoidFunction;
   private _pmUnsubcribe: vscode.Disposable;
+  private readonly supportsScopedHttpProxy_: boolean;
 }

@@ -4,6 +4,7 @@ import { Uri } from "vscode";
 
 import {
   addViewScopeHeaders,
+  HttpProxyRpcRequest,
   kViewScopeHeader,
   kViewScopeKindHeader,
 } from "../../core/package/view-server";
@@ -490,6 +491,75 @@ suite("InspectViewServer Test Suite", () => {
   });
 
   suite("Integration Concepts", () => {
+    const proxyRequest: HttpProxyRpcRequest = {
+      method: "GET",
+      path: "/api/logs",
+    };
+
+    test("rejects the generic proxy on older Inspect versions", async () => {
+      const server = Object.create(
+        InspectViewServer.prototype
+      ) as InspectViewServer;
+      server.supportsScopedHttpProxy = () => false;
+
+      await assert.rejects(
+        server.proxyRpcRequest(
+          proxyRequest,
+          directoryViewPathScope(Uri.parse("s3://bucket/logs"))
+        ),
+        /require scoped authorization support/
+      );
+    });
+
+    test("requires a scope for generic Inspect requests", async () => {
+      const server = Object.create(
+        InspectViewServer.prototype
+      ) as InspectViewServer;
+      server.supportsScopedHttpProxy = () => true;
+
+      await assert.rejects(
+        server.proxyRpcRequest(proxyRequest),
+        /require scoped authorization support/
+      );
+    });
+
+    test("forwards the panel scope through the generic proxy", async () => {
+      const server = Object.create(
+        InspectViewServer.prototype
+      ) as InspectViewServer;
+      const scope = directoryViewPathScope(Uri.parse("s3://bucket/logs"));
+      let forwardedScope: unknown;
+      const testServer = server as unknown as {
+        ensureRunning: () => Promise<void>;
+        serverFetch: (
+          path: string,
+          method: "GET" | "POST" | "PUT" | "DELETE",
+          headers: Headers,
+          body?: string,
+          scope?: unknown
+        ) => Promise<{ status: number; data: string; headers: Headers }>;
+      };
+      server.supportsScopedHttpProxy = () => true;
+      testServer.ensureRunning = () => Promise.resolve();
+      testServer.serverFetch = (
+        _path,
+        _method,
+        _headers,
+        _body,
+        requestScope
+      ) => {
+        forwardedScope = requestScope;
+        return Promise.resolve({
+          status: 200,
+          data: "{}",
+          headers: new Headers(),
+        });
+      };
+
+      await server.proxyRpcRequest(proxyRequest, scope);
+      assert.strictEqual(forwardedScope, scope);
+    });
+
     test("rejects an out-of-scope file before contacting the server", async () => {
       const server = Object.create(
         InspectViewServer.prototype
