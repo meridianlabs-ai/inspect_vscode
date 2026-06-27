@@ -76,7 +76,7 @@ export class LogTreeDataProvider extends LogListingTreeDataProvider {
       treeItem.command = {
         command: "inspect.openLogViewer",
         title: "View Inspect Log",
-        arguments: [uri],
+        arguments: [uri, element.scope_location],
       };
     }
     return treeItem;

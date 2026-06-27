@@ -9,6 +9,8 @@ import {
 
 export interface LogviewState {
   log_file?: Uri;
+  log_location?: string;
+  canonical_location?: boolean;
   log_dir: Uri;
   scope_kind?: "directory" | "file";
   path_scope?: ViewPathScope;
@@ -25,7 +27,11 @@ export function logviewPathScope(state: LogviewState): ViewPathScope {
   }
   const kind = state.scope_kind ?? (state.log_file ? "file" : "directory");
   return kind === "file"
-    ? fileViewPathScope(state.log_file ?? state.log_dir)
+    ? fileViewPathScope(
+        state.log_file ?? state.log_dir,
+        state.canonical_location ? undefined : state.log_location,
+        state.canonical_location ? state.log_location : undefined
+      )
     : directoryViewPathScope(state.log_dir);
 }
 

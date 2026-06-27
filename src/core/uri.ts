@@ -10,14 +10,20 @@ export interface ViewPathScope {
   kind: ViewPathScopeKind;
   uri: Uri;
   canonicalUri: Promise<Uri>;
+  opaqueLocation?: string;
+  canonical?: boolean;
 }
 
 export function directoryViewPathScope(uri: Uri): ViewPathScope {
   return createViewPathScope("directory", uri);
 }
 
-export function fileViewPathScope(uri: Uri): ViewPathScope {
-  return createViewPathScope("file", uri);
+export function fileViewPathScope(
+  uri: Uri,
+  opaqueLocation?: string,
+  canonicalLocation?: string
+): ViewPathScope {
+  return createViewPathScope("file", uri, opaqueLocation, canonicalLocation);
 }
 
 export function viewPathScopesEqual(
@@ -26,8 +32,73 @@ export function viewPathScopesEqual(
 ): boolean {
   return (
     left.kind === right.kind &&
-    viewPathUriString(left.uri) === viewPathUriString(right.uri)
+    !!left.canonical === !!right.canonical &&
+    (left.opaqueLocation ?? viewPathUriString(left.uri)) ===
+      (right.opaqueLocation ?? viewPathUriString(right.uri))
   );
+}
+
+const kViewPathLocationFragment = "inspect-view-location=";
+const kCanonicalViewPathLocationFragment = "inspect-view-canonical-location=";
+
+export function withViewPathLocation(uri: Uri, location: string): Uri {
+  return isOpaqueHttpViewLocation(location)
+    ? uri.with({
+        fragment:
+          kViewPathLocationFragment +
+          Buffer.from(location, "utf-8").toString("base64url"),
+      })
+    : uri;
+}
+
+export function viewPathLocationFromUri(uri: Uri): string | undefined {
+  if (!uri.fragment.startsWith(kViewPathLocationFragment)) {
+    return undefined;
+  }
+  try {
+    return Buffer.from(
+      uri.fragment.slice(kViewPathLocationFragment.length),
+      "base64url"
+    ).toString("utf-8");
+  } catch {
+    return undefined;
+  }
+}
+
+export function withCanonicalViewPathLocation(uri: Uri, location: string): Uri {
+  return uri.with({
+    fragment:
+      kCanonicalViewPathLocationFragment +
+      Buffer.from(location, "utf-8").toString("base64url"),
+  });
+}
+
+export function canonicalViewPathLocationFromUri(uri: Uri): string | undefined {
+  if (!uri.fragment.startsWith(kCanonicalViewPathLocationFragment)) {
+    return undefined;
+  }
+  try {
+    return Buffer.from(
+      uri.fragment.slice(kCanonicalViewPathLocationFragment.length),
+      "base64url"
+    ).toString("utf-8");
+  } catch {
+    return undefined;
+  }
+}
+
+export function isOpaqueHttpViewLocation(location: string): boolean {
+  try {
+    const parsed = new URL(location);
+    return (
+      (parsed.protocol === "http:" || parsed.protocol === "https:") &&
+      !parsed.hash &&
+      !parsed.username &&
+      !parsed.password
+    );
+  } catch {
+    return false;
+  }
 }
 
 export function viewPathUriString(uri: Uri): string {
@@ -62,6 +133,20 @@ export async function resolvePathInViewScope(
   scope: ViewPathScope,
   candidate: string | Uri
 ): Promise<Uri | null> {
+  if (scope.opaqueLocation) {
+    if (
+      candidate instanceof Uri &&
+      candidate.toString() === scope.uri.toString()
+    ) {
+      return scope.uri;
+    }
+    const candidateLocation =
+      typeof candidate === "string"
+        ? candidate
+        : (viewPathLocationFromUri(candidate) ?? viewPathUriString(candidate));
+    return candidateLocation === scope.opaqueLocation ? scope.uri : null;
+  }
+
   const candidateUri = resolveViewPathCandidate(scope, candidate);
   if (scope.uri.scheme === "file") {
     const [scopeUri, candidatePath] = await Promise.all([
@@ -121,6 +206,20 @@ export async function resolvePathInViewScope(
     : null;
 }
 
+export async function viewPathScopeLocation(
+  scope: ViewPathScope
+): Promise<string> {
+  return scope.opaqueLocation ?? viewPathUriString(await scope.canonicalUri);
+}
+
+export async function resolveViewPathLocation(
+  scope: ViewPathScope,
+  candidate: string | Uri
+): Promise<string> {
+  const resolved = await assertPathInViewScope(scope, candidate);
+  return scope.opaqueLocation ?? viewPathUriString(resolved);
+}
+
 export function resolveViewPathCandidate(
   scope: ViewPathScope,
   candidate: string | Uri
@@ -136,7 +235,46 @@ export function resolveViewPathCandidate(
     : Uri.joinPath(scope.uri, candidate);
 }
 
-function createViewPathScope(kind: ViewPathScopeKind, uri: Uri): ViewPathScope {
+function createViewPathScope(
+  kind: ViewPathScopeKind,
+  uri: Uri,
+  opaqueLocation?: string,
+  canonicalLocation?: string
+): ViewPathScope {
+  if (kind === "file" && canonicalLocation) {
+    if (viewPathUriString(uri) !== canonicalLocation) {
+      throw new Error(
+        `Canonical viewer file scope does not match: ${canonicalLocation}`
+      );
+    }
+    return {
+      kind,
+      uri,
+      canonicalUri: Promise.resolve(uri.with({ fragment: "" })),
+      canonical: true,
+    };
+  }
+
+  if (kind === "file" && opaqueLocation) {
+    if (!isOpaqueHttpViewLocation(opaqueLocation)) {
+      throw new Error(`Invalid viewer file scope: ${opaqueLocation}`);
+    }
+    const opaqueUri = Uri.parse(opaqueLocation);
+    if (
+      opaqueUri.scheme.toLowerCase() !== uri.scheme.toLowerCase() ||
+      opaqueUri.authority.toLowerCase() !== uri.authority.toLowerCase() ||
+      opaqueUri.path !== uri.path
+    ) {
+      throw new Error(`Viewer file scope does not match: ${opaqueLocation}`);
+    }
+    return {
+      kind,
+      uri,
+      canonicalUri: Promise.resolve(uri.with({ fragment: "" })),
+      opaqueLocation,
+    };
+  }
+
   if (uri.scheme === "file") {
     let canonicalUri: Promise<Uri> | undefined;
     return {

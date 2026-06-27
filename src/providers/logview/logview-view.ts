@@ -13,6 +13,7 @@ import { OutputWatcher } from "../../core/package/output-watcher";
 import {
   dirname,
   ViewPathScope,
+  viewPathScopeLocation,
   viewPathScopesEqual,
   viewPathUriString,
 } from "../../core/uri";
@@ -63,8 +64,18 @@ export class InspectViewManager {
     }
   }
 
-  public async showLogFile(uri: Uri, activation?: "open" | "activate") {
-    await this.webViewManager_.showLogFile(uri, activation);
+  public async showLogFile(
+    uri: Uri,
+    activation?: "open" | "activate",
+    location?: string,
+    canonical: boolean = false
+  ) {
+    await this.webViewManager_.showLogFile(
+      uri,
+      activation,
+      location,
+      canonical
+    );
   }
 
   public async logFileWillVisiblyUpdate(uri: Uri): Promise<boolean> {
@@ -114,12 +125,23 @@ export class InspectViewWebviewManager extends InspectWebviewManager<
     );
   }
 
-  public async showLogFile(uri: Uri, activation?: "open" | "activate") {
+  public async showLogFile(
+    uri: Uri,
+    activation?: "open" | "activate",
+    location?: string,
+    canonical: boolean = false
+  ) {
     // Get the directory name using posix path methods
     const log_dir = dirname(uri);
 
     await this.showLogview(
-      { log_file: uri, log_dir, scope_kind: "file" },
+      {
+        log_file: uri,
+        log_location: location,
+        canonical_location: canonical,
+        log_dir,
+        scope_kind: "file",
+      },
       activation
     );
   }
@@ -143,6 +165,10 @@ export class InspectViewWebviewManager extends InspectWebviewManager<
       }
       await this.displayLogFile({
         log_file: log_file,
+        log_location: scope.canonical
+          ? await viewPathScopeLocation(scope)
+          : scope.opaqueLocation,
+        canonical_location: scope.canonical,
         log_dir: state.log_dir,
         scope_kind: scope.kind,
         background_refresh: true,
@@ -173,7 +199,7 @@ export class InspectViewWebviewManager extends InspectWebviewManager<
           // or to check whether the view is focused and call us back to
           // display a log file
           await this.activeView_?.backgroundUpdate(
-            viewPathUriString(state.log_file),
+            state.log_location ?? viewPathUriString(state.log_file),
             state.log_dir.toString()
           );
         }
@@ -228,7 +254,7 @@ export class InspectViewWebviewManager extends InspectWebviewManager<
         this.revealWebview(activation !== "activate");
       } else if (state.log_file) {
         await this.activeView_?.backgroundUpdate(
-          viewPathUriString(state.log_file),
+          state.log_location ?? viewPathUriString(state.log_file),
           state.log_dir.toString()
         );
       }
@@ -266,6 +292,8 @@ export class InspectViewWebviewManager extends InspectWebviewManager<
       return {
         log_dir: Uri.parse(data["log_dir"] ?? ""),
         log_file: data["log_file"] ? Uri.parse(data["log_file"]) : undefined,
+        log_location: data["log_location"] || undefined,
+        canonical_location: data["canonical_location"] === "true",
         background_refresh: !!data["background_refresh"],
         scope_kind:
           data["scope_kind"] === "file" ||
@@ -282,6 +310,8 @@ export class InspectViewWebviewManager extends InspectWebviewManager<
     void this.context_.workspaceState.update(this.kInspectViewState, {
       log_dir: state.log_dir.toString(),
       log_file: state.log_file ? viewPathUriString(state.log_file) : undefined,
+      log_location: state.log_location,
+      canonical_location: state.canonical_location ? "true" : undefined,
       background_refresh: state.background_refresh,
       scope_kind: state.scope_kind,
     });
@@ -305,7 +335,11 @@ const logStateEquals = (a: LogviewState, b: LogviewState) => {
   } else if (a.log_file && !b.log_file) {
     return false;
   } else if (a.log_file && b.log_file) {
-    return viewPathUriString(a.log_file) === viewPathUriString(b.log_file);
+    return (
+      !!a.canonical_location === !!b.canonical_location &&
+      (a.log_location ?? viewPathUriString(a.log_file)) ===
+        (b.log_location ?? viewPathUriString(b.log_file))
+    );
   }
   return true;
 };
@@ -336,6 +370,10 @@ class InspectViewWebview extends InspectWebview<LogviewState> {
                   const scope = this.logviewPanel_.scope();
                   const state: LogviewState = {
                     log_file: logFile,
+                    log_location: scope.canonical
+                      ? await viewPathScopeLocation(scope)
+                      : scope.opaqueLocation,
+                    canonical_location: scope.canonical,
                     log_dir:
                       scope.kind === "directory" ? scope.uri : dirname(logFile),
                     scope_kind: scope.kind,
@@ -370,7 +408,9 @@ class InspectViewWebview extends InspectWebview<LogviewState> {
   public async update(state: LogviewState) {
     await this._webviewPanel.webview.postMessage({
       type: "updateState",
-      url: state.log_file ? viewPathUriString(state.log_file) : undefined,
+      url: state.log_file
+        ? (state.log_location ?? viewPathUriString(state.log_file))
+        : undefined,
     });
   }
 

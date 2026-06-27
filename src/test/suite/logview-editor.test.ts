@@ -2,6 +2,7 @@ import * as assert from "assert";
 
 import { Uri } from "vscode";
 
+import { viewPathUriString, withViewPathLocation } from "../../core/uri";
 import { resolveLogDocumentLocation } from "../../providers/logview/logview-editor";
 
 suite("Logview Editor Test Suite", () => {
@@ -15,6 +16,7 @@ suite("Logview Editor Test Suite", () => {
 
     assert.strictEqual(location.resourceUri.query, "");
     assert.strictEqual(location.resourceUri.fragment, "");
+    assert.strictEqual(location.canonicalLocation, false);
     assert.strictEqual(location.sample_id, "sample-1");
     assert.strictEqual(location.epoch, "2");
   });
@@ -26,6 +28,19 @@ suite("Logview Editor Test Suite", () => {
     const location = resolveLogDocumentLocation(uri);
 
     assert.strictEqual(location.resourceUri.query, uri.query);
+    assert.strictEqual(location.resourceLocation, viewPathUriString(uri));
+    assert.strictEqual(location.sample_id, undefined);
+    assert.strictEqual(location.epoch, undefined);
+  });
+
+  test("uses the opaque URL carried by the editor URI", () => {
+    const raw = "https://example.test/run.eval?sample_id=a%26b&epoch=2";
+    const location = resolveLogDocumentLocation(
+      withViewPathLocation(Uri.parse(raw), raw)
+    );
+
+    assert.strictEqual(location.resourceLocation, raw);
+    assert.strictEqual(location.resourceUri.query, Uri.parse(raw).query);
     assert.strictEqual(location.sample_id, undefined);
     assert.strictEqual(location.epoch, undefined);
   });

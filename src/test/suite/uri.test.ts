@@ -6,6 +6,7 @@ import path from "path";
 import { Uri } from "vscode";
 
 import {
+  canonicalViewPathLocationFromUri,
   directoryViewPathScope,
   dirname,
   fileViewPathScope,
@@ -15,7 +16,11 @@ import {
   prettyUriPath,
   resolvePathInViewScope,
   resolveToUri,
+  viewPathLocationFromUri,
+  viewPathScopeLocation,
   viewPathUriString,
+  withCanonicalViewPathLocation,
+  withViewPathLocation,
 } from "../../core/uri";
 
 suite("URI Utilities Test Suite", () => {
@@ -383,6 +388,48 @@ suite("URI Utilities Test Suite", () => {
         viewPathUriString(uri),
         "https://example.test/run.eval?" +
           "credential=team%2Fmember&label=hello%20world"
+      );
+    });
+
+    test("preserves opaque signed URLs exactly", async () => {
+      const location =
+        "https://example.test/run.eval?" +
+        "token=a%26b&credential=team%2Fmember";
+      const scope = fileViewPathScope(Uri.parse(location), location);
+
+      assert.strictEqual(await viewPathScopeLocation(scope), location);
+      assert.strictEqual(await pathIsInViewScope(scope, location), true);
+      assert.strictEqual(
+        await pathIsInViewScope(scope, Uri.parse(location)),
+        true
+      );
+      assert.strictEqual(
+        await pathIsInViewScope(
+          scope,
+          "https://example.test/run.eval?" +
+            "token=a&b&credential=team%2Fmember"
+        ),
+        false
+      );
+    });
+
+    test("round-trips opaque and canonical editor locations", () => {
+      const resource = Uri.parse("https://example.test/run.eval?token=a%26b");
+      const opaque = "https://example.test/run.eval?token=a%26b";
+      const canonical = "file:///tmp/logs/run.eval";
+
+      assert.strictEqual(
+        viewPathLocationFromUri(withViewPathLocation(resource, opaque)),
+        opaque
+      );
+      assert.strictEqual(
+        canonicalViewPathLocationFromUri(
+          withCanonicalViewPathLocation(
+            Uri.file("/tmp/logs/run.eval"),
+            canonical
+          )
+        ),
+        canonical
       );
     });
 

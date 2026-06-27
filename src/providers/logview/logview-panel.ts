@@ -27,7 +27,7 @@ import {
   pathIsInViewScope,
   resolvePathInViewScope,
   ViewPathScope,
-  viewPathUriString,
+  viewPathScopeLocation,
 } from "../../core/uri";
 import {
   getWebviewPanelHtml,
@@ -77,7 +77,7 @@ export class LogviewPanel extends Disposable {
       [kMethodEvalLogs]: async () =>
         type === "dir"
           ? server_.evalLogs(uri, this.scope_)
-          : server_.evalLogsSolo(uri),
+          : server_.evalLogsSolo(uri, this.scope_),
       [kMethodEvalLog]: (params: unknown[]) =>
         server_.evalLog(
           params[0] as string,
@@ -196,7 +196,9 @@ export class LogviewPanel extends Disposable {
     // message being sent before the view itself is configured to receive messages)
     const stateMsg = {
       type: "updateState",
-      url: state.log_file ? viewPathUriString(state.log_file) : undefined,
+      url: state.log_file
+        ? await viewPathScopeLocation(this.scope_)
+        : undefined,
       sample_id: state.sample?.id,
       sample_epoch: state.sample?.epoch,
     };

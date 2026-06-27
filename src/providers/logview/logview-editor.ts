@@ -2,7 +2,13 @@ import * as vscode from "vscode";
 import { Uri } from "vscode";
 
 import { log } from "../../core/log";
-import { dirname, fileViewPathScope, viewPathUriString } from "../../core/uri";
+import {
+  canonicalViewPathLocationFromUri,
+  dirname,
+  fileViewPathScope,
+  viewPathLocationFromUri,
+  viewPathUriString,
+} from "../../core/uri";
 import { HostWebviewPanel } from "../../hooks";
 import { inspectViewPath } from "../../inspect/props";
 import { hasMinimumInspectVersion } from "../../inspect/version";
@@ -16,30 +22,42 @@ export const kInspectLogViewType = "inspect-ai.log-editor";
 
 interface InspectLogDocument extends vscode.CustomDocument {
   resourceUri: Uri;
+  resourceLocation: string;
+  canonicalLocation: boolean;
   sample_id?: string;
   epoch?: string;
 }
 
 export function resolveLogDocumentLocation(uri: Uri): {
   resourceUri: Uri;
+  resourceLocation: string;
+  canonicalLocation: boolean;
   sample_id?: string;
   epoch?: string;
 } {
+  const canonicalLocation = canonicalViewPathLocationFromUri(uri);
+  const opaqueLocation = viewPathLocationFromUri(uri);
   const queryParams = new URLSearchParams(uri.query);
   const sampleIds = queryParams.getAll("sample_id");
   const epochs = queryParams.getAll("epoch");
   const isViewStateQuery =
+    !canonicalLocation &&
+    !opaqueLocation &&
     sampleIds.length === 1 &&
     epochs.length === 1 &&
     [...queryParams.keys()].every(
       (key) => key === "sample_id" || key === "epoch"
     );
 
+  const resourceUri = uri.with({
+    query: isViewStateQuery ? "" : uri.query,
+    fragment: "",
+  });
   return {
-    resourceUri: uri.with({
-      query: isViewStateQuery ? "" : uri.query,
-      fragment: "",
-    }),
+    resourceUri,
+    resourceLocation:
+      canonicalLocation ?? opaqueLocation ?? viewPathUriString(resourceUri),
+    canonicalLocation: canonicalLocation !== undefined,
     sample_id: isViewStateQuery ? sampleIds[0] : undefined,
     epoch: isViewStateQuery ? epochs[0] : undefined,
   };
@@ -95,15 +113,20 @@ class InspectLogReadonlyEditor implements vscode.CustomReadonlyEditorProvider {
     const epoch = doc.epoch;
 
     const resourceUri = doc.resourceUri;
-    const resourceUriString = viewPathUriString(resourceUri);
+    const resourceLocation = doc.resourceLocation;
+    const canonicalLocation = doc.canonicalLocation;
 
     // check if we should use the log viewer (version check + size threshold)
     let useLogViewer = hasMinimumInspectVersion(kInspectEvalLogFormatVersion);
     if (useLogViewer) {
       if (resourceUri.path.endsWith(".json")) {
         const fileSize = await this.server_.evalLogSize(
-          resourceUriString,
-          fileViewPathScope(resourceUri)
+          resourceLocation,
+          fileViewPathScope(
+            resourceUri,
+            canonicalLocation ? undefined : resourceLocation,
+            canonicalLocation ? resourceLocation : undefined
+          )
         );
         if (fileSize > 1024 * 1000 * 100) {
           log.info(
@@ -115,7 +138,11 @@ class InspectLogReadonlyEditor implements vscode.CustomReadonlyEditorProvider {
     }
 
     if (useLogViewer) {
-      const pathScope = fileViewPathScope(resourceUri);
+      const pathScope = fileViewPathScope(
+        resourceUri,
+        canonicalLocation ? undefined : resourceLocation,
+        canonicalLocation ? resourceLocation : undefined
+      );
       await pathScope.canonicalUri;
 
       // local resource roots
@@ -144,6 +171,8 @@ class InspectLogReadonlyEditor implements vscode.CustomReadonlyEditorProvider {
       // set html
       const logViewState: LogviewState = {
         log_file: resourceUri,
+        log_location: resourceLocation,
+        canonical_location: canonicalLocation,
         log_dir: dirname(resourceUri),
         sample:
           sample_id && epoch
@@ -159,7 +188,7 @@ class InspectLogReadonlyEditor implements vscode.CustomReadonlyEditorProvider {
       const viewColumn = webviewPanel.viewColumn;
       await vscode.commands.executeCommand(
         "vscode.openWith",
-        document.uri,
+        resourceUri,
         "default",
         viewColumn
       );

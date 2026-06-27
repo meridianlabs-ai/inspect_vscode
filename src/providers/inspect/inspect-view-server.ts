@@ -11,11 +11,7 @@ import {
   activeWorkspacePath,
   toAbsolutePath,
 } from "../../core/path";
-import {
-  assertPathInViewScope,
-  ViewPathScope,
-  viewPathUriString,
-} from "../../core/uri";
+import { resolveViewPathLocation, ViewPathScope } from "../../core/uri";
 import { activeWorkspaceFolder } from "../../core/workspace";
 import {
   inspectEvalLog,
@@ -99,7 +95,7 @@ export class InspectViewServer extends PackageViewServer {
     clientFileCount: number,
     scope: ViewPathScope
   ): Promise<string | undefined> {
-    log_dir = viewPathUriString(await assertPathInViewScope(scope, log_dir));
+    log_dir = await resolveViewPathLocation(scope, log_dir);
     const log_file_token = (mtime: number, fileCount: number): string => {
       // Use a weak etag as the mtime and file count may not
       // uniquely identify the state of the log directory
@@ -135,11 +131,11 @@ export class InspectViewServer extends PackageViewServer {
     log_dir: Uri,
     scope: ViewPathScope
   ): Promise<string | undefined> {
-    log_dir = await assertPathInViewScope(scope, log_dir);
+    const resolvedLogDir = await resolveViewPathLocation(scope, log_dir);
     if (this.haveInspectEvalLogFormat()) {
       return (
         await this.api_json(
-          `/api/logs?log_dir=${encodeURIComponent(viewPathUriString(log_dir))}`,
+          `/api/logs?log_dir=${encodeURIComponent(resolvedLogDir)}`,
           "GET",
           undefined,
           undefined,
@@ -147,17 +143,20 @@ export class InspectViewServer extends PackageViewServer {
         )
       ).data;
     } else {
-      return evalLogs(log_dir);
+      return evalLogs(Uri.parse(resolvedLogDir));
     }
   }
 
-  public async evalLogsSolo(log_file: Uri): Promise<string> {
+  public async evalLogsSolo(
+    log_file: Uri,
+    scope: ViewPathScope
+  ): Promise<string> {
     if (this.haveInspectEvalLogFormat()) {
       await this.ensureRunning();
     }
     return JSON.stringify({
       log_dir: "",
-      files: [{ name: viewPathUriString(log_file) }],
+      files: [{ name: await resolveViewPathLocation(scope, log_file) }],
     });
   }
 
@@ -166,7 +165,7 @@ export class InspectViewServer extends PackageViewServer {
     headerOnly: boolean | number,
     scope: ViewPathScope
   ): Promise<string | undefined> {
-    file = viewPathUriString(await assertPathInViewScope(scope, file));
+    file = await resolveViewPathLocation(scope, file);
     if (this.haveInspectEvalLogFormat()) {
       return (
         await this.api_json(
@@ -186,7 +185,7 @@ export class InspectViewServer extends PackageViewServer {
     file: string,
     scope: ViewPathScope
   ): Promise<number> {
-    file = viewPathUriString(await assertPathInViewScope(scope, file));
+    file = await resolveViewPathLocation(scope, file);
     if (this.haveInspectEvalLogFormat()) {
       return Number(
         (
@@ -208,7 +207,7 @@ export class InspectViewServer extends PackageViewServer {
     file: string,
     scope: ViewPathScope
   ): Promise<number> {
-    file = viewPathUriString(await assertPathInViewScope(scope, file));
+    file = await resolveViewPathLocation(scope, file);
     if (this.haveInspectEvalLogFormat()) {
       return Number(
         (
@@ -232,7 +231,7 @@ export class InspectViewServer extends PackageViewServer {
     end: number,
     scope: ViewPathScope
   ): Promise<Uint8Array> {
-    file = viewPathUriString(await assertPathInViewScope(scope, file));
+    file = await resolveViewPathLocation(scope, file);
     if (this.haveInspectEvalLogFormat()) {
       return (
         await this.api_bytes(
@@ -251,9 +250,7 @@ export class InspectViewServer extends PackageViewServer {
     scope: ViewPathScope
   ): Promise<string | undefined> {
     files = await Promise.all(
-      files.map(async (file) =>
-        viewPathUriString(await assertPathInViewScope(scope, file))
-      )
+      files.map((file) => resolveViewPathLocation(scope, file))
     );
     if (this.haveInspectEvalLogFormat()) {
       const params = new URLSearchParams();
@@ -279,7 +276,7 @@ export class InspectViewServer extends PackageViewServer {
     etag: string | undefined,
     scope: ViewPathScope
   ): Promise<string | undefined> {
-    log_file = viewPathUriString(await assertPathInViewScope(scope, log_file));
+    log_file = await resolveViewPathLocation(scope, log_file);
     const params = new URLSearchParams();
     params.append("log", log_file);
 
@@ -317,7 +314,7 @@ export class InspectViewServer extends PackageViewServer {
     last_event?: number,
     last_attachment?: number
   ): Promise<string | undefined> {
-    log_file = viewPathUriString(await assertPathInViewScope(scope, log_file));
+    log_file = await resolveViewPathLocation(scope, log_file);
     // Url Params
     const params = new URLSearchParams();
     params.append("log", log_file);
@@ -366,7 +363,7 @@ export class InspectViewServer extends PackageViewServer {
     ifMatchEtag: string | undefined,
     scope: ViewPathScope
   ): Promise<string> {
-    file = viewPathUriString(await assertPathInViewScope(scope, file));
+    file = await resolveViewPathLocation(scope, file);
     if (!this.haveInspectEvalLogFormat()) {
       throw new Error("editLog not implemented");
     }
@@ -481,9 +478,7 @@ export class InspectViewServer extends PackageViewServer {
     request: unknown,
     scope: ViewPathScope
   ): Promise<string> {
-    transcriptDir = viewPathUriString(
-      await assertPathInViewScope(scope, transcriptDir)
-    );
+    transcriptDir = await resolveViewPathLocation(scope, transcriptDir);
     const headers = new Headers({
       "Content-Type": "application/json",
       Accept: "application/json",
@@ -518,9 +513,7 @@ export class InspectViewServer extends PackageViewServer {
     searchScope: { events?: string; messages?: string } | undefined,
     pathScope: ViewPathScope
   ): Promise<string> {
-    transcriptDir = viewPathUriString(
-      await assertPathInViewScope(pathScope, transcriptDir)
-    );
+    transcriptDir = await resolveViewPathLocation(pathScope, transcriptDir);
     const params = new URLSearchParams();
     if (searchScope?.messages) {
       params.set("messages", searchScope.messages);
@@ -551,7 +544,7 @@ export class InspectViewServer extends PackageViewServer {
     message: string | undefined,
     scope: ViewPathScope
   ): Promise<void> {
-    log_file = viewPathUriString(await assertPathInViewScope(scope, log_file));
+    log_file = await resolveViewPathLocation(scope, log_file);
     if (hasMinimumInspectVersion(kInspectLogMessageVersion)) {
       await this.api_json(
         `/api/log-message/${encodeURIComponent(log_file)}?message=${encodeURIComponent(

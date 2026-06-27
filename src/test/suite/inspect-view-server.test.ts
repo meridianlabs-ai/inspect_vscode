@@ -414,22 +414,16 @@ suite("InspectViewServer Test Suite", () => {
 
     test("scope headers preserve canonical signed query parameters", async () => {
       const headers = new Headers();
+      const location =
+        "https://example.test/run.eval?" +
+        "token=a%26b&credential=team%2Fmember";
       await addViewScopeHeaders(
         headers,
-        fileViewPathScope(
-          Uri.parse(
-            "https://example.test/run.eval?" +
-              "credential=team%2Fmember&label=hello%20world"
-          )
-        )
+        fileViewPathScope(Uri.parse(location), location)
       );
 
       assert.strictEqual(headers.get(kViewScopeKindHeader), "file");
-      assert.strictEqual(
-        headers.get(kViewScopeHeader),
-        "https://example.test/run.eval?" +
-          "credential=team%2Fmember&label=hello%20world"
-      );
+      assert.strictEqual(headers.get(kViewScopeHeader), location);
     });
   });
 
