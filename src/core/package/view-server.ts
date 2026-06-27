@@ -12,6 +12,32 @@ import { shQuote } from "../../core/string";
 
 import { PackageManager } from "./manager";
 
+// Custom request/response types for JSON-RPC proxy communication.
+// We can't use fetch's Request/Response/Headers because:
+// - They're not serializable (contain methods, streams, etc.)
+// - Headers is a class, not Record<string, string>
+// - Response.body is ReadableStream, not string
+// - We need bodyEncoding to indicate base64 for binary data
+//
+// Limitations vs native fetch:
+// - No streaming: bodies must be fully buffered as strings
+// - Binary data requires base64 encoding (adds ~33% overhead)
+// - Multi-value headers (e.g. Set-Cookie) collapse to single string
+// - Large request bodies must fit in memory
+export interface HttpProxyRpcRequest {
+  method: "GET" | "POST" | "PUT" | "DELETE";
+  path: string;
+  headers?: Record<string, string>;
+  body?: string;
+}
+
+export interface HttpProxyRpcResponse {
+  status: number;
+  headers: Record<string, string>;
+  body: string | null;
+  bodyEncoding: "utf8" | "base64";
+}
+
 export class PackageViewServer implements Disposable {
   constructor(
     context: ExtensionContext,
@@ -105,6 +131,37 @@ export class PackageViewServer implements Disposable {
         ? await response.text()
         : new Uint8Array(await response.arrayBuffer()),
       headers: responseHeaders,
+    };
+  }
+
+  /**
+   * JSON-RPC handler that proxies a webview HTTP request to the backend view
+   * server. Used by both the Inspect and Scout webviews so new viewer
+   * endpoints need no extension changes.
+   */
+  public async proxyRpcRequest(
+    request: HttpProxyRpcRequest
+  ): Promise<HttpProxyRpcResponse> {
+    await this.ensureRunning();
+
+    const { status, headers, data } = await this.serverFetch(
+      request.path,
+      request.method,
+      new Headers(request.headers),
+      request.body
+    );
+
+    const responseHeaders: Record<string, string> = {};
+    headers.forEach((value, key) => {
+      responseHeaders[key] = value;
+    });
+
+    return {
+      status,
+      headers: responseHeaders,
+      ...(data instanceof Uint8Array
+        ? { body: Buffer.from(data).toString("base64"), bodyEncoding: "base64" }
+        : { body: data, bodyEncoding: "utf8" }),
     };
   }
 
