@@ -80,12 +80,7 @@ export type Model1 = string;
 export type BaseUrl = string | null;
 export type Limit = number | [unknown, unknown] | null;
 export type SampleId =
-  | string
-  | number
-  | string[]
-  | number[]
-  | (string | number)[]
-  | null;
+  string | number | string[] | number[] | (string | number)[] | null;
 export type Epochs = number | null;
 export type EpochsReducer = string[] | null;
 export type Name2 = string;
@@ -200,8 +195,7 @@ export type Type3 = "text";
 export type Text = string;
 export type Refusal = boolean | null;
 export type Citations =
-  | (ContentCitation | DocumentCitation | UrlCitation)[]
-  | null;
+  (ContentCitation | DocumentCitation | UrlCitation)[] | null;
 export type CitedText = string | [number, number] | null;
 export type Title = string | null;
 export type Internal = {
@@ -309,10 +303,7 @@ export type Target = string | string[];
 export type Files = string[] | null;
 export type Setup = string | null;
 export type Messages = (
-  | ChatMessageSystem
-  | ChatMessageUser
-  | ChatMessageAssistant
-  | ChatMessageTool
+  ChatMessageSystem | ChatMessageUser | ChatMessageAssistant | ChatMessageTool
 )[];
 export type Model3 = string;
 export type StopReason =
@@ -381,12 +372,7 @@ export type WorkingStart1 = number;
 export type Pending1 = boolean | null;
 export type Event1 = "sample_limit";
 export type Type15 =
-  | "message"
-  | "time"
-  | "working"
-  | "token"
-  | "operator"
-  | "custom";
+  "message" | "time" | "working" | "token" | "operator" | "custom";
 export type Message2 = string;
 export type Limit1 = number | null;
 export type SpanId2 = string | null;
@@ -427,10 +413,7 @@ export type Event5 = "model";
 export type Model4 = string;
 export type Role4 = string | null;
 export type Input3 = (
-  | ChatMessageSystem
-  | ChatMessageUser
-  | ChatMessageAssistant
-  | ChatMessageTool
+  ChatMessageSystem | ChatMessageUser | ChatMessageAssistant | ChatMessageTool
 )[];
 export type Name8 = string;
 export type Description2 = string;
@@ -484,11 +467,7 @@ export type Event7 = "approval";
 export type Message3 = string;
 export type Approver = string;
 export type Decision =
-  | "approve"
-  | "modify"
-  | "reject"
-  | "escalate"
-  | "terminate";
+  "approve" | "modify" | "reject" | "escalate" | "terminate";
 export type Explanation1 = string | null;
 export type SpanId8 = string | null;
 export type Timestamp8 = string;
@@ -633,13 +612,7 @@ export type WorkingTime3 = number | null;
 export type Uuid = string | null;
 export type ErrorRetries = EvalError[] | null;
 export type Type21 =
-  | "context"
-  | "time"
-  | "working"
-  | "message"
-  | "token"
-  | "operator"
-  | "custom";
+  "context" | "time" | "working" | "message" | "token" | "operator" | "custom";
 export type Limit2 = number;
 export type Reductions = EvalSampleReductions[] | null;
 export type Scorer1 = string;
