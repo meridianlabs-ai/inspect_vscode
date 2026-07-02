@@ -19,7 +19,7 @@
     "url": "https://github.com/meridianlabs-ai/inspect_vscode/issues"
   },
   "engines": {
-    "vscode": "^1.93.0",
+    "vscode": "^1.125.0",
     "node": ">=22.0.0"
   },
   "capabilities": {
