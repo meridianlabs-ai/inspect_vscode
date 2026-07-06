@@ -15,8 +15,8 @@ importers:
         specifier: ^2.30.6
         version: 2.30.6
       '@microsoft/fast-element':
-        specifier: ^3.0.0
-        version: 3.0.0
+        specifier: ^3.0.1
+        version: 3.0.1
       '@vscode/webview-ui-toolkit':
         specifier: ^1.4.0
         version: 1.4.0(react@19.2.5)
@@ -368,8 +368,8 @@ packages:
   '@microsoft/fast-element@1.14.0':
     resolution: {integrity: sha512-zXvuSOzvsu8zDTy9eby8ix8VqLop2rwKRgp++ZN2kTCsoB3+QJVoaGD2T/Cyso2ViZQFXNpiNCVKfnmxBvmWkQ==}
 
-  '@microsoft/fast-element@3.0.0':
-    resolution: {integrity: sha512-XjOUCGT0zSueOzNyelA6qq+Gvu6QiC1mT1s9Th2xwoqVTHsUV9xr7zJO74ZHoiT2+/jIXu7/wnVgalug0b1RzQ==}
+  '@microsoft/fast-element@3.0.1':
+    resolution: {integrity: sha512-euVlL8v7EAnkYD9gf6xhnY+XgzCkD0hHwC0MVsUVyhnKfGGhrNyBeD5kYnBOCcJ9afL2jTQoOA+oOpLEty3s+A==}
 
   '@microsoft/fast-foundation@2.50.0':
     resolution: {integrity: sha512-8mFYG88Xea1jZf2TI9Lm/jzZ6RWR8x29r24mGuLojNYqIR2Bl8+hnswoV6laApKdCbGMPKnsAL/O68Q0sRxeVg==}
@@ -3415,7 +3415,7 @@ snapshots:
 
   '@microsoft/fast-element@1.14.0': {}
 
-  '@microsoft/fast-element@3.0.0': {}
+  '@microsoft/fast-element@3.0.1': {}
 
   '@microsoft/fast-foundation@2.50.0':
     dependencies:
