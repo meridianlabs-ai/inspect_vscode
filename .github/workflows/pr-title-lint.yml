@@ -1,0 +1,9 @@
+name: PR Title Lint
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+jobs:
+  lint:
+    uses: meridianlabs-ai/actions/.github/workflows/pr-title-lint.yml@v1
