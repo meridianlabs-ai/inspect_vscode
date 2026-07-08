@@ -6,4 +6,6 @@ on:
 
 jobs:
   lint:
+    permissions:
+      pull-requests: read
     uses: meridianlabs-ai/actions/.github/workflows/pr-title-lint.yml@v1
