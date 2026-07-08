@@ -8,6 +8,10 @@ updates:
       dev-dependencies:
         dependency-type: "development"
     open-pull-requests-limit: 5
+    ignore:
+      # Pin @types/vscode to the minimum supported VS Code version.
+      # We don't want to force use of too new a version of VS Code.
+      - dependency-name: "@types/vscode"
 
   - package-ecosystem: "github-actions"
     directory: "/"
