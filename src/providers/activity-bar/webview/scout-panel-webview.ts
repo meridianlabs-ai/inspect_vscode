@@ -6,6 +6,8 @@ import {
   provideVSCodeDesignSystem,
 } from "@vscode/webview-ui-toolkit";
 
+import { isMessageFromHost } from "./webview-utils";
+
 // Declare the acquireVsCodeApi function
 declare function acquireVsCodeApi(): {
   postMessage(message: unknown): void;
@@ -20,6 +22,9 @@ function init() {
 
   // Handle messages from the extension
   window.addEventListener("message", (e: MessageEvent) => {
+    if (!isMessageFromHost(e)) {
+      return;
+    }
     const message = e.data;
     switch (message.type) {
       case "initialize":

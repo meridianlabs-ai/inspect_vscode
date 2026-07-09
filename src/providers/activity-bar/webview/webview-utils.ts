@@ -2,6 +2,12 @@ import { debounce } from "lodash";
 
 export const kBounceInterval = 200;
 
+// True when a message event was relayed by the VS Code webview host (the
+// webview's parent frame) rather than posted by some other window.
+export const isMessageFromHost = (e: MessageEvent) => {
+  return e.origin === window.origin || e.source === window.parent;
+};
+
 export const restoreInputState = (id: string, value?: string) => {
   const el = document.getElementById(id) as HTMLInputElement;
   if (value) {

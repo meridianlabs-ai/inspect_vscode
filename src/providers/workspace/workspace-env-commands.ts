@@ -1,4 +1,4 @@
-import { existsSync, writeFileSync } from "fs";
+import { writeFileSync } from "fs";
 
 import { window, workspace } from "vscode";
 
@@ -15,10 +15,9 @@ export class EditEnvFileCommand implements Command {
     // The path to the env file
     const absPath = workspacePath(`.env`);
 
-    // Ensure env file actually exists
-    if (!existsSync(absPath.path)) {
-      writeFileSync(absPath.path, "", { encoding: "utf-8" });
-    }
+    // Ensure env file actually exists (append mode creates the file if
+    // missing without truncating one created in the meantime)
+    writeFileSync(absPath.path, "", { encoding: "utf-8", flag: "a" });
 
     // Open the env file
     const document = await workspace.openTextDocument(absPath.path);
