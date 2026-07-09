@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.9.14](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.9.13...v0.9.14) (2026-07-09)
+
+
+### Bug Fixes
+
+* Fix possible file races in environment file management ([#136](https://github.com/meridianlabs-ai/inspect_vscode/issues/136)) ([6b387f7](https://github.com/meridianlabs-ai/inspect_vscode/commit/6b387f78f05a4453981c614fd1970741c07f456e))
+* grant pull-requests: read to pr-title-lint caller ([#133](https://github.com/meridianlabs-ai/inspect_vscode/issues/133)) ([73b13f4](https://github.com/meridianlabs-ai/inspect_vscode/commit/73b13f4f29b9be327b3d9861afcbdcee68d9ccde))
+* skip Claude review on release-bot PRs ([#135](https://github.com/meridianlabs-ai/inspect_vscode/issues/135)) ([21cade1](https://github.com/meridianlabs-ai/inspect_vscode/commit/21cade1ad97ef31c7ddc91191745622997e3a51d))
+
 ## [0.9.13](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.9.12...v0.9.13) (2026-06-27)
 
 
