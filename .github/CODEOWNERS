@@ -5,5 +5,5 @@
 # without affecting normal feature PRs. Pair with the `protect main` ruleset's
 # "Require review from Code Owners".
 
-/CHANGELOG.md                    @dragonstyle @jjallaire @epatey
-/.release-please-manifest.json   @dragonstyle @jjallaire @epatey
+/CHANGELOG.md                    @dragonstyle @epatey @brandly
+/.release-please-manifest.json   @dragonstyle @epatey @brandly
