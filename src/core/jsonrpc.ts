@@ -46,6 +46,11 @@ export function webViewJsonRpcClient(vscode: {
     },
     onMessage: (handler: (data: unknown) => void) => {
       const onMessage = (ev: MessageEvent) => {
+        // Only handle messages relayed by the VS Code webview host (the
+        // webview's parent frame) — ignore anything posted by other windows.
+        if (ev.origin !== window.origin && ev.source !== window.parent) {
+          return;
+        }
         handler(ev.data);
       };
       window.addEventListener("message", onMessage);

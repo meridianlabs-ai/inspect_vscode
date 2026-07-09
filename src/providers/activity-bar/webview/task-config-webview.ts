@@ -14,6 +14,7 @@ import {
 import { DocumentState } from "../../workspace/workspace-state-provider";
 
 import {
+  isMessageFromHost,
   restoreInputState,
   setControlsVisible,
   showEmptyPanel,
@@ -34,6 +35,9 @@ const vscode = acquireVsCodeApi();
 
 // Process messages
 window.addEventListener("message", (e) => {
+  if (!isMessageFromHost(e)) {
+    return;
+  }
   switch (e.data.type) {
     case "initialize":
       showEmptyPanel("No task selected", "configuration-controls");

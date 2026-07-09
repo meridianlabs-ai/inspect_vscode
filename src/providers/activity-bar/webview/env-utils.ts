@@ -12,7 +12,7 @@ import {
 } from "@vscode/webview-ui-toolkit";
 
 import { attachModelListeners } from "./env-utils-model";
-import { showEmptyPanel } from "./webview-utils";
+import { isMessageFromHost, showEmptyPanel } from "./webview-utils";
 
 // Declare the acquireVsCodeApi function to tell TypeScript about it
 declare function acquireVsCodeApi(): any;
@@ -32,6 +32,9 @@ export function initEnv(
 
   // Process messages
   window.addEventListener("message", (e) => {
+    if (!isMessageFromHost(e)) {
+      return;
+    }
     switch (e.data.type) {
       case "initialize":
         // Set the env values

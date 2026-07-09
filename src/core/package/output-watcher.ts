@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, statSync } from "fs";
+import { closeSync, fstatSync, openSync, readFileSync } from "fs";
 
 import { Disposable, Event, EventEmitter, Uri } from "vscode";
 
@@ -42,8 +42,19 @@ export class OutputWatcher implements Disposable {
 
     this.watchInterval_ = setInterval(() => {
       for (const evalSignalFile of evalSignalFiles) {
-        if (existsSync(evalSignalFile.path)) {
-          const updated = statSync(evalSignalFile.path).mtime.getTime();
+        // Open the signal file and stat/read through the file descriptor so
+        // that the mtime check and the read can't race a concurrent
+        // delete/replace of the file
+        let fd: number;
+        try {
+          fd = openSync(evalSignalFile.path, "r");
+        } catch {
+          // There is no signal file (yet)
+          continue;
+        }
+
+        try {
+          const updated = fstatSync(fd).mtime.getTime();
 
           const lastTime =
             evalSignalFile.type === "log" ? this.lastLog_ : this.lastScan_;
@@ -57,7 +68,7 @@ export class OutputWatcher implements Disposable {
 
             let evalLogPath: string | undefined;
             let workspaceId;
-            const contents = readFileSync(evalSignalFile.path, {
+            const contents = readFileSync(fd, {
               encoding: "utf-8",
             });
 
@@ -108,6 +119,8 @@ export class OutputWatcher implements Disposable {
               }
             }
           }
+        } finally {
+          closeSync(fd);
         }
       }
     }, 500);

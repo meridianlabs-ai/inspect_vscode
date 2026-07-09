@@ -1,19 +1,12 @@
-import { existsSync, readFileSync, writeFileSync } from "fs";
+import { readFileSync, writeFileSync } from "fs";
 
 import { Uri } from "vscode";
 
 import { lines } from "./text";
 
 export const readEnv = (file: Uri): Record<string, string> => {
-  // There is no env file, no env settings
-  if (!existsSync(file.fsPath)) {
-    return {};
-  }
-
-  // Read the env file
+  // Read the env file (empty if there is no env file)
   const envLines = readEnvLines(file);
-
-  // Read the env file
   return envLines
     .map((line) => {
       return readLine(line);
@@ -31,7 +24,7 @@ export const readEnv = (file: Uri): Record<string, string> => {
 
 export const writeEnv = (key: string, value: string, file: Uri) => {
   // Read the env file
-  const envLines = existsSync(file.fsPath) ? readEnvLines(file) : [];
+  const envLines = readEnvLines(file);
   const outLines = [];
 
   let valueWritten = false;
@@ -53,7 +46,7 @@ export const writeEnv = (key: string, value: string, file: Uri) => {
 
 export const clearEnv = (key: string, file: Uri) => {
   // Read the env file
-  const envLines = existsSync(file.fsPath) ? readEnvLines(file) : [];
+  const envLines = readEnvLines(file);
   const outLines = [];
 
   for (const line of envLines) {
@@ -91,7 +84,17 @@ function readLine(line: string) {
 }
 
 function readEnvLines(file: Uri) {
-  const envRaw = readFileSync(file.fsPath, { encoding: "utf-8" });
+  // Treat a missing env file as empty rather than checking existence
+  // beforehand (the file could appear or disappear in between)
+  let envRaw: string;
+  try {
+    envRaw = readFileSync(file.fsPath, { encoding: "utf-8" });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      return [];
+    }
+    throw error;
+  }
   return lines(envRaw);
 }
 
