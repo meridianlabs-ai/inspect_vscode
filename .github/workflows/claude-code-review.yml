@@ -12,8 +12,12 @@ on:
 
 jobs:
   claude-review:
-    # Skip PRs opened by Claude bot
-    if: github.event.pull_request.user.login != 'claude[bot]' && github.actor != 'dependabot[bot]'
+    # Skip PRs opened by bots (Claude, Dependabot, and the release bot — release
+    # PRs are machine-generated changelog/version bumps that don't need AI review).
+    if: >-
+      github.event.pull_request.user.login != 'claude[bot]'
+      && github.event.pull_request.user.login != 'meridian-release-bot[bot]'
+      && github.actor != 'dependabot[bot]'
 
     runs-on: ubuntu-latest
     permissions:
