@@ -149,6 +149,16 @@ docs: Update installation instructions
 refactor: Extract webview messaging into separate module
 ```
 
+### How commits become releases
+
+Because we squash-merge, **the PR title becomes the commit message** that
+[Release Please](https://github.com/googleapis/release-please) reads — so format
+the PR title as a conventional commit too. Only `feat:` and `fix:` appear in the
+release notes and drive the version bump; reserve them for user-facing changes.
+
+**Don't edit `CHANGELOG.md` or bump the version by hand.** Release Please opens a
+release PR that updates both; merging that PR tags and publishes the extension.
+
 ## Building for Release
 
 ```bash
