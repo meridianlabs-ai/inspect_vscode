@@ -3,6 +3,12 @@ name: Release
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      target-branch:
+        description: "Maintenance branch to release from (e.g. hotfix/1.4.x). Leave as main for a normal release."
+        type: string
+        default: main
 
 jobs:
   release:
@@ -12,4 +18,5 @@ jobs:
     uses: meridianlabs-ai/actions/.github/workflows/release-please-vscode.yml@v1
     with:
       extension-id: ukaisi.inspect-ai
+      target-branch: ${{ inputs.target-branch }}
     secrets: inherit
