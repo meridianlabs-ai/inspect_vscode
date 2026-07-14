@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       target-branch:
-        description: "Maintenance branch to release from (e.g. hotfix/1.4.x). Leave as main for a normal release."
+        description: "Maintenance branch to release from (e.g. hotfix/1.4.x). Must match the branch selected in 'Use workflow from' (publish checks out that ref). Leave as main for a normal release."
         type: string
         default: main
 
