@@ -149,6 +149,20 @@ docs: Update installation instructions
 refactor: Extract webview messaging into separate module
 ```
 
+### How commits become releases
+
+Format the **PR title as a conventional commit** (`<type>: <description>`) — that's
+what `pr-title-lint` enforces and what
+[Release Please](https://github.com/googleapis/release-please) reads to build the
+changelog and pick the next version. Use `feat:`/`fix:` for user-facing changes:
+they headline the release notes and drive the version bump (`feat` → minor,
+`fix` → patch, a breaking change → major). `perf:`/`revert:` also appear in the
+notes; `docs:`/`refactor:`/`chore:`/`build:`/`ci:`/`test:` are hidden.
+
+**Don't edit `CHANGELOG.md` or bump the version by hand.** Release Please opens a
+release PR that updates both; merging it tags the release, and — once a maintainer
+approves the `marketplace` deployment — publishes the extension.
+
 ## Building for Release
 
 ```bash
