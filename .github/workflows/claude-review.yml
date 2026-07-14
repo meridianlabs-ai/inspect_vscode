@@ -22,8 +22,20 @@ jobs:
   review:
     # Run on PR events, or on a PR comment containing @review. `@review` does
     # not collide with the dev agent's `@claude` trigger.
+    #
+    # Auto-review is skipped for:
+    # - Release Please PRs (meridian-release-bot): machine-generated
+    #   changelog/version bumps — the review action also rejects non-human
+    #   actors, so these runs could only fail.
+    # - PRs from forks and Dependabot: GitHub withholds the OIDC id-token from
+    #   those pull_request runs, so the reviewer's WIF auth cannot work.
+    # All are still reviewable on demand via an @review comment (issue_comment
+    # runs in the base-repo context as the human commenter).
     if: >
-      github.event_name == 'pull_request' ||
+      (github.event_name == 'pull_request' &&
+       github.event.pull_request.head.repo.full_name == github.repository &&
+       github.actor != 'dependabot[bot]' &&
+       github.event.pull_request.user.login != 'meridian-release-bot[bot]') ||
       (github.event.issue.pull_request != null &&
        contains(github.event.comment.body, '@review'))
     uses: meridianlabs-ai/agents/.github/workflows/claude-review.yml@main
