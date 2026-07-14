@@ -1,5 +1,69 @@
 # Changelog
 
+## [0.3.65](https://github.com/meridianlabs-ai/inspect_vscode/compare/inspect-ai-v0.9.14...inspect-ai-v0.3.65) (2026-07-14)
+
+
+### Features
+
+* Improved Scout Support ([#44](https://github.com/meridianlabs-ai/inspect_vscode/issues/44)) ([c9d00f5](https://github.com/meridianlabs-ai/inspect_vscode/commit/c9d00f595402e7c9392a06345281439da3336a00))
+* Inspect Scout Support ([#14](https://github.com/meridianlabs-ai/inspect_vscode/issues/14)) ([cbc0819](https://github.com/meridianlabs-ai/inspect_vscode/commit/cbc081976f7cf6a669c37735e51054cadbb27b09))
+* Scout Activity Panel and other Scout improvements ([#53](https://github.com/meridianlabs-ai/inspect_vscode/issues/53)) ([de27d4d](https://github.com/meridianlabs-ai/inspect_vscode/commit/de27d4d920d4b7098011b7076af042cf4c7dea2a))
+* show log and scan views in main column ([#28](https://github.com/meridianlabs-ai/inspect_vscode/issues/28)) ([f873c10](https://github.com/meridianlabs-ai/inspect_vscode/commit/f873c10c5c2e48f4cec6daf8d57850530e0a2591))
+* Sort folders (and logs) by most recently updated ([#10](https://github.com/meridianlabs-ai/inspect_vscode/issues/10)) ([3b398df](https://github.com/meridianlabs-ai/inspect_vscode/commit/3b398df1c1691676f0203fc094559547dd10f34c))
+* Support for improved scout view performance ([#30](https://github.com/meridianlabs-ai/inspect_vscode/issues/30)) ([a1dcf80](https://github.com/meridianlabs-ai/inspect_vscode/commit/a1dcf804498bfb109e997d82660f6dee808d2f24))
+
+
+### Bug Fixes
+
+* ‘Inspect View’ command doesn’t respect the selected directory ([#35](https://github.com/meridianlabs-ai/inspect_vscode/issues/35)) ([48e3ff6](https://github.com/meridianlabs-ai/inspect_vscode/commit/48e3ff61d6710bdafd8893d626ce33bc073c4989))
+* add --no-dependencies to vsce publish in release workflow ([#80](https://github.com/meridianlabs-ai/inspect_vscode/issues/80)) ([5654594](https://github.com/meridianlabs-ai/inspect_vscode/commit/56545942d774bfa599ab039d805b238099f51bcf))
+* Add HTTP proxy for webview-to-server communication ([#41](https://github.com/meridianlabs-ai/inspect_vscode/issues/41)) ([bec8833](https://github.com/meridianlabs-ai/inspect_vscode/commit/bec883340e38ce05555aaa62537c12009056417b))
+* add petri package index depth ([#68](https://github.com/meridianlabs-ai/inspect_vscode/issues/68)) ([8e2b4ac](https://github.com/meridianlabs-ai/inspect_vscode/commit/8e2b4acf8f5f65a4c56c4db3a72b8c3ec4d54249))
+* Add support for displaying client log messages in the output channel ([#2](https://github.com/meridianlabs-ai/inspect_vscode/issues/2)) ([6fcb364](https://github.com/meridianlabs-ai/inspect_vscode/commit/6fcb36480def0efbfca43151219cfd41920a13ae))
+* Add trace log level to tasks panel logging select box ([2e148f2](https://github.com/meridianlabs-ai/inspect_vscode/commit/2e148f2c31c79cbd34f9ff9384bbdb87d6557b8a))
+* Add yaml completion/diagnostics for Inspect Scout ([#39](https://github.com/meridianlabs-ai/inspect_vscode/issues/39)) ([7ac4333](https://github.com/meridianlabs-ai/inspect_vscode/commit/7ac433390558c8f1bdd3506c2fb562d452005fce))
+* detect octet-stream responses as binary in serverFetch ([#87](https://github.com/meridianlabs-ai/inspect_vscode/issues/87)) ([a600dcf](https://github.com/meridianlabs-ai/inspect_vscode/commit/a600dcfd56b25dbe41593f90b72accdd7ae25498))
+* Disable scan notify command ([48b4a9e](https://github.com/meridianlabs-ai/inspect_vscode/commit/48b4a9e2abda85368aed5bdc3125273365ff8c2d))
+* Exclude empty task params when running an evaluation using the task panel ([4bc2140](https://github.com/meridianlabs-ai/inspect_vscode/commit/4bc214086379db83d3ecea89df2698442868dd53))
+* Fix error opening S3 scans ([#89](https://github.com/meridianlabs-ai/inspect_vscode/issues/89)) ([250d36e](https://github.com/meridianlabs-ai/inspect_vscode/commit/250d36e3bb6369c045b0f39cd4862becf73bf4a4))
+* Fix issue displaying S3 log directories with duplicated eval files ([#62](https://github.com/meridianlabs-ai/inspect_vscode/issues/62)) ([0763c08](https://github.com/meridianlabs-ai/inspect_vscode/commit/0763c0807cbdebee46b9b072798e839d0b2e657f))
+* Fix possible file races in environment file management ([#136](https://github.com/meridianlabs-ai/inspect_vscode/issues/136)) ([6b387f7](https://github.com/meridianlabs-ai/inspect_vscode/commit/6b387f78f05a4453981c614fd1970741c07f456e))
+* Fix support for scout view ([#20](https://github.com/meridianlabs-ai/inspect_vscode/issues/20)) ([005fda2](https://github.com/meridianlabs-ai/inspect_vscode/commit/005fda218a2c3eb6cb5d1a8a0dcb8f66afb90e4b))
+* grant pull-requests: read to pr-title-lint caller ([#133](https://github.com/meridianlabs-ai/inspect_vscode/issues/133)) ([73b13f4](https://github.com/meridianlabs-ai/inspect_vscode/commit/73b13f4f29b9be327b3d9861afcbdcee68d9ccde))
+* harden script-tag nonce injection regex (CodeQL js/bad-tag-filter) ([#119](https://github.com/meridianlabs-ai/inspect_vscode/issues/119)) ([4093d64](https://github.com/meridianlabs-ai/inspect_vscode/commit/4093d64fd2e61f013b33f6813cc91c134cdee594))
+* harden webview CSP, URI handler, and nonce generation ([#101](https://github.com/meridianlabs-ai/inspect_vscode/issues/101)) ([9ae866c](https://github.com/meridianlabs-ai/inspect_vscode/commit/9ae866c70908fff88f83bf2fe9d917028a61943f))
+* Improve behavior when clicking on non-scan parquet files ([#64](https://github.com/meridianlabs-ai/inspect_vscode/issues/64)) ([db4ab98](https://github.com/meridianlabs-ai/inspect_vscode/commit/db4ab98065b48d8978c35edec62c5c3d79c75254))
+* Improve Eval Link Detection ([#59](https://github.com/meridianlabs-ai/inspect_vscode/issues/59)) ([70281ea](https://github.com/meridianlabs-ai/inspect_vscode/commit/70281eac5198942d962279196f221aba4494347c))
+* Improve viewer file resolution ([#70](https://github.com/meridianlabs-ai/inspect_vscode/issues/70)) ([e2cb27e](https://github.com/meridianlabs-ai/inspect_vscode/commit/e2cb27e2eddb0b8ed01c63ab26919ee88059a8f6))
+* Improved task panel (add sample ids, add better help, add validation) ([ab09fdd](https://github.com/meridianlabs-ai/inspect_vscode/commit/ab09fddcc52ca41c840507e5140fb6a983a44bbc))
+* Inherit process env for things like credentials ([#60](https://github.com/meridianlabs-ai/inspect_vscode/issues/60)) ([c0aa181](https://github.com/meridianlabs-ai/inspect_vscode/commit/c0aa18186e645118e8f03fb56c145d79675d5bd2))
+* Inspect View command works with latest version of Inspect ([#12](https://github.com/meridianlabs-ai/inspect_vscode/issues/12)) ([025c5be](https://github.com/meridianlabs-ai/inspect_vscode/commit/025c5be73cc8533ac9678c24e21b07321b34d09d))
+* make detectShellKind fallback test platform-aware ([#109](https://github.com/meridianlabs-ai/inspect_vscode/issues/109)) ([bcf9351](https://github.com/meridianlabs-ai/inspect_vscode/commit/bcf935137654fbc3e61935bfb06dacaae2e70ca5))
+* parse log task name with basename instead of split("/") ([#107](https://github.com/meridianlabs-ai/inspect_vscode/issues/107)) ([c16701c](https://github.com/meridianlabs-ai/inspect_vscode/commit/c16701c91f75878d176f025a2413608c00c07ecd))
+* Properly resolve imports to other Meridian packages ([#18](https://github.com/meridianlabs-ai/inspect_vscode/issues/18)) ([81d763c](https://github.com/meridianlabs-ai/inspect_vscode/commit/81d763c7ce3421489e96bc67b27af113d04d3c88))
+* quote run commands per-shell (fix space-in-path + command injection) ([#95](https://github.com/meridianlabs-ai/inspect_vscode/issues/95)) ([56997fd](https://github.com/meridianlabs-ai/inspect_vscode/commit/56997fdaa03cfc8b2bc92039e86bedbc828100a5))
+* Refresh log listing when the workspace log dir changes ([#8](https://github.com/meridianlabs-ai/inspect_vscode/issues/8)) ([91b723e](https://github.com/meridianlabs-ai/inspect_vscode/commit/91b723ec126d3b9d0e1f3784956475ddae22c3da))
+* Regression which broke log viewing ([#32](https://github.com/meridianlabs-ai/inspect_vscode/issues/32)) ([2815388](https://github.com/meridianlabs-ai/inspect_vscode/commit/2815388dd7166bf17ab951278dc6ce50de8af2f7))
+* relativize log listing locations tolerantly (URI vs plain path) ([#110](https://github.com/meridianlabs-ai/inspect_vscode/issues/110)) ([1ba97e5](https://github.com/meridianlabs-ai/inspect_vscode/commit/1ba97e50ae364323230fb10967bb64888ab360d7))
+* Require Inspect AI installation for command enablement ([#85](https://github.com/meridianlabs-ai/inspect_vscode/issues/85)) ([62003ad](https://github.com/meridianlabs-ai/inspect_vscode/commit/62003ad33025d2285317a52f5884c88573699750))
+* Require Scout 0.4.13 ([#56](https://github.com/meridianlabs-ai/inspect_vscode/issues/56)) ([65e4a81](https://github.com/meridianlabs-ai/inspect_vscode/commit/65e4a8158d74a0782fc76fa5c86c45269aa09496))
+* Resolve Inspect view dist path from server to handle LFS stubs ([#69](https://github.com/meridianlabs-ai/inspect_vscode/issues/69)) ([ed1e199](https://github.com/meridianlabs-ai/inspect_vscode/commit/ed1e1992648885e586638807b8cf4a4fefcbf1a9))
+* resolve js-yaml DoS advisory (Dependabot alert 87) ([#137](https://github.com/meridianlabs-ai/inspect_vscode/issues/137)) ([fd49e9c](https://github.com/meridianlabs-ai/inspect_vscode/commit/fd49e9c8041d975ec95d44c387bdf5bd60a291e9))
+* Resolve Scout view dist path from server to handle LFS stubs ([#66](https://github.com/meridianlabs-ai/inspect_vscode/issues/66)) ([d364c2e](https://github.com/meridianlabs-ai/inspect_vscode/commit/d364c2e4844be3febfb757b66283ebc9beeeea6a))
+* resolve serialize-javascript security vulnerabilities ([#73](https://github.com/meridianlabs-ai/inspect_vscode/issues/73)) ([92d5f83](https://github.com/meridianlabs-ai/inspect_vscode/commit/92d5f83a746f7dcca768f5946e0d70023ef1aa13))
+* Scout View no longer resets app state when tabbed away ([#91](https://github.com/meridianlabs-ai/inspect_vscode/issues/91)) ([#92](https://github.com/meridianlabs-ai/inspect_vscode/issues/92)) ([4f9a3b0](https://github.com/meridianlabs-ai/inspect_vscode/commit/4f9a3b03ac0884e8fbaf4bb37675e0d8fd72ae1c))
+* skip Claude review on release-bot PRs ([#135](https://github.com/meridianlabs-ai/inspect_vscode/issues/135)) ([21cade1](https://github.com/meridianlabs-ai/inspect_vscode/commit/21cade1ad97ef31c7ddc91191745622997e3a51d))
+* Support scout navigate to specific scanner ([a721662](https://github.com/meridianlabs-ai/inspect_vscode/commit/a721662dac1f2ba4850cd6cd8cb263e4c0be95b4))
+* Support scout navigate to specific scanner ([5deeeea](https://github.com/meridianlabs-ai/inspect_vscode/commit/5deeeeacaf9cbc05a362e22e252f59c008345c79))
+* trigger release for recent changes ([#26](https://github.com/meridianlabs-ai/inspect_vscode/issues/26)) ([0e07fbb](https://github.com/meridianlabs-ai/inspect_vscode/commit/0e07fbb480bb55dee691b5358bd54132b29cfc1f))
+* update scout yaml schemas ([#67](https://github.com/meridianlabs-ai/inspect_vscode/issues/67)) ([04f2868](https://github.com/meridianlabs-ai/inspect_vscode/commit/04f28683b851cd8c74ec1f133fa257a458ad160d))
+* Use non-conflicting scout port ([#19](https://github.com/meridianlabs-ai/inspect_vscode/issues/19)) ([d9e1de1](https://github.com/meridianlabs-ai/inspect_vscode/commit/d9e1de1ffbf2cec35b76edc9c53410e3279908e7))
+
+
+### Miscellaneous
+
+* release 0.3.65 ([a0dc52b](https://github.com/meridianlabs-ai/inspect_vscode/commit/a0dc52b7d65de11be07136ff979e84d3be670d9d))
+
 ## [0.9.14](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.9.13...v0.9.14) (2026-07-09)
 
 
