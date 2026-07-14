@@ -1,6 +1,5 @@
 {
   "release-type": "node",
-  "include-v-in-tag": true,
   "packages": {
     ".": {
       "changelog-sections": [
@@ -22,15 +21,18 @@
         },
         {
           "type": "refactor",
-          "section": "Code Refactoring"
+          "section": "Code Refactoring",
+          "hidden": true
         },
         {
           "type": "docs",
-          "section": "Documentation"
+          "section": "Documentation",
+          "hidden": true
         },
         {
           "type": "chore",
-          "section": "Miscellaneous"
+          "section": "Miscellaneous",
+          "hidden": true
         },
         {
           "type": "build",
@@ -52,10 +54,7 @@
           "section": "Styles",
           "hidden": true
         }
-      ],
-      "release-notes-config": {
-        "grouping": true
-      }
+      ]
     }
   }
 }
