@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.15](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.9.14...v0.9.15) (2026-07-21)
+
+
+### Bug Fixes
+
+* resolve js-yaml DoS advisory (Dependabot alert 87) ([#137](https://github.com/meridianlabs-ai/inspect_vscode/issues/137)) ([fd49e9c](https://github.com/meridianlabs-ai/inspect_vscode/commit/fd49e9c8041d975ec95d44c387bdf5bd60a291e9))
+
 ## [0.9.14](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.9.13...v0.9.14) (2026-07-09)
 
 
