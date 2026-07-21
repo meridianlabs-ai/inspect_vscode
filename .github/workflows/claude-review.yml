@@ -1,7 +1,8 @@
 # Copy to .github/workflows/claude-review.yml in any Meridian repo to add the
-# read-only reviewer. Auto-reviews PRs when they open and on demand via an
-# @review comment. Independent of the dev agent (claude.yml) — different
-# trigger, different (lower) permissions.
+# read-only reviewer. Auto-reviews PRs when they open (drafts are skipped
+# until marked ready for review) and on demand via an @review comment.
+# Independent of the dev agent (claude.yml) — different trigger, different
+# (lower) permissions.
 #
 # Caveat: auto-review-on-open (the pull_request trigger) only fires where this
 # file exists on the PR's BASE branch — GitHub resolves pull_request-family
@@ -20,22 +21,13 @@ on:
 
 jobs:
   review:
-    # Run on PR events, or on a PR comment containing @review. `@review` does
-    # not collide with the dev agent's `@claude` trigger.
-    #
-    # Auto-review is skipped for:
-    # - Release Please PRs (meridian-release-bot): machine-generated
-    #   changelog/version bumps — the review action also rejects non-human
-    #   actors, so these runs could only fail.
-    # - PRs from forks and Dependabot: GitHub withholds the OIDC id-token from
-    #   those pull_request runs, so the reviewer's WIF auth cannot work.
-    # All are still reviewable on demand via an @review comment (issue_comment
-    # runs in the base-repo context as the human commenter).
+    # Run on PR events (skipping drafts — they get reviewed via
+    # ready_for_review when marked ready), or on a PR comment containing
+    # @review. An explicit @review still works on a draft. `@review` does not
+    # collide with the dev agent's `@claude` trigger.
     if: >
       (github.event_name == 'pull_request' &&
-       github.event.pull_request.head.repo.full_name == github.repository &&
-       github.actor != 'dependabot[bot]' &&
-       github.event.pull_request.user.login != 'meridian-release-bot[bot]') ||
+       github.event.pull_request.draft != true) ||
       (github.event.issue.pull_request != null &&
        contains(github.event.comment.body, '@review'))
     uses: meridianlabs-ai/agents/.github/workflows/claude-review.yml@main
