@@ -22,12 +22,14 @@ on:
 jobs:
   review:
     # Run on PR events (skipping drafts — they get reviewed via
-    # ready_for_review when marked ready), or on a PR comment containing
-    # @review. An explicit @review still works on a draft. `@review` does not
+    # ready_for_review when marked ready — and dependabot PRs, which don't
+    # need agent review), or on a PR comment containing @review. An explicit
+    # @review still works on a draft or dependabot PR. `@review` does not
     # collide with the dev agent's `@claude` trigger.
     if: >
       (github.event_name == 'pull_request' &&
-       github.event.pull_request.draft != true) ||
+       github.event.pull_request.draft != true &&
+       github.event.pull_request.user.login != 'dependabot[bot]') ||
       (github.event.issue.pull_request != null &&
        contains(github.event.comment.body, '@review'))
     uses: meridianlabs-ai/agents/.github/workflows/claude-review.yml@main
