@@ -1,12 +1,17 @@
 import { ExtensionContext, Uri } from "vscode";
 
 import { PackageManager } from "../../core/package/manager";
-import { PackageViewServer } from "../../core/package/view-server";
+import {
+  HttpProxyRpcRequest,
+  HttpProxyRpcResponse,
+  PackageViewServer,
+} from "../../core/package/view-server";
 import {
   AbsolutePath,
   activeWorkspacePath,
   toAbsolutePath,
 } from "../../core/path";
+import { resolveViewPathLocation, ViewPathScope } from "../../core/uri";
 import { activeWorkspaceFolder } from "../../core/workspace";
 import {
   inspectEvalLog,
@@ -23,6 +28,7 @@ import {
   kInspectEvalLogFormatVersion,
   kInspectLogMessageVersion,
   kInspectOpenInspectViewVersion,
+  kInspectScopedAuthorizationVersion,
 } from "./inspect-constants";
 
 const kNotFoundSignal = "NotFound";
@@ -52,6 +58,29 @@ export class InspectViewServer extends PackageViewServer {
     );
   }
 
+  public supportsScopedHttpProxy(): boolean {
+    return hasMinimumInspectVersion(kInspectScopedAuthorizationVersion);
+  }
+
+  protected override viewArgs(): string[] {
+    return [
+      ...super.viewArgs(),
+      ...(this.supportsScopedHttpProxy() ? ["--scoped-authorization"] : []),
+    ];
+  }
+
+  public override async proxyRpcRequest(
+    request: HttpProxyRpcRequest,
+    scope?: ViewPathScope
+  ): Promise<HttpProxyRpcResponse> {
+    if (!this.supportsScopedHttpProxy() || !scope) {
+      throw new Error(
+        "Generic viewer requests require scoped authorization support."
+      );
+    }
+    return await super.proxyRpcRequest(request, scope);
+  }
+
   public async evalLogDir(): Promise<string | undefined> {
     if (this.haveInspectEvalLogFormat()) {
       return (await this.api_json(`/api/log-dir`)).data;
@@ -63,8 +92,10 @@ export class InspectViewServer extends PackageViewServer {
   public async evalLogFiles(
     log_dir: string,
     mtime: number,
-    clientFileCount: number
+    clientFileCount: number,
+    scope: ViewPathScope
   ): Promise<string | undefined> {
+    log_dir = await resolveViewPathLocation(scope, log_dir);
     const log_file_token = (mtime: number, fileCount: number): string => {
       // Use a weak etag as the mtime and file count may not
       // uniquely identify the state of the log directory
@@ -86,7 +117,9 @@ export class InspectViewServer extends PackageViewServer {
         await this.api_json(
           `/api/log-files?${params.toString()}`,
           "GET",
-          headers
+          headers,
+          undefined,
+          scope
         )
       ).data;
     } else {
@@ -94,36 +127,53 @@ export class InspectViewServer extends PackageViewServer {
     }
   }
 
-  public async evalLogs(log_dir: Uri): Promise<string | undefined> {
+  public async evalLogs(
+    log_dir: Uri,
+    scope: ViewPathScope
+  ): Promise<string | undefined> {
+    const resolvedLogDir = await resolveViewPathLocation(scope, log_dir);
     if (this.haveInspectEvalLogFormat()) {
       return (
         await this.api_json(
-          `/api/logs?log_dir=${encodeURIComponent(log_dir.toString())}`
+          `/api/logs?log_dir=${encodeURIComponent(resolvedLogDir)}`,
+          "GET",
+          undefined,
+          undefined,
+          scope
         )
       ).data;
     } else {
-      return evalLogs(log_dir);
+      return evalLogs(Uri.parse(resolvedLogDir));
     }
   }
 
-  public async evalLogsSolo(log_file: Uri): Promise<string> {
+  public async evalLogsSolo(
+    log_file: Uri,
+    scope: ViewPathScope
+  ): Promise<string> {
     if (this.haveInspectEvalLogFormat()) {
       await this.ensureRunning();
     }
     return JSON.stringify({
       log_dir: "",
-      files: [{ name: log_file.toString(true) }],
+      files: [{ name: await resolveViewPathLocation(scope, log_file) }],
     });
   }
 
   public async evalLog(
     file: string,
-    headerOnly: boolean | number
+    headerOnly: boolean | number,
+    scope: ViewPathScope
   ): Promise<string | undefined> {
+    file = await resolveViewPathLocation(scope, file);
     if (this.haveInspectEvalLogFormat()) {
       return (
         await this.api_json(
-          `/api/logs/${encodeURIComponent(file)}?header-only=${headerOnly}`
+          `/api/logs/${encodeURIComponent(file)}?header-only=${headerOnly}`,
+          "GET",
+          undefined,
+          undefined,
+          scope
         )
       ).data;
     } else {
@@ -131,21 +181,44 @@ export class InspectViewServer extends PackageViewServer {
     }
   }
 
-  public async evalLogSize(file: string): Promise<number> {
+  public async evalLogSize(
+    file: string,
+    scope: ViewPathScope
+  ): Promise<number> {
+    file = await resolveViewPathLocation(scope, file);
     if (this.haveInspectEvalLogFormat()) {
       return Number(
-        (await this.api_json(`/api/log-size/${encodeURIComponent(file)}`)).data
+        (
+          await this.api_json(
+            `/api/log-size/${encodeURIComponent(file)}`,
+            "GET",
+            undefined,
+            undefined,
+            scope
+          )
+        ).data
       );
     } else {
       throw new Error("evalLogSize not implemented");
     }
   }
 
-  public async evalLogDelete(file: string): Promise<number> {
+  public async evalLogDelete(
+    file: string,
+    scope: ViewPathScope
+  ): Promise<number> {
+    file = await resolveViewPathLocation(scope, file);
     if (this.haveInspectEvalLogFormat()) {
       return Number(
-        (await this.api_json(`/api/log-delete/${encodeURIComponent(file)}`))
-          .data
+        (
+          await this.api_json(
+            `/api/log-delete/${encodeURIComponent(file)}`,
+            "GET",
+            undefined,
+            undefined,
+            scope
+          )
+        ).data
       );
     } else {
       throw new Error("evalLogDelete not implemented");
@@ -155,12 +228,16 @@ export class InspectViewServer extends PackageViewServer {
   public async evalLogBytes(
     file: string,
     start: number,
-    end: number
+    end: number,
+    scope: ViewPathScope
   ): Promise<Uint8Array> {
+    file = await resolveViewPathLocation(scope, file);
     if (this.haveInspectEvalLogFormat()) {
       return (
         await this.api_bytes(
-          `/api/log-bytes/${encodeURIComponent(file)}?start=${start}&end=${end}`
+          `/api/log-bytes/${encodeURIComponent(file)}?start=${start}&end=${end}`,
+          "GET",
+          scope
         )
       ).data;
     } else {
@@ -168,14 +245,27 @@ export class InspectViewServer extends PackageViewServer {
     }
   }
 
-  public async evalLogHeaders(files: string[]): Promise<string | undefined> {
+  public async evalLogHeaders(
+    files: string[],
+    scope: ViewPathScope
+  ): Promise<string | undefined> {
+    files = await Promise.all(
+      files.map((file) => resolveViewPathLocation(scope, file))
+    );
     if (this.haveInspectEvalLogFormat()) {
       const params = new URLSearchParams();
       for (const file of files) {
         params.append("file", file);
       }
-      return (await this.api_json(`/api/log-headers?${params.toString()}`))
-        .data;
+      return (
+        await this.api_json(
+          `/api/log-headers?${params.toString()}`,
+          "GET",
+          undefined,
+          undefined,
+          scope
+        )
+      ).data;
     } else {
       return evalLogHeaders(files);
     }
@@ -183,8 +273,10 @@ export class InspectViewServer extends PackageViewServer {
 
   public async evalLogPendingSamples(
     log_file: string,
-    etag?: string
+    etag: string | undefined,
+    scope: ViewPathScope
   ): Promise<string | undefined> {
+    log_file = await resolveViewPathLocation(scope, log_file);
     const params = new URLSearchParams();
     params.append("log", log_file);
 
@@ -208,7 +300,8 @@ export class InspectViewServer extends PackageViewServer {
         `/api/pending-samples?${params.toString()}`,
         "GET",
         headers,
-        handleError
+        handleError,
+        scope
       )
     ).data;
   }
@@ -217,9 +310,11 @@ export class InspectViewServer extends PackageViewServer {
     log_file: string,
     id: string | number,
     epoch: number,
+    scope: ViewPathScope,
     last_event?: number,
     last_attachment?: number
   ): Promise<string | undefined> {
+    log_file = await resolveViewPathLocation(scope, log_file);
     // Url Params
     const params = new URLSearchParams();
     params.append("log", log_file);
@@ -246,7 +341,8 @@ export class InspectViewServer extends PackageViewServer {
         `/api/pending-sample-data?${params.toString()}`,
         "GET",
         {},
-        handleError
+        handleError,
+        scope
       )
     ).data;
   }
@@ -264,8 +360,10 @@ export class InspectViewServer extends PackageViewServer {
   public async editLog(
     file: string,
     update: unknown,
-    ifMatchEtag?: string
+    ifMatchEtag: string | undefined,
+    scope: ViewPathScope
   ): Promise<string> {
+    file = await resolveViewPathLocation(scope, file);
     if (!this.haveInspectEvalLogFormat()) {
       throw new Error("editLog not implemented");
     }
@@ -281,7 +379,8 @@ export class InspectViewServer extends PackageViewServer {
       path,
       "POST",
       headers,
-      JSON.stringify(update)
+      JSON.stringify(update),
+      scope
     );
     if (result.status >= 400) {
       const text = typeof result.data === "string" ? result.data : "";
@@ -376,8 +475,10 @@ export class InspectViewServer extends PackageViewServer {
   public async postSearch(
     transcriptDir: string,
     transcriptId: string,
-    request: unknown
+    request: unknown,
+    scope: ViewPathScope
   ): Promise<string> {
+    transcriptDir = await resolveViewPathLocation(scope, transcriptDir);
     const headers = new Headers({
       "Content-Type": "application/json",
       Accept: "application/json",
@@ -391,7 +492,8 @@ export class InspectViewServer extends PackageViewServer {
       path,
       "POST",
       headers,
-      JSON.stringify(request)
+      JSON.stringify(request),
+      scope
     );
     if (result.status >= 400) {
       const text = typeof result.data === "string" ? result.data : "";
@@ -408,14 +510,16 @@ export class InspectViewServer extends PackageViewServer {
     transcriptDir: string,
     transcriptId: string,
     searchId: string,
-    scope: { events?: string; messages?: string } | undefined
+    searchScope: { events?: string; messages?: string } | undefined,
+    pathScope: ViewPathScope
   ): Promise<string> {
+    transcriptDir = await resolveViewPathLocation(pathScope, transcriptDir);
     const params = new URLSearchParams();
-    if (scope?.messages) {
-      params.set("messages", scope.messages);
+    if (searchScope?.messages) {
+      params.set("messages", searchScope.messages);
     }
-    if (scope?.events) {
-      params.set("events", scope.events);
+    if (searchScope?.events) {
+      params.set("events", searchScope.events);
     }
     const query = params.toString();
     const path =
@@ -425,18 +529,31 @@ export class InspectViewServer extends PackageViewServer {
     // A result that isn't ready yet is a 404; return the JSON literal `null`
     // so the viewer reads it as "keep polling" rather than an error.
     return (
-      await this.api_json(path, "GET", undefined, (status) =>
-        status === 404 ? "null" : undefined
+      await this.api_json(
+        path,
+        "GET",
+        undefined,
+        (status) => (status === 404 ? "null" : undefined),
+        pathScope
       )
     ).data;
   }
 
-  public async logMessage(log_file: string, message?: string): Promise<void> {
+  public async logMessage(
+    log_file: string,
+    message: string | undefined,
+    scope: ViewPathScope
+  ): Promise<void> {
+    log_file = await resolveViewPathLocation(scope, log_file);
     if (hasMinimumInspectVersion(kInspectLogMessageVersion)) {
       await this.api_json(
         `/api/log-message/${encodeURIComponent(log_file)}?message=${encodeURIComponent(
           message || ""
-        )}`
+        )}`,
+        "GET",
+        undefined,
+        undefined,
+        scope
       );
       return undefined;
     } else {

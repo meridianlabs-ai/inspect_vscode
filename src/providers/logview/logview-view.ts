@@ -10,7 +10,13 @@ import {
   PackageManager,
 } from "../../core/package/manager";
 import { OutputWatcher } from "../../core/package/output-watcher";
-import { dirname, getRelativeUri } from "../../core/uri";
+import {
+  dirname,
+  ViewPathScope,
+  viewPathScopeLocation,
+  viewPathScopesEqual,
+  viewPathUriString,
+} from "../../core/uri";
 import { HostWebviewPanel } from "../../hooks";
 import { inspectViewPath } from "../../inspect/props";
 import { selectLogDirectory } from "../activity-bar/log-listing/log-directory-selector";
@@ -18,7 +24,11 @@ import { InspectViewServer } from "../inspect/inspect-view-server";
 import { WorkspaceEnvManager } from "../workspace/workspace-env-provider";
 
 import { LogviewPanel } from "./logview-panel";
-import { LogviewState } from "./logview-state";
+import {
+  logFileIsInLogviewScope,
+  logviewPathScope,
+  LogviewState,
+} from "./logview-state";
 
 const kLogViewId = "inspect.logview";
 
@@ -31,10 +41,9 @@ export class InspectViewManager {
   ) {
     this.context_.subscriptions.push(
       outputWatcher.onInspectLogCreated(async (e) => {
-        // if this log is contained in the directory currently being viewed
-        // then do a background refresh on it
+        // Refresh only when the new log is allowed by the current view scope.
         if (this.webViewManager_.hasWebview()) {
-          await this.webViewManager_.showLogFileIfWithinLogDir(e.log);
+          await this.webViewManager_.showLogFileIfInViewScope(e.log);
         }
       })
     );
@@ -48,18 +57,31 @@ export class InspectViewManager {
     }
     if (log_dir) {
       // Show the log view for the log dir (or the workspace)
-      await this.webViewManager_.showLogview({ log_dir }, "activate");
+      await this.webViewManager_.showLogview(
+        { log_dir, scope_kind: "directory" },
+        "activate"
+      );
     }
   }
 
-  public async showLogFile(uri: Uri, activation?: "open" | "activate") {
-    await this.webViewManager_.showLogFile(uri, activation);
+  public async showLogFile(
+    uri: Uri,
+    activation?: "open" | "activate",
+    location?: string,
+    canonical: boolean = false
+  ) {
+    await this.webViewManager_.showLogFile(
+      uri,
+      activation,
+      location,
+      canonical
+    );
   }
 
-  public logFileWillVisiblyUpdate(uri: Uri): boolean {
+  public async logFileWillVisiblyUpdate(uri: Uri): Promise<boolean> {
     return (
       this.webViewManager_.isVisible() &&
-      this.webViewManager_.logFileIsWithinLogDir(uri)
+      (await this.webViewManager_.logFileIsInViewScope(uri))
     );
   }
 
@@ -102,33 +124,55 @@ export class InspectViewWebviewManager extends InspectWebviewManager<
       InspectViewWebview
     );
   }
-  private activeLogDir_: Uri | null = null;
 
-  public async showLogFile(uri: Uri, activation?: "open" | "activate") {
+  public async showLogFile(
+    uri: Uri,
+    activation?: "open" | "activate",
+    location?: string,
+    canonical: boolean = false
+  ) {
     // Get the directory name using posix path methods
     const log_dir = dirname(uri);
 
-    await this.showLogview({ log_file: uri, log_dir }, activation);
-  }
-
-  public logFileIsWithinLogDir(log_file: Uri) {
-    const state = this.getWorkspaceState();
-    return (
-      state?.log_dir !== undefined &&
-      getRelativeUri(state?.log_dir, log_file) !== null
+    await this.showLogview(
+      {
+        log_file: uri,
+        log_location: location,
+        canonical_location: canonical,
+        log_dir,
+        scope_kind: "file",
+      },
+      activation
     );
   }
 
-  public async showLogFileIfWithinLogDir(log_file: Uri) {
+  public async logFileIsInViewScope(log_file: Uri): Promise<boolean> {
     const state = this.getWorkspaceState();
-    if (state?.log_dir) {
-      if (getRelativeUri(state?.log_dir, log_file) !== null) {
-        await this.displayLogFile({
-          log_file: log_file,
-          log_dir: state?.log_dir,
-          background_refresh: true,
-        });
+    const scope =
+      this.activeView_?.scope() ??
+      (state ? logviewPathScope(state) : undefined);
+    return (
+      scope !== undefined && (await logFileIsInLogviewScope(scope, log_file))
+    );
+  }
+
+  public async showLogFileIfInViewScope(log_file: Uri) {
+    const state = this.getWorkspaceState();
+    if (state) {
+      const scope = this.activeView_?.scope() ?? logviewPathScope(state);
+      if (!(await logFileIsInLogviewScope(scope, log_file))) {
+        return;
       }
+      await this.displayLogFile({
+        log_file: log_file,
+        log_location: scope.canonical
+          ? await viewPathScopeLocation(scope)
+          : scope.opaqueLocation,
+        canonical_location: scope.canonical,
+        log_dir: state.log_dir,
+        scope_kind: scope.kind,
+        background_refresh: true,
+      });
     }
   }
 
@@ -155,7 +199,7 @@ export class InspectViewWebviewManager extends InspectWebviewManager<
           // or to check whether the view is focused and call us back to
           // display a log file
           await this.activeView_?.backgroundUpdate(
-            state.log_file.path,
+            state.log_location ?? viewPathUriString(state.log_file),
             state.log_dir.toString()
           );
         }
@@ -177,19 +221,19 @@ export class InspectViewWebviewManager extends InspectWebviewManager<
     state: LogviewState,
     activation?: "open" | "activate"
   ) {
-    // Determine whether we are showing a log viewer for this directory
-    // If we aren't close the log viewer so a fresh one can be opened.
-    if (
-      this.activeLogDir_ !== null &&
-      state.log_dir.toString() !== this.activeLogDir_.toString()
-    ) {
-      // Close it
+    const activeScope = this.activeView_?.scope();
+    const requestedScope = logviewPathScope(state);
+    const scope =
+      activeScope && viewPathScopesEqual(activeScope, requestedScope)
+        ? activeScope
+        : requestedScope;
+    await scope.canonicalUri;
+    if (activeScope && activeScope !== scope) {
       this.activeView_?.dispose();
       this.activeView_ = undefined;
     }
 
-    // Note the log directory that we are showing
-    this.activeLogDir_ = state.log_dir || null;
+    state = { ...state, path_scope: scope };
 
     // Update the view state
     this.updateViewState(state);
@@ -202,7 +246,6 @@ export class InspectViewWebviewManager extends InspectWebviewManager<
     // If the view is closed, clear the state
     this.setOnClose(() => {
       this.lastState_ = undefined;
-      this.activeLogDir_ = null;
     });
 
     // Actually reveal or show the webview
@@ -211,7 +254,7 @@ export class InspectViewWebviewManager extends InspectWebviewManager<
         this.revealWebview(activation !== "activate");
       } else if (state.log_file) {
         await this.activeView_?.backgroundUpdate(
-          state.log_file.path,
+          state.log_location ?? viewPathUriString(state.log_file),
           state.log_dir.toString()
         );
       }
@@ -249,7 +292,14 @@ export class InspectViewWebviewManager extends InspectWebviewManager<
       return {
         log_dir: Uri.parse(data["log_dir"] ?? ""),
         log_file: data["log_file"] ? Uri.parse(data["log_file"]) : undefined,
+        log_location: data["log_location"] || undefined,
+        canonical_location: data["canonical_location"] === "true",
         background_refresh: !!data["background_refresh"],
+        scope_kind:
+          data["scope_kind"] === "file" ||
+          (!data["scope_kind"] && data["log_file"])
+            ? "file"
+            : "directory",
       };
     } else {
       return this.lastState_;
@@ -259,8 +309,11 @@ export class InspectViewWebviewManager extends InspectWebviewManager<
   protected setWorkspaceState(state: LogviewState) {
     void this.context_.workspaceState.update(this.kInspectViewState, {
       log_dir: state.log_dir.toString(),
-      log_file: state.log_file?.toString(),
+      log_file: state.log_file ? viewPathUriString(state.log_file) : undefined,
+      log_location: state.log_location,
+      canonical_location: state.canonical_location ? "true" : undefined,
       background_refresh: state.background_refresh,
+      scope_kind: state.scope_kind,
     });
   }
 
@@ -270,6 +323,9 @@ export class InspectViewWebviewManager extends InspectWebviewManager<
 }
 
 const logStateEquals = (a: LogviewState, b: LogviewState) => {
+  if ((a.scope_kind ?? "directory") !== (b.scope_kind ?? "directory")) {
+    return false;
+  }
   if (a.log_dir.toString() !== b.log_dir.toString()) {
     return false;
   }
@@ -279,7 +335,11 @@ const logStateEquals = (a: LogviewState, b: LogviewState) => {
   } else if (a.log_file && !b.log_file) {
     return false;
   } else if (a.log_file && b.log_file) {
-    return a.log_file.toString() === b.log_file.toString();
+    return (
+      !!a.canonical_location === !!b.canonical_location &&
+      (a.log_location ?? viewPathUriString(a.log_file)) ===
+        (b.log_location ?? viewPathUriString(b.log_file))
+    );
   }
   return true;
 };
@@ -295,13 +355,8 @@ class InspectViewWebview extends InspectWebview<LogviewState> {
   ) {
     super(context, webviewPanel);
 
-    this.logviewPanel_ = new LogviewPanel(
-      webviewPanel,
-      context,
-      server,
-      "dir",
-      state.log_dir
-    );
+    const scope = logviewPathScope(state);
+    this.logviewPanel_ = new LogviewPanel(webviewPanel, context, server, scope);
     this._register(this.logviewPanel_);
 
     this._register(
@@ -310,15 +365,23 @@ class InspectViewWebview extends InspectWebview<LogviewState> {
           switch (e.type) {
             case "displayLogFile":
               {
-                if (e.log_dir && this._manager) {
+                const logFile = await this.logviewPanel_.resolve(e.url);
+                if (this._manager && logFile) {
+                  const scope = this.logviewPanel_.scope();
                   const state: LogviewState = {
-                    log_file: Uri.parse(e.url),
-                    log_dir: Uri.parse(e.log_dir as string),
+                    log_file: logFile,
+                    log_location: scope.canonical
+                      ? await viewPathScopeLocation(scope)
+                      : scope.opaqueLocation,
+                    canonical_location: scope.canonical,
+                    log_dir:
+                      scope.kind === "directory" ? scope.uri : dirname(logFile),
+                    scope_kind: scope.kind,
                   };
                   await this._manager.displayLogFile(state, "open");
                 } else {
                   await showError(
-                    "Unable to display log file because of a missing log_dir or manager. This is an unexpected error, please report it."
+                    "Unable to display a log file outside the selected viewer scope."
                   );
                 }
               }
@@ -338,10 +401,16 @@ class InspectViewWebview extends InspectWebview<LogviewState> {
   }
   _manager: InspectViewWebviewManager | undefined;
 
+  public scope(): ViewPathScope {
+    return this.logviewPanel_.scope();
+  }
+
   public async update(state: LogviewState) {
     await this._webviewPanel.webview.postMessage({
       type: "updateState",
-      url: state.log_file?.toString(),
+      url: state.log_file
+        ? (state.log_location ?? viewPathUriString(state.log_file))
+        : undefined,
     });
   }
 

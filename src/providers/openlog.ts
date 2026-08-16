@@ -1,5 +1,12 @@
 import { commands, ExtensionContext, Uri } from "vscode";
 
+import {
+  isOpaqueHttpViewLocation,
+  viewPathLocationFromUri,
+  viewPathUriString,
+  withCanonicalViewPathLocation,
+  withViewPathLocation,
+} from "../core/uri";
 import { withEditorAssociation } from "../core/vscode/association";
 import { hasMinimumInspectVersion } from "../inspect/version";
 
@@ -14,12 +21,25 @@ export function activateOpenLog(
   context.subscriptions.push(
     commands.registerCommand(
       "inspect.openLogViewer",
-      async (uri: Uri | string) => {
-        uri = typeof uri === "string" ? Uri.parse(uri) : uri;
+      async (uriOrLocation: Uri | string, canonicalLocation?: string) => {
+        const location =
+          typeof uriOrLocation === "string"
+            ? uriOrLocation
+            : (viewPathLocationFromUri(uriOrLocation) ??
+              viewPathUriString(uriOrLocation));
+        const uri =
+          typeof uriOrLocation === "string"
+            ? Uri.parse(uriOrLocation)
+            : uriOrLocation.with({ fragment: "" });
+        const editorUri = canonicalLocation
+          ? withCanonicalViewPathLocation(uri, canonicalLocation)
+          : withViewPathLocation(uri, location);
 
         // function to open using defualt editor in preview mode
         const openLogViewer = async () => {
-          await commands.executeCommand("vscode.open", uri, { preview: true });
+          await commands.executeCommand("vscode.open", editorUri, {
+            preview: true,
+          });
         };
 
         if (hasMinimumInspectVersion(kInspectEvalLogFormatVersion)) {
@@ -41,7 +61,13 @@ export function activateOpenLog(
           // notify the logs pane that we are doing this so that it can take a reveal action
           await commands.executeCommand("inspect.logListingReveal", uri);
         } else {
-          await viewManager.showLogFile(uri, "activate");
+          await viewManager.showLogFile(
+            uri,
+            "activate",
+            canonicalLocation ??
+              (isOpaqueHttpViewLocation(location) ? location : undefined),
+            canonicalLocation !== undefined
+          );
         }
       }
     )

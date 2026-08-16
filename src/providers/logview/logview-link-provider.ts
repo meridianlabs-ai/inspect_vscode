@@ -120,7 +120,7 @@ export const logviewTerminalLinkProvider = (
       // Resolve the clicked link into a complete Uri to the file
       const logUri = await resolveLogFile(link.data);
       if (logUri) {
-        await commands.executeCommand("inspect.openLogViewer", logUri);
+        await commands.executeCommand("inspect.openLogViewer", link.data);
       } else {
         // Since we couldn't resolve the log file, just let the user know
         const close: MessageItem = { title: "Close" };

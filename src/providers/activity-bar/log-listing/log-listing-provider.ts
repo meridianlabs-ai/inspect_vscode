@@ -3,7 +3,11 @@ import { Uri } from "vscode";
 
 import { Command } from "../../../core/command";
 import { OutputWatcher } from "../../../core/package/output-watcher";
-import { getRelativeUri, prettyUriPath } from "../../../core/uri";
+import {
+  directoryViewPathScope,
+  getRelativeUri,
+  prettyUriPath,
+} from "../../../core/uri";
 import { activeWorkspaceFolder } from "../../../core/workspace";
 import { hasMinimumInspectVersion } from "../../../inspect/version";
 import { kInspectEvalLogFormatVersion } from "../../inspect/inspect-constants";
@@ -11,7 +15,12 @@ import { InspectViewServer } from "../../inspect/inspect-view-server";
 import { WorkspaceEnvManager } from "../../workspace/workspace-env-provider";
 
 import { selectLogDirectory } from "./log-directory-selector";
-import { LogListing, LogNode, Logs } from "./log-listing";
+import {
+  filterLogItemsToViewScope,
+  LogListing,
+  LogNode,
+  Logs,
+} from "./log-listing";
 import { LogTreeDataProvider } from "./log-listing-data";
 import { LogListingMRU } from "./log-listing-mru";
 
@@ -40,16 +49,18 @@ export async function activateLogListing(
   });
 
   // update the tree based on the current preferred log dir
-  const updateTree = () => {
+  const updateTree = async () => {
     // see what the active log dir is
     const preferredLogDir = context.workspaceState.get<string>(kLogListingDir);
     const logDir = preferredLogDir
       ? Uri.parse(preferredLogDir)
       : envManager.getDefaultLogDir();
+    const listingScope = directoryViewPathScope(logDir);
+    await listingScope.canonicalUri;
 
     // create a logs fetcher
     const logsFetcher = async (uri: Uri): Promise<Logs | undefined> => {
-      const logsJSON = await viewServer.evalLogs(uri);
+      const logsJSON = await viewServer.evalLogs(uri, listingScope);
       if (logsJSON) {
         const logs = JSON.parse(logsJSON) as {
           log_dir: string;
@@ -60,14 +71,15 @@ export async function activateLogListing(
             task_id: string;
           }>;
         };
+        const items = logs.files.map((file) => ({
+          name: file.name,
+          mtime: file.mtime,
+          display_name: file.task,
+          item_id: file.task_id,
+        }));
         return {
           log_dir: logs.log_dir,
-          items: logs.files.map((file) => ({
-            name: file.name,
-            mtime: file.mtime,
-            display_name: file.task,
-            item_id: file.task_id,
-          })),
+          items: await filterLogItemsToViewScope(listingScope, items),
         };
       } else {
         return undefined;
@@ -76,7 +88,12 @@ export async function activateLogListing(
 
     // set it
     treeDataProvider.setLogListing(
-      new LogListing(logDir, new LogListingMRU(context), logsFetcher)
+      new LogListing(
+        logDir,
+        new LogListingMRU(context),
+        logsFetcher,
+        listingScope
+      )
     );
 
     // show a workspace relative path if this is in the workspace,
@@ -90,13 +107,13 @@ export async function activateLogListing(
   };
 
   // initial tree update
-  updateTree();
+  await updateTree();
 
   // update tree if the environment changes and we are tracking the workspace log dir
   disposables.push(
     envManager.onEnvironmentChanged(() => {
       if (context.workspaceState.get<string>(kLogListingDir) === undefined) {
-        updateTree();
+        void updateTree();
       }
     })
   );
@@ -113,7 +130,7 @@ export async function activateLogListing(
         );
 
         // trigger update
-        updateTree();
+        await updateTree();
 
         // reveal
         await revealLogListing();
@@ -147,7 +164,7 @@ export async function activateLogListing(
   // Register update command (for when the log directory changes )
   disposables.push(
     vscode.commands.registerCommand("inspect.logListingUpdate", () => {
-      updateTree();
+      void updateTree();
     })
   );
 
@@ -197,7 +214,13 @@ export async function activateLogListing(
           );
 
           if (result?.title === "Delete") {
-            await viewServer.evalLogDelete(logUri.toString());
+            const listing = treeDataProvider.getLogListing();
+            const treeLogDir = listing?.logDir();
+            const scope = listing?.pathScope();
+            if (!treeLogDir || !scope) {
+              return;
+            }
+            await viewServer.evalLogDelete(logUri.toString(), scope);
             treeDataProvider.refresh();
           }
         }

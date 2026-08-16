@@ -2,7 +2,7 @@ import { Uri, window } from "vscode";
 
 import { resolveLogFile } from "./logview-link-provider";
 
-export async function selectFileUri(): Promise<Uri | undefined> {
+export async function selectFileUri(): Promise<Uri | string | undefined> {
   const uriOrPath = await window.showInputBox({
     title: "Select Log File",
     prompt: "Provide a path to a log file",
@@ -21,6 +21,9 @@ export async function selectFileUri(): Promise<Uri | undefined> {
     },
   });
   if (uriOrPath) {
+    if (/^https?:\/\//i.test(uriOrPath)) {
+      return uriOrPath;
+    }
     return await resolveLogFile(uriOrPath);
   } else {
     return undefined;

@@ -2,14 +2,28 @@
  * Tests for log-listing.ts and log-listing-data.ts - LogListing and TreeDataProviders
  */
 import * as assert from "assert";
+import { mkdir, mkdtemp, rm, symlink, writeFile } from "fs/promises";
+import * as os from "os";
+import path from "path";
 
-import { relativeLogPath } from "../../providers/activity-bar/log-listing/log-listing";
+import { Uri } from "vscode";
+
+import {
+  directoryViewPathScope,
+  fileViewPathScope,
+  pathIsInViewScope,
+} from "../../core/uri";
+import {
+  filterLogItemsToViewScope,
+  relativeLogPath,
+} from "../../providers/activity-bar/log-listing/log-listing";
 
 /**
  * Mock LogItem for testing
  */
 interface LogItem {
   name: string;
+  scope_location?: string;
   mtime: number;
   display_name: string;
   item_id: string;
@@ -29,6 +43,89 @@ interface LogDirectory {
 type LogNode =
   | ({ type: "dir"; parent?: LogNode } & LogDirectory)
   | ({ type: "file"; parent?: LogNode } & LogItem);
+
+suite("Log Listing Scope", () => {
+  test("drops traversal entries before they can become file grants", async () => {
+    const items: LogItem[] = [
+      {
+        name: "s3://bucket/logs/allowed.eval",
+        mtime: 1,
+        display_name: "allowed",
+        item_id: "allowed",
+      },
+      {
+        name: "s3://bucket/logs/../secret.eval",
+        mtime: 1,
+        display_name: "secret",
+        item_id: "secret",
+      },
+    ];
+
+    const filtered = await filterLogItemsToViewScope(
+      directoryViewPathScope(Uri.parse("s3://bucket/logs")),
+      items
+    );
+
+    assert.deepStrictEqual(
+      filtered.map((item) => item.name),
+      ["s3://bucket/logs/allowed.eval"]
+    );
+    assert.strictEqual(
+      filtered[0]?.scope_location,
+      "s3://bucket/logs/allowed.eval"
+    );
+  });
+
+  test("freezes a local listing item before a symlink is retargeted", async function () {
+    if (os.platform() === "win32") {
+      this.skip();
+      return;
+    }
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "inspect-listing-"));
+    try {
+      const root = path.join(tempDir, "logs");
+      const first = path.join(root, "first");
+      const outside = path.join(tempDir, "outside");
+      const selected = path.join(root, "selected");
+      await mkdir(first, { recursive: true });
+      await mkdir(outside);
+      await writeFile(path.join(first, "run.eval"), "first");
+      await writeFile(path.join(outside, "run.eval"), "outside");
+      await symlink(first, selected, "dir");
+
+      const [item] = await filterLogItemsToViewScope(
+        directoryViewPathScope(Uri.file(root)),
+        [
+          {
+            name: Uri.file(path.join(selected, "run.eval")).toString(),
+            mtime: 1,
+            display_name: "run",
+            item_id: "run",
+          },
+        ]
+      );
+      assert.ok(item?.scope_location);
+
+      await rm(selected);
+      await symlink(outside, selected, "dir");
+
+      const frozenScope = fileViewPathScope(
+        Uri.parse(item.scope_location),
+        undefined,
+        item.scope_location
+      );
+      assert.strictEqual(
+        await pathIsInViewScope(
+          frozenScope,
+          Uri.file(path.join(selected, "run.eval"))
+        ),
+        false
+      );
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+});
 
 /**
  * Build a log tree from flat list of items

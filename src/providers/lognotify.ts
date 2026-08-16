@@ -36,7 +36,7 @@ export function activateLogNotify(
         return;
       }
 
-      if (viewManager.logFileWillVisiblyUpdate(e.log)) {
+      if (await viewManager.logFileWillVisiblyUpdate(e.log)) {
         return false;
       }
 

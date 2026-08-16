@@ -18,7 +18,10 @@ import {
   getRelativeUri,
   isUri,
   normalizeWindowsUri,
+  resolvePathInViewScope,
   resolveToUri,
+  ViewPathScope,
+  viewPathUriString,
 } from "../../../core/uri";
 
 export type LogNode =
@@ -41,6 +44,7 @@ export interface LogDirectory {
 
 export interface LogItem {
   name: string;
+  scope_location?: string;
   mtime: number;
   display_name: string;
   item_id: string;
@@ -50,6 +54,21 @@ export interface LogItem {
 export interface Logs {
   log_dir: string;
   items: LogItem[];
+}
+
+export async function filterLogItemsToViewScope(
+  scope: ViewPathScope,
+  items: LogItem[]
+): Promise<LogItem[]> {
+  const resolved = await Promise.all(
+    items.map((item) => resolvePathInViewScope(scope, item.name))
+  );
+  return items.flatMap((item, index) => {
+    const location = resolved[index];
+    return location
+      ? [{ ...item, scope_location: viewPathUriString(location) }]
+      : [];
+  });
 }
 
 /**
@@ -87,11 +106,16 @@ export class LogListing {
   constructor(
     private readonly logDir_: Uri,
     private readonly mru_: ListingMRU,
-    private readonly logsFetcher_: (uri: Uri) => Promise<Logs | undefined>
+    private readonly logsFetcher_: (uri: Uri) => Promise<Logs | undefined>,
+    private readonly pathScope_?: ViewPathScope
   ) {}
 
   public logDir(): Uri {
     return this.logDir_;
+  }
+
+  public pathScope(): ViewPathScope | undefined {
+    return this.pathScope_;
   }
 
   public async ls(parent?: LogDirectory): Promise<LogNode[]> {
@@ -123,6 +147,9 @@ export class LogListing {
   }
 
   public uriForNode(node: LogNode) {
+    if (node.type === "file" && node.scope_location) {
+      return Uri.parse(node.scope_location);
+    }
     return Uri.joinPath(this.logDir_, node.name);
   }
 
