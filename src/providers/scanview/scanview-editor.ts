@@ -89,7 +89,6 @@ class ScoutScanReadonlyEditor implements vscode.CustomReadonlyEditorProvider {
     if (viewDir) {
       localResourceRoots.push(Uri.file(viewDir.path));
     }
-    Uri.joinPath(this.context_.extensionUri, "assets", "www");
 
     // set webview options
     webviewPanel.webview.options = {

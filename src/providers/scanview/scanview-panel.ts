@@ -9,7 +9,9 @@ import {
   kMethodHttpRequest,
   webviewPanelJsonRpcServer,
 } from "../../core/jsonrpc";
+import { log } from "../../core/log";
 import { HttpProxyRpcRequest } from "../../core/package/view-server";
+import { AbsolutePath } from "../../core/path";
 import {
   getWebviewPanelHtml,
   handleWebviewPanelOpenMessages,
@@ -63,8 +65,17 @@ export class ScanviewPanel extends Disposable {
     )}</script>`;
 
     // Try to resolve the dist path from the server (handles LFS resolution),
-    // falling back to the local scoutViewPath() if the endpoint isn't available.
-    const distDir = await this.server_.getDistPath();
+    // falling back to the local scoutViewPath() if the endpoint isn't
+    // available. If the server can't run at all (e.g. inspect-scout isn't
+    // installed) fall back as well so we render the 'Not available' page
+    // rather than leaving the panel blank.
+    let distDir: AbsolutePath | null = null;
+    try {
+      distDir = await this.server_.getDistPath();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      log.info(`Unable to resolve view dist path from view server: ${message}`);
+    }
     const viewDir = distDir ?? scoutViewPath();
 
     // Update localResourceRoots to include the resolved dist path,

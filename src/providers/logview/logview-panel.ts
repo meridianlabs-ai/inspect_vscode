@@ -137,9 +137,7 @@ export class LogviewPanel extends Disposable {
       distDir = await this.server_.getDistPath();
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      log.info(
-        `Unable to resolve view dist path from view server: ${message}`
-      );
+      log.info(`Unable to resolve view dist path from view server: ${message}`);
     }
     const viewDir = distDir ?? inspectViewPath();
 
