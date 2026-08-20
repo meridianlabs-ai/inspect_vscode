@@ -130,7 +130,7 @@ export class LogviewPanel extends Disposable {
     // Try to resolve the dist path from the server (handles LFS resolution),
     // falling back to the local inspectViewPath() if the endpoint isn't
     // available. If the server can't run at all (e.g. inspect_ai isn't
-    // installed) fall back as well so we render the 'Not available' page
+    // installed) fall back as well so we render the 'not available' message
     // rather than leaving the panel blank.
     let distDir: AbsolutePath | null = null;
     try {

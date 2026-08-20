@@ -212,11 +212,11 @@ size 1217`;
   });
 
   suite("Null viewDir handling", () => {
-    test("should return 'Not available' when viewDir is null", () => {
+    test("should return 'not available' message when viewDir is null", () => {
       const result = getWebviewPanelHtml(null, mockPanel, "1.0.0");
 
       assert.ok(
-        result.includes("Not available"),
+        result.includes("view is not available"),
         "Should show not available message"
       );
     });
