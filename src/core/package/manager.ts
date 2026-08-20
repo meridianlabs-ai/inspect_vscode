@@ -33,7 +33,7 @@ export class PackageManager implements Disposable {
   private packageBinPath_: string | undefined = undefined;
 
   get available(): boolean {
-    return this.packageBinPath_ !== null;
+    return this.packageBinPath_ !== undefined;
   }
 
   private updatePackageAvailable() {
