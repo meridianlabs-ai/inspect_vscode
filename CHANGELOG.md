@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.16](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.9.15...v0.9.16) (2026-08-21)
+
+
+### Bug Fixes
+
+* show message instead of blank editor when inspect_ai is missing ([#164](https://github.com/meridianlabs-ai/inspect_vscode/issues/164)) ([bbf9173](https://github.com/meridianlabs-ai/inspect_vscode/commit/bbf9173a83a81f6dec29cd0d0a9ef324ec5431a7))
+
 ## [0.9.15](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.9.14...v0.9.15) (2026-07-21)
 
 
