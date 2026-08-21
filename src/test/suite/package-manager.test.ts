@@ -61,7 +61,8 @@ class TestPackageManager {
   }
 
   get available(): boolean {
-    return this.packageBinPath_ !== undefined && this.packageBinPath_ !== null;
+    // Mirrors PackageManager.available (packageBinPath_ !== undefined)
+    return this.packageBinPath_ !== undefined;
   }
 
   get packageName(): string {
@@ -142,14 +143,14 @@ suite("PackageManager Test Suite", () => {
       manager.dispose();
     });
 
-    test("should handle empty path as unavailable", () => {
+    test("should treat empty path as available", () => {
       const manager = new TestPackageManager("inspect-ai", () => ({
         path: "",
       }));
 
-      // Empty string is truthy for !== undefined check but falsy otherwise
-      // The implementation checks packageBinPath_ !== null
-      assert.ok(manager.available !== undefined);
+      // The implementation checks packageBinPath_ !== undefined, so an
+      // empty-string path (a non-null bin path) still counts as available
+      assert.strictEqual(manager.available, true);
       manager.dispose();
     });
   });

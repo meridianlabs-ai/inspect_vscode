@@ -129,18 +129,45 @@ Please update to a newer version of ${packageName} to view this content.
 
     return indexHtml;
   } else {
-    return `
-<!DOCTYPE html>
+    return getMessagePanelHtml(
+      `${packageName} view is not available.\n\nEnsure that the required Python package is installed in the active Python interpreter (or select a Python interpreter that includes it), then try again.`
+    );
+  }
+}
+
+/**
+ * Minimal static HTML for showing an informational message in a webview
+ * panel (e.g. when the view can't be rendered). The message is escaped and
+ * rendered as plain text; blank lines separate paragraphs.
+ */
+export function getMessagePanelHtml(message: string): string {
+  const escapeHtml = (text: string) =>
+    text
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  const paragraphs = message
+    .split("\n\n")
+    .map((para) => `<p>${escapeHtml(para)}</p>`)
+    .join("\n");
+  return `<!DOCTYPE html>
 <html>
 <head>
     <meta http-equiv="Content-type" content="text/html;charset=UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline';">
+    <style>
+      body {
+        font-family: var(--vscode-font-family);
+        color: var(--vscode-foreground);
+        padding: 0.5em 1em;
+      }
+    </style>
 </head>
 <body>
-Not available.
+${paragraphs}
 </body>
-</html>
-`;
-  }
+</html>`;
 }
 
 export function handleWebviewPanelOpenMessages(

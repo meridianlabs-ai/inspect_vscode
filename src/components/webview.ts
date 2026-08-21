@@ -12,6 +12,7 @@ import { Disposable } from "../core/dispose";
 import { log } from "../core/log";
 import { getNonce } from "../core/nonce";
 import { PackageViewServer } from "../core/package/view-server";
+import { getMessagePanelHtml } from "../core/webview";
 import { HostWebviewPanel } from "../hooks";
 
 import { FocusManager } from "./focus";
@@ -263,7 +264,17 @@ export abstract class InspectWebview<T> extends Disposable {
   }
 
   public async show(state: T, options?: ShowOptions) {
-    this._webviewPanel.webview.html = await this.getHtml(state);
+    // callers frequently fire-and-forget show(), so render errors as a
+    // message page rather than rejecting (which would leave a blank panel)
+    try {
+      this._webviewPanel.webview.html = await this.getHtml(state);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      log.error(`Unable to display view: ${message}`);
+      this._webviewPanel.webview.html = getMessagePanelHtml(
+        `Unable to display view.\n\n${message}`
+      );
+    }
     this._webviewPanel.reveal(options?.viewColumn, options?.preserveFocus);
   }
 
