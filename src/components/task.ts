@@ -23,8 +23,36 @@ export interface TaskData {
 const kTaskPattern = /@task/;
 const kFunctionNamePattern = /def\s+(.*)\((.*)$/;
 
-const kFunctionEndPattern = /\s*\)\s*(->\s*\S+)?\s*:\s*/;
-const kParamsPattern = /^(.*?)\s*(?:\)\s*:\s*|$|\)\s*(->\s*\S+)?\s*:\s*)/;
+/**
+ * Whether a parsed task/function name is a plain Python identifier.
+ *
+ * The `def (.*)\(` parsers are deliberately loose and can capture flag- or
+ * shell-metacharacter-bearing text from crafted source (e.g. a fake
+ * `def demo,--model-base-url,https://x(` or `def demo’;calc;‘(`). Such a
+ * "name" is later embedded in the `inspect eval <path>@<name>` command line,
+ * so validating it as an identifier before it is surfaced to a run command
+ * keeps injection payloads off the command line (matches the identifier check
+ * the task-outline tree already applies).
+ */
+export function isValidTaskName(name: string): boolean {
+  return /^[A-Za-z_]\w*$/.test(name);
+}
+
+// Matches the end of a function signature — the closing ')' with an optional
+// '-> ret' annotation and the ':'. Linear-time: the previous patterns
+// backtracked quadratically on a long line of spaces (a ~2 MB param line froze
+// the extension host — see ReDoS finding). kParamsPattern's lazy (.*?)
+// overlapped its following \s*, and this pattern's leading \s* made .test()
+// re-scan the whole space run at every start offset. Dropping the leading \s*
+// makes each start offset fail immediately unless a ')' is present, and the
+// parameter text is derived from this single match (everything before the
+// closing ')') rather than a second, overlapping regex.
+const kFunctionEndPattern = /\)\s*(?:->\s*\S+\s*)?:/;
+
+// Defensive cap on the text handed to the parsing regexes, independent of the
+// patterns themselves: a real function-signature line is never this long, and
+// bounding it ensures a pathological file cannot block the extension host.
+const kMaxParamsLineLength = 100_000;
 
 export function readTaskData(document: TextDocument): TaskData[] {
   const tasks: TaskData[] = [];
@@ -45,7 +73,14 @@ export function readTaskData(document: TextDocument): TaskData[] {
         {
           const match = line.match(kFunctionNamePattern);
           if (match) {
-            const fnName = match[1] ?? "";
+            const fnName = (match[1] ?? "").trim();
+            // A crafted `def <flags/metacharacters>(` is not a real task; only
+            // surface identifier-named functions so the name can't carry an
+            // injection payload onto the run command line.
+            if (!isValidTaskName(fnName)) {
+              state = "seeking-task";
+              break;
+            }
             const task: TaskData = {
               name: fnName,
               params: [],
@@ -84,18 +119,23 @@ export function readTaskData(document: TextDocument): TaskData[] {
   return tasks;
 }
 
-const readParams = (line: string, task: TaskData) => {
-  const paramsMatch = line.match(kParamsPattern);
-  if (paramsMatch) {
-    const paramsStr = paramsMatch[1];
-    if (paramsStr) {
-      const params = parseParameters(paramsStr);
-      params.forEach((param) => {
-        task.params.push(param.trim());
-      });
-    }
+const readParams = (rawLine: string, task: TaskData) => {
+  const line =
+    rawLine.length > kMaxParamsLineLength
+      ? rawLine.slice(0, kMaxParamsLineLength)
+      : rawLine;
+  // A single match locates the signature end (if any). The parameter text is
+  // everything before the closing ')'; if the signature does not end on this
+  // line, the whole line is parameter text and we keep reading.
+  const endMatch = line.match(kFunctionEndPattern);
+  const paramsStr = endMatch ? line.slice(0, endMatch.index) : line;
+  if (paramsStr) {
+    const params = parseParameters(paramsStr);
+    params.forEach((param) => {
+      task.params.push(param.trim());
+    });
   }
-  return !kFunctionEndPattern.test(line);
+  return endMatch === null;
 };
 
 const parseParameters = (paramStr: string): string[] => {

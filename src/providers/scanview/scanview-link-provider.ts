@@ -12,6 +12,7 @@ import {
 } from "vscode";
 
 import { workspacePath } from "../../core/path";
+import { isUncPath, parseTerminalLinkUri } from "../../core/uri";
 
 const kScanResultPattern =
   /([^\s"]*scan_id=[23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]{22})/g;
@@ -68,11 +69,15 @@ export const scanviewTerminalLinkProvider = (_context: ExtensionContext) => {
 
 export const resolveScanDirLink = async (link: string) => {
   if (/^[a-z0-9]+:\/\//.test(link)) {
-    // This is a Uri - just parse it and return
-    // (e.g. S3 url)
-    return Uri.parse(link);
+    // This is a Uri (e.g. S3 url). Only dereference schemes we expect, and
+    // never a file:// URI with a host — see parseTerminalLinkUri.
+    return parseTerminalLinkUri(link) ?? undefined;
   } else {
-    // This is likely a file path.
+    // This is likely a file path. Refuse UNC paths (\\host\share, //host/share)
+    // whose mere existence check would open an NTLM-authenticated SMB session.
+    if (isUncPath(link)) {
+      return undefined;
+    }
     const wsAbs = workspacePath(link);
     if (existsSync(wsAbs.path)) {
       // This is a workspace file that exists

@@ -676,13 +676,13 @@ suite("LogListing Test Suite", () => {
       );
     });
 
-    test("leaves a location outside of the log dir unchanged", () => {
+    test("returns null for a location outside of the log dir", () => {
       assert.strictEqual(
         relativeLogPath(
           "file:///Users/me/project/scans",
           "/Users/me/elsewhere/scan_id=abc"
         ),
-        "/Users/me/elsewhere/scan_id=abc"
+        null
       );
     });
 
@@ -690,6 +690,33 @@ suite("LogListing Test Suite", () => {
       assert.strictEqual(
         relativeLogPath("file:///Users/me/project/scans", "2024/scan_id=abc"),
         "2024/scan_id=abc"
+      );
+    });
+
+    test("returns null for a '..' escape under the dir prefix", () => {
+      assert.strictEqual(
+        relativeLogPath(
+          "s3://bucket/team-a/logs",
+          "s3://bucket/team-a/logs/../../team-b/logs/run.eval"
+        ),
+        null
+      );
+    });
+
+    test("returns null for an already-relative '..' traversal", () => {
+      assert.strictEqual(
+        relativeLogPath("file:///Users/me/project/scans", "../../etc/passwd"),
+        null
+      );
+    });
+
+    test("returns null for a sibling dir sharing a string prefix", () => {
+      assert.strictEqual(
+        relativeLogPath(
+          "file:///Users/me/project/logs",
+          "file:///Users/me/project/logs-evil/run.eval"
+        ),
+        null
       );
     });
   });

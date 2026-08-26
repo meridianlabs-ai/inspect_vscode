@@ -6,7 +6,9 @@ import { Uri } from "vscode";
 import {
   dirname,
   getRelativeUri,
+  isUncPath,
   normalizeWindowsUri,
+  parseTerminalLinkUri,
   prettyUriPath,
   resolveToUri,
 } from "../../core/uri";
@@ -196,6 +198,83 @@ suite("URI Utilities Test Suite", () => {
       const child = Uri.file("/home/user/project2/file.txt");
       const relative = getRelativeUri(parent, child);
       assert.strictEqual(relative, null);
+    });
+
+    test("should return null for a sibling sharing a string prefix", () => {
+      // '.../logs' must not be judged to contain '.../logs-evil/...'
+      const parent = Uri.file("/w/logs");
+      const child = Uri.file("/w/logs-evil/a.eval");
+      assert.strictEqual(getRelativeUri(parent, child), null);
+    });
+
+    test("should return null when '..' traversal escapes the parent", () => {
+      const parent = Uri.file("/w/logs");
+      const child = Uri.file("/w/logs/../../etc/passwd");
+      assert.strictEqual(getRelativeUri(parent, child), null);
+    });
+
+    test("should resolve interior '..' that stays within the parent", () => {
+      const parent = Uri.file("/w/logs");
+      const child = Uri.file("/w/logs/sub/../a.eval");
+      assert.strictEqual(getRelativeUri(parent, child), "a.eval");
+    });
+
+    test("should return null for a different S3 bucket (authority)", () => {
+      const parent = Uri.parse("s3://bucket-a/logs");
+      const child = Uri.parse("s3://bucket-b/logs/x.eval");
+      assert.strictEqual(getRelativeUri(parent, child), null);
+    });
+
+    test("should relativize within the same S3 bucket", () => {
+      const parent = Uri.parse("s3://bucket-a/logs");
+      const child = Uri.parse("s3://bucket-a/logs/x.eval");
+      assert.strictEqual(getRelativeUri(parent, child), "x.eval");
+    });
+
+    test("should return null when '..' escapes an S3 prefix", () => {
+      const parent = Uri.parse("s3://bucket-a/logs");
+      const child = Uri.parse("s3://bucket-a/logs/../secrets/x.eval");
+      assert.strictEqual(getRelativeUri(parent, child), null);
+    });
+  });
+
+  suite("parseTerminalLinkUri", () => {
+    test("accepts remote backend schemes", () => {
+      assert.ok(parseTerminalLinkUri("s3://bucket/x.eval"));
+      assert.ok(parseTerminalLinkUri("https://example.com/x.eval"));
+      assert.ok(parseTerminalLinkUri("http://example.com/x.eval"));
+    });
+
+    test("accepts a local file:// URI without an authority", () => {
+      assert.ok(parseTerminalLinkUri("file:///Users/me/x.eval"));
+    });
+
+    test("rejects a file:// URI with a host (UNC / NTLM leak)", () => {
+      assert.strictEqual(
+        parseTerminalLinkUri("file://attacker.example/share/x.eval"),
+        null
+      );
+    });
+
+    test("rejects unexpected schemes", () => {
+      assert.strictEqual(
+        parseTerminalLinkUri("vscode://ukaisi.inspect-ai/open"),
+        null
+      );
+      assert.strictEqual(parseTerminalLinkUri("ssh://host/x.eval"), null);
+    });
+  });
+
+  suite("isUncPath", () => {
+    test("detects backslash and forward-slash UNC forms", () => {
+      assert.strictEqual(isUncPath("\\\\attacker\\share\\x.json"), true);
+      assert.strictEqual(isUncPath("//attacker/share/x.json"), true);
+    });
+
+    test("does not flag ordinary absolute/relative paths", () => {
+      assert.strictEqual(isUncPath("/Users/me/x.json"), false);
+      assert.strictEqual(isUncPath("logs/x.json"), false);
+      assert.strictEqual(isUncPath("C:\\logs\\x.json"), false);
     });
   });
 

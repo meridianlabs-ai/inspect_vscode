@@ -260,6 +260,35 @@ def my_task(
       assert.deepStrictEqual(task.params, ["items", "config", "callback"]);
     });
 
+    test("ignores a crafted non-identifier task name (argument injection)", () => {
+      // A loosely parsed 'name' carrying flags/metacharacters must not become a
+      // runnable task whose name reaches the CLI.
+      const doc = createDocument(`
+@task
+def demo,--model-base-url,https://attacker.example(x):
+    pass
+`);
+      const tasks = readTaskData(doc);
+      assert.strictEqual(tasks.length, 0);
+    });
+
+    test("parses a pathological megabyte param line in linear time (ReDoS)", () => {
+      // A ~2 MB line of spaces inside the parameter list previously drove the
+      // param regexes into quadratic backtracking, freezing the extension host.
+      const doc = createDocument(
+        `\n@task\ndef my_task(\n${" ".repeat(2_000_000)}x\n`
+      );
+      const start = Date.now();
+      const tasks = readTaskData(doc);
+      const elapsed = Date.now() - start;
+      assert.ok(
+        elapsed < 2000,
+        `readTaskData took ${elapsed}ms on a pathological line`
+      );
+      assert.strictEqual(tasks.length, 1);
+      assert.strictEqual(tasks[0]?.name, "my_task");
+    });
+
     test("should handle return type annotations", () => {
       const doc = createDocument(`
 @task

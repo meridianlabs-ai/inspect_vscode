@@ -10,6 +10,7 @@ import {
 } from "vscode";
 
 import { isNotebook } from "../../components/notebook";
+import { isValidTaskName } from "../../components/task";
 
 export function activateCodeLens(context: ExtensionContext) {
   const provider = new InspectCodeLensProvider();
@@ -54,8 +55,11 @@ export class InspectCodeLensProvider implements CodeLensProvider {
     alias?: string;
   } {
     const text = document.getText();
-    // Handle multiline imports by removing newlines between parentheses
-    const normalizedText = text.replace(normalizeTextPattern, "($1)");
+    // Handle multiline imports by collapsing whitespace within parentheses
+    const normalizedText = text.replace(
+      normalizeTextPattern,
+      (_m, inner: string) => `(${inner.replace(/\s+/g, " ")})`
+    );
 
     const fromImportMatch = normalizedText.match(fromImportPattern);
     if (fromImportMatch) {
@@ -106,9 +110,15 @@ export class InspectCodeLensProvider implements CodeLensProvider {
           const funcLine = document.lineAt(j);
           const match = funcLine.text.match(kFuncPattern);
           if (match && match[1]) {
-            taskCommands(document.uri, match[1]).forEach((cmd) => {
-              lenses.push(new CodeLens(line.range, cmd));
-            });
+            // Only offer a Run lens for identifier-named tasks; a loosely
+            // parsed name carrying flags/metacharacters must not reach the
+            // run command line.
+            const name = match[1].trim();
+            if (isValidTaskName(name)) {
+              taskCommands(document.uri, name).forEach((cmd) => {
+                lenses.push(new CodeLens(line.range, cmd));
+              });
+            }
             break;
           }
           j++;
@@ -119,9 +129,20 @@ export class InspectCodeLensProvider implements CodeLensProvider {
   }
 }
 
+// Linear-time: prior import names are matched as `\w+` elements separated by
+// `\s*,\s*`. No two whitespace-matching quantifiers are ever adjacent (the
+// optional `\s*` after `(` only exists when `(` matched, and elements are
+// comma-separated), so the engine cannot backtrack super-linearly on a long
+// run of spaces/commas that never reaches `task`. The previous `[\w,\s]*`
+// overlapped the separator and surrounding whitespace, giving O(n^2) — see
+// the ReDoS finding. `\s` spans newlines, so multiline imports match directly.
 const fromImportPattern =
-  /from\s+inspect_ai\s+import\s+(?:\(\s*)?(?:[\w,\s]*,\s*)?task(?:\s+as\s+(\w+))?/;
+  /from\s+inspect_ai\s+import\s+(?:\(\s*)?(?:\w+\s*,\s*)*task\b(?:\s+as\s+(\w+))?/;
 const hasImportPattern = /import\s+inspect_ai\b/;
 const kFuncPattern = /^\s*def\s*(.*)\(.*$/;
 const kDecoratorPattern = /^\s*@(inspect_ai\.)?task\b|@(\w+)\b/;
-const normalizeTextPattern = /\(\s*\n\s*([^)]+)\s*\n\s*\)/g;
+// Linear-time: `[^)]*` has no adjacent overlapping quantifier, so it scans each
+// parenthesized group once (the previous `\(\s*\n\s*([^)]+)\s*\n\s*\)` had
+// overlapping `\s*`/`[^)]+` quantifiers that backtracked quadratically on an
+// unclosed '(' followed by a long whitespace run).
+const normalizeTextPattern = /\(([^)]*)\)/g;

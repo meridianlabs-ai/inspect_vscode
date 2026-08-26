@@ -124,6 +124,52 @@ suite("getWebviewPanelHtml Test Suite", () => {
       }
     });
 
+    test("should NOT stamp a nonce on scripts injected via extraHead", () => {
+      const { viewDir, cleanup } = createTempViewDir(
+        `<!DOCTYPE html>
+<html lang="en">
+<head>
+</head>
+<body>
+<script src="assets/index.js"></script>
+</body>
+</html>`
+      );
+
+      try {
+        // Simulate a payload that broke out of an inline JSON block and injected
+        // a live <script> element into the head fragment.
+        const extraHead =
+          '<script id="legit" type="application/json">{}</script>' +
+          "<script>window.__pwned = true;</script>";
+        const result = getWebviewPanelHtml(
+          toAbsolutePath(viewDir),
+          mockPanel,
+          "1.0.0",
+          null,
+          extraHead
+        );
+
+        // The trusted template script must be nonced...
+        assert.ok(
+          /<script nonce="[^"]+" src=/.test(result),
+          "Template script should receive a nonce"
+        );
+        // ...but the injected script from extraHead must NOT be nonced, so the
+        // nonce-based CSP blocks it.
+        assert.ok(
+          result.includes("<script>window.__pwned = true;</script>"),
+          "Injected script should be present verbatim"
+        );
+        assert.ok(
+          !/<script nonce="[^"]+">window\.__pwned/.test(result),
+          "Injected script must NOT receive a nonce"
+        );
+      } finally {
+        cleanup();
+      }
+    });
+
     test("should rewrite script src attributes for bundled HTML", () => {
       const { viewDir, cleanup } = createTempViewDir(
         `<!DOCTYPE html>

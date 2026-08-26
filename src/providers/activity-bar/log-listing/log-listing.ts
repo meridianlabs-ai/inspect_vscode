@@ -53,34 +53,39 @@ export interface Logs {
 }
 
 /**
- * Computes a log-dir-relative path for a listing item location.
+ * Computes a log-dir-relative path for a listing item location, or null if the
+ * location is not contained within the log directory.
  *
- * Listings historically used an exact string-prefix strip, which assumes the
- * server returns locations in exactly the same form as the requested log dir.
- * That isn't guaranteed — e.g. scout returns plain absolute paths for local
- * scan dirs even when the requested dir is a file:// URI — so fall back to
- * URI-aware relativization when the string prefix doesn't match. Locations
- * outside the log dir are returned unchanged.
+ * Listing names come from the view server / remote storage (e.g. S3 keys),
+ * which may contain literal '..' segments, so a name must never be trusted to
+ * stay inside the log dir. The exact string-prefix fast path is kept (the
+ * server usually returns locations in the requested form) but is rejected if
+ * the relative part contains a '..' escape; otherwise fall back to the
+ * containment-checked getRelativeUri. Locations outside the log dir return null
+ * so the caller can drop them rather than surface an out-of-boundary entry.
  */
-export function relativeLogPath(logDir: string, location: string): string {
+export function relativeLogPath(
+  logDir: string,
+  location: string
+): string | null {
   const dirWithSlash = logDir.endsWith("/") ? logDir : `${logDir}/`;
   if (location.startsWith(dirWithSlash)) {
-    return location.slice(dirWithSlash.length);
+    const relative = location.slice(dirWithSlash.length);
+    return relative.split(/[\\/]/).includes("..") ? null : relative;
   }
   try {
     if (isUri(location) || path.isAbsolute(location)) {
-      const relative = getRelativeUri(
-        resolveToUri(logDir),
-        resolveToUri(location)
-      );
-      if (relative !== null) {
-        return relative;
-      }
+      // Absolute/URI locations: contained iff getRelativeUri says so (null
+      // drops anything outside the dir, including '..' escapes).
+      return getRelativeUri(resolveToUri(logDir), resolveToUri(location));
     }
   } catch {
-    // unparseable dir or location — leave the location unchanged
+    // unparseable dir or location — treat as outside the log dir
+    return null;
   }
-  return location;
+  // Otherwise the server returned a name already relative to the log dir; keep
+  // it unless it uses '..' to climb out.
+  return location.split(/[\\/]/).includes("..") ? null : location;
 }
 
 export class LogListing {
@@ -123,7 +128,20 @@ export class LogListing {
   }
 
   public uriForNode(node: LogNode) {
-    return Uri.joinPath(this.logDir_, node.name);
+    const uri = Uri.joinPath(this.logDir_, node.name);
+    // Node names are containment-checked on ingest (see listLogs), so this
+    // should always hold; verify defensively and never hand back a URI that
+    // escapes the log directory (clamp to the log dir if it somehow does).
+    if (
+      uri.toString() !== this.logDir_.toString() &&
+      getRelativeUri(this.logDir_, uri) === null
+    ) {
+      log.error(
+        `Log node "${node.name}" resolved outside the log directory; refusing.`
+      );
+      return this.logDir_;
+    }
+    return uri;
   }
 
   public nodeForUri(uri: Uri): LogNode | undefined {
@@ -162,10 +180,29 @@ export class LogListing {
       const logs = await this.logsFetcher_(this.logDir_);
       if (logs) {
         const log_dir = normalizeWindowsUri(logs.log_dir);
+        const items: LogItem[] = [];
+        let dropped = 0;
         for (const file of logs.items) {
-          file.name = relativeLogPath(log_dir, normalizeWindowsUri(file.name));
+          const relative = relativeLogPath(
+            log_dir,
+            normalizeWindowsUri(file.name)
+          );
+          // Drop listing entries that resolve outside the log directory
+          // (e.g. remote-storage names containing '..' traversal) rather than
+          // surfacing an out-of-boundary node in the tree.
+          if (relative === null) {
+            dropped++;
+            continue;
+          }
+          file.name = relative;
+          items.push(file);
         }
-        const tree = buildLogTree(logs.items);
+        if (dropped > 0) {
+          log.warn(
+            `Dropped ${dropped} log listing item(s) that resolved outside ${log_dir}.`
+          );
+        }
+        const tree = buildLogTree(items);
         return tree;
       } else {
         log.error(

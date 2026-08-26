@@ -24,6 +24,7 @@ import {
 import { log } from "../../core/log";
 import { HttpProxyRpcRequest } from "../../core/package/view-server";
 import { AbsolutePath } from "../../core/path";
+import { getRelativeUri, resolveToUri } from "../../core/uri";
 import {
   getWebviewPanelHtml,
   handleWebviewPanelOpenMessages,
@@ -34,6 +35,51 @@ import { InspectViewServer } from "../inspect/inspect-view-server";
 
 import { LogviewState } from "./logview-state";
 
+/**
+ * Whether a webview-supplied file path/URL is within the scope this log-view
+ * panel was opened for. A `file` panel may only touch its own log file; a `dir`
+ * panel may only touch descendants of its log directory. Used to gate the
+ * file-content RPC methods so injected webview script cannot read or write
+ * paths outside what the panel is actually viewing.
+ */
+export function logPathInScope(
+  type: "file" | "dir",
+  panelUri: Uri,
+  target: string
+): boolean {
+  const panelUriStr = panelUri.toString();
+  let targetUri: Uri;
+  try {
+    targetUri = resolveToUri(target);
+  } catch {
+    return false;
+  }
+  if (target === panelUriStr || targetUri.toString() === panelUriStr) {
+    return true;
+  }
+  return type === "dir" && getRelativeUri(panelUri, targetUri) !== null;
+}
+
+/**
+ * Serialize a value to JSON for embedding inside an inline `<script>` element.
+ *
+ * `JSON.stringify` does not escape HTML-significant characters, so a string
+ * value containing `</script>` (e.g. an attacker-controlled sample id supplied
+ * via the log URI query string) would otherwise terminate the script element
+ * and inject live markup into the webview. Escaping `<`, `>`, and `&` — plus
+ * the U+2028/U+2029 line separators that are invalid in JS string literals —
+ * keeps the serialized payload inert as HTML regardless of its contents.
+ */
+export function jsonForScript(value: unknown): string {
+  // Match `<`, `>`, `&` and the U+2028/U+2029 line separators, replacing each
+  // with its `\uXXXX` escape so the result is inert as HTML and valid inside a
+  // JS string literal. `JSON.stringify` escapes none of these on its own.
+  return JSON.stringify(value).replace(
+    /[<>&\u2028\u2029]/g,
+    (ch) => "\\u" + ch.charCodeAt(0).toString(16).padStart(4, "0")
+  );
+}
+
 export class LogviewPanel extends Disposable {
   constructor(
     private panel_: HostWebviewPanel,
@@ -43,6 +89,25 @@ export class LogviewPanel extends Disposable {
     uri: Uri
   ) {
     super();
+
+    // The webview renders untrusted eval-log content and its RPC surface is
+    // reachable from injected script. The token-authorized view server reads
+    // and writes ANY path/URL by design, so the extension host is the only
+    // place that can confine webview-supplied paths to what this panel is
+    // actually viewing. Every file-content method below is gated by this guard:
+    // a `file` panel may only touch its own log file; a `dir` panel may only
+    // touch descendants of its log directory. Requests outside that scope are
+    // rejected before the path ever reaches the server.
+    const requireScope = (target: unknown): string => {
+      if (typeof target !== "string" || !logPathInScope(type, uri, target)) {
+        throw new Error(
+          `Refusing to access "${String(
+            target
+          )}": outside the scope of this log view.`
+        );
+      }
+      return target;
+    };
 
     // serve eval log api to webview
     this._rpcDisconnect = webviewPanelJsonRpcServer(panel_, {
@@ -64,25 +129,27 @@ export class LogviewPanel extends Disposable {
       [kMethodEvalLogs]: async () =>
         type === "dir" ? server_.evalLogs(uri) : server_.evalLogsSolo(uri),
       [kMethodEvalLog]: (params: unknown[]) =>
-        server_.evalLog(params[0] as string, params[1] as number | boolean),
+        server_.evalLog(requireScope(params[0]), params[1] as number | boolean),
       [kMethodEvalLogSize]: (params: unknown[]) =>
-        server_.evalLogSize(params[0] as string),
+        server_.evalLogSize(requireScope(params[0])),
       [kMethodEvalLogBytes]: (params: unknown[]) =>
         server_.evalLogBytes(
-          params[0] as string,
+          requireScope(params[0]),
           params[1] as number,
           params[2] as number
         ),
       [kMethodEvalLogHeaders]: (params: unknown[]) =>
-        server_.evalLogHeaders(params[0] as string[]),
+        server_.evalLogHeaders(
+          (params[0] as unknown[]).map((f) => requireScope(f))
+        ),
       [kMethodPendingSamples]: (params: unknown[]) =>
         server_.evalLogPendingSamples(
-          params[0] as string,
+          requireScope(params[0]),
           params[1] as string | undefined
         ),
       [kMethodSampleData]: (params: unknown[]) =>
         server_.evalLogSampleData(
-          params[0] as string,
+          requireScope(params[0]),
           params[1] as string | number,
           params[2] as number,
           params[3] as number | undefined,
@@ -96,7 +163,7 @@ export class LogviewPanel extends Disposable {
       },
       [kMethodEditLog]: (params: unknown[]) =>
         server_.editLog(
-          params[0] as string,
+          requireScope(params[0]),
           params[1],
           params[2] as string | undefined
         ),
@@ -160,14 +227,14 @@ export class LogviewPanel extends Disposable {
       sample_epoch: state.sample?.epoch,
     };
     const stateScript = state.log_file
-      ? `<script id="logview-state" type="application/json">${JSON.stringify(
+      ? `<script id="logview-state" type="application/json">${jsonForScript(
           stateMsg
         )}</script>`
       : "";
 
     // Advertise the generic http_request proxy to the viewer. Older extensions
     // inject nothing, so the viewer falls back to the named-RPC API.
-    const capabilitiesScript = `<script id="inspect-host-capabilities" type="application/json">${JSON.stringify(
+    const capabilitiesScript = `<script id="inspect-host-capabilities" type="application/json">${jsonForScript(
       [kMethodHttpRequest]
     )}</script>`;
 
