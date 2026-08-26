@@ -59,5 +59,32 @@ suite("Protocol Handler Test Suite", () => {
       const err = validateLogUri(Uri.parse("https://evil.example/page.html"));
       assert.ok(err && err.includes("not an Inspect log file"));
     });
+
+    test("accepts a benign sample_id/epoch query", () => {
+      assert.strictEqual(
+        validateLogUri(
+          Uri.parse("s3://bucket/run.eval?sample_id=task_42&epoch=1")
+        ),
+        null
+      );
+    });
+
+    test("rejects a sample_id carrying HTML markup (XSS vector)", () => {
+      const err = validateLogUri(
+        Uri.parse(
+          "s3://bucket/run.eval?sample_id=" +
+            encodeURIComponent("</script><script>alert(1)</script>") +
+            "&epoch=1"
+        )
+      );
+      assert.ok(err && err.includes("invalid sample id"));
+    });
+
+    test("rejects a non-integer epoch", () => {
+      const err = validateLogUri(
+        Uri.parse("s3://bucket/run.eval?sample_id=ok&epoch=1e9")
+      );
+      assert.ok(err && err.includes("invalid epoch"));
+    });
   });
 });

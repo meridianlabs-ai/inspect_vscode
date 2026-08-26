@@ -10,6 +10,7 @@ import {
 } from "vscode";
 
 import { isNotebook } from "../../components/notebook";
+import { isValidTaskName } from "../../components/task";
 
 export function activateScoutCodeLens(context: ExtensionContext) {
   const provider = new ScoutCodeLensProvider();
@@ -54,8 +55,11 @@ export class ScoutCodeLensProvider implements CodeLensProvider {
     alias?: string;
   } {
     const text = document.getText();
-    // Handle multiline imports by removing newlines between parentheses
-    const normalizedText = text.replace(normalizeTextPattern, "($1)");
+    // Handle multiline imports by collapsing whitespace within parentheses
+    const normalizedText = text.replace(
+      normalizeTextPattern,
+      (_m, inner: string) => `(${inner.replace(/\s+/g, " ")})`
+    );
 
     const fromImportMatch = normalizedText.match(fromImportPattern);
     if (fromImportMatch) {
@@ -107,9 +111,15 @@ export class ScoutCodeLensProvider implements CodeLensProvider {
           const funcLine = document.lineAt(j);
           const match = funcLine.text.match(kFuncPattern);
           if (match && match[1]) {
-            scanCommands(document.uri, match[1]).forEach((cmd) => {
-              lenses.push(new CodeLens(line.range, cmd));
-            });
+            // Only offer a Run lens for identifier-named scanners; a loosely
+            // parsed name carrying flags/metacharacters must not reach the
+            // run command line.
+            const name = match[1].trim();
+            if (isValidTaskName(name)) {
+              scanCommands(document.uri, name).forEach((cmd) => {
+                lenses.push(new CodeLens(line.range, cmd));
+              });
+            }
             break;
           }
           j++;
@@ -120,9 +130,13 @@ export class ScoutCodeLensProvider implements CodeLensProvider {
   }
 }
 
+// Linear-time rewrite (see the matching comment in codelens-provider.ts):
+// prior import names are `\w+` elements separated by `\s*,\s*` with no two
+// whitespace quantifiers adjacent, and normalizeTextPattern scans each
+// parenthesized group once. Group 1 stays (scanner|scanjob), group 2 the alias.
 const fromImportPattern =
-  /from\s+inspect_scout\s+import\s+(?:\(\s*)?(?:[\w,\s]*,\s*)?(scanner|scanjob)(?:\s+as\s+(\w+))?/;
+  /from\s+inspect_scout\s+import\s+(?:\(\s*)?(?:\w+\s*,\s*)*(scanner|scanjob)\b(?:\s+as\s+(\w+))?/;
 const hasImportPattern = /import\s+inspect_scout\b/;
 const kFuncPattern = /^\s*def\s*(.*)\(.*$/;
 const kDecoratorPattern = /^\s*@(inspect_scout\.)?(scanner|scanjob)\b|@(\w+)\b/;
-const normalizeTextPattern = /\(\s*\n\s*([^)]+)\s*\n\s*\)/g;
+const normalizeTextPattern = /\(([^)]*)\)/g;

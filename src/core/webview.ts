@@ -1,11 +1,26 @@
 import { readFileSync } from "fs";
 
-import { Disposable, env, MessageItem, Uri, window } from "vscode";
+import { Disposable, env, MessageItem, Uri, window, workspace } from "vscode";
 
 import { HostWebviewPanel } from "../hooks";
 
 import { getNonce } from "./nonce";
 import { AbsolutePath, workspacePath } from "./path";
+import { getRelativeUri } from "./uri";
+
+// Schemes the webview is allowed to open via env.openExternal. Web links only;
+// vscode://, file://, and OS-registered custom schemes are refused.
+const kOpenExternalSchemes = ["http", "https", "mailto"];
+
+// Whether an absolute path resolves inside one of the open workspace folders.
+function isWithinWorkspace(absPath: string): boolean {
+  const target = Uri.file(absPath);
+  return (workspace.workspaceFolders ?? []).some(
+    (folder) =>
+      folder.uri.fsPath === absPath ||
+      getRelativeUri(folder.uri, target) !== null
+  );
+}
 
 export function getWebviewPanelHtml(
   viewDir: AbsolutePath | null,
@@ -70,22 +85,32 @@ Please update to a newer version of ${packageName} to view this content.
       panel.webview.cspSource
     }; connect-src ${panel.webview.cspSource} blob:;">
     ${overrideCssHtml}
-    ${extraHead}
+    <!--inspect-extra-head-->
 
     `
     );
 
-    // function to resolve resource uri
-    const resourceUri = (path: string) =>
-      panel.webview.asWebviewUri(Uri.joinPath(viewDirUri, path)).toString();
-
     // nonces for scripts. Match the `<script` start tag followed by a tag
     // boundary (whitespace or `>`) so we don't accidentally match tags like
     // `<scripting>`. Case-insensitive and covers all whitespace forms.
+    //
+    // IMPORTANT: stamp nonces BEFORE inserting the caller-supplied `extraHead`
+    // fragment. Otherwise any `<script>` element injected into `extraHead`
+    // (e.g. by a value that broke out of an inline JSON payload) would receive
+    // a valid CSP nonce and execute. Only scripts from the trusted index.html
+    // template should be granted the nonce.
     indexHtml = indexHtml.replace(
       /<script(?=[\s>])/gi,
       (match) => `${match} nonce="${nonce}"`
     );
+
+    // insert the (untrusted) extra head fragment only after nonces have been
+    // stamped, so its scripts are not nonced and remain blocked by the CSP.
+    indexHtml = indexHtml.replace("<!--inspect-extra-head-->", () => extraHead);
+
+    // function to resolve resource uri
+    const resourceUri = (path: string) =>
+      panel.webview.asWebviewUri(Uri.joinPath(viewDirUri, path)).toString();
 
     // Determine whether this is the old index.html format (before bundling),
     // or the newer one. Fix up the html properly in each case
@@ -179,7 +204,13 @@ export function handleWebviewPanelOpenMessages(
         case "openExternal":
           try {
             const url = Uri.parse(e.url);
-            await env.openExternal(url);
+            // These messages originate from untrusted webview content (rendered
+            // eval logs / scan results, or injected script). Only hand web URLs
+            // to env.openExternal; refusing other schemes prevents a malicious
+            // log from launching arbitrary protocol/URI handlers on the host.
+            if (kOpenExternalSchemes.includes(url.scheme.toLowerCase())) {
+              await env.openExternal(url);
+            }
           } catch {
             // Noop
           }
@@ -188,6 +219,12 @@ export function handleWebviewPanelOpenMessages(
           {
             if (e.url) {
               const file = workspacePath(e.url);
+              // Despite the name, workspacePath returns absolute inputs verbatim,
+              // so confine the target to an open workspace folder before opening
+              // it — otherwise the webview could open any file on disk.
+              if (!isWithinWorkspace(file.path)) {
+                break;
+              }
               try {
                 await window.showTextDocument(Uri.file(file.path));
               } catch (err) {

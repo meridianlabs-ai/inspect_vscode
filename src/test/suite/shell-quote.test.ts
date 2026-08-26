@@ -90,6 +90,34 @@ suite("Shell Quote Test Suite", () => {
         "'task; rm $env:HOME'"
       );
     });
+
+    test("quotes a comma so PowerShell does not split it into an array", () => {
+      // In PowerShell argument mode 'a,b' is the array operator; quoting keeps
+      // it a single literal argument.
+      assert.strictEqual(
+        quoteArg("tasks.py@demo,--model-base-url,https://x", "powershell"),
+        "'tasks.py@demo,--model-base-url,https://x'"
+      );
+      assert.strictEqual(quoteArg("1,2", "powershell"), "'1,2'");
+    });
+
+    test("doubles Unicode smart quotes so they cannot terminate the string", () => {
+      // PowerShell treats U+2018–U+201B as single-quote characters, so an
+      // embedded smart quote must be doubled or it would end the quoted string
+      // and let the following text execute.
+      const payload = "demo" + "’" + ";calc;" + "’";
+      const quoted = quoteArg(payload, "powershell");
+      assert.strictEqual(quoted, "'demo’’;calc;’’'");
+    });
+
+    test("quotes a leading @ (splatting/array subexpression)", () => {
+      assert.strictEqual(quoteArg("@evil", "powershell"), "'@evil'");
+    });
+
+    test("still passes a comma unquoted to POSIX and cmd", () => {
+      assert.strictEqual(quoteArg("1,2", "posix"), "1,2");
+      assert.strictEqual(quoteArg("1,2", "cmd"), "1,2");
+    });
   });
 
   suite("quoteArg - cmd", () => {

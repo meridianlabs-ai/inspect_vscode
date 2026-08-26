@@ -14,7 +14,7 @@ import {
 
 import { OutputWatcher } from "../../core/package/output-watcher";
 import { workspacePath } from "../../core/path";
-import { isUri } from "../../core/uri";
+import { isUncPath, isUri, parseTerminalLinkUri } from "../../core/uri";
 
 const kLogFilePattern = /^.*Log: (\S*?\.json|\S*?\.eval)\s*/g;
 const kEvalJsonPattern = /(?:^|\s)(\S*?\.json|\S*?\.eval)\s*/g;
@@ -135,11 +135,15 @@ export const logviewTerminalLinkProvider = (
 
 export const resolveLogFile = async (link: string) => {
   if (/^[a-z0-9]+:\/\//.test(link)) {
-    // This is a Uri - just parse it and return
-    // (e.g. S3 url)
-    return Uri.parse(link);
+    // This is a Uri (e.g. S3 url). Only dereference schemes we expect, and
+    // never a file:// URI with a host — see parseTerminalLinkUri.
+    return parseTerminalLinkUri(link) ?? undefined;
   } else {
-    // This is likely a file path.
+    // This is likely a file path. Refuse UNC paths (\\host\share, //host/share)
+    // whose mere existence check would open an NTLM-authenticated SMB session.
+    if (isUncPath(link)) {
+      return undefined;
+    }
     const wsAbs = workspacePath(link);
     if (existsSync(wsAbs.path)) {
       // This is a workspace file that exists
