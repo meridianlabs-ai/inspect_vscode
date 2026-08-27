@@ -4,6 +4,7 @@ import {
   debug,
   DebugConfiguration,
   ExtensionContext,
+  MessageItem,
   Terminal,
   window,
   workspace,
@@ -80,13 +81,22 @@ export class ExecManager {
     const docState = this.stateManager_.getTaskState(file.path, target);
     args.push(...this.profile_.execArgs(docState, debug));
 
-    // Find the python environment
+    // Find the python environment. A discovered subdirectory interpreter would
+    // be executed in place of the user's selected interpreter, so a repository
+    // can ship a fake environment (a directory with pyvenv.cfg plus an
+    // executable bin/python) to run arbitrary code on Run/Debug Task. Require
+    // explicit, remembered per-environment consent before executing it.
     const useSubdirectoryEnvironments = workspace
       .getConfiguration("inspect_ai")
       .get("useSubdirectoryEnvironments");
-    const pythonPath = useSubdirectoryEnvironments
+    const discoveredPython = useSubdirectoryEnvironments
       ? findEnvPythonPath(file.dirname(), activeWorkspacePath())
       : undefined;
+    const pythonPath =
+      discoveredPython &&
+      (await this.confirmSubdirectoryEnvironment(discoveredPython))
+        ? discoveredPython
+        : undefined;
 
     // If we're debugging, launch using the debugger
     if (debug) {
@@ -114,6 +124,47 @@ export class ExecManager {
         pythonPath ? pythonPath : undefined
       );
     }
+  }
+
+  // Approvals are remembered per interpreter path for the workspace so a trusted
+  // subdirectory environment (e.g. the user's own .venv) is only confirmed once.
+  private static readonly kApprovedEnvKey =
+    "inspect.approvedSubdirectoryEnvironments";
+
+  private async confirmSubdirectoryEnvironment(
+    python: AbsolutePath
+  ): Promise<boolean> {
+    const approved = this.context_.workspaceState.get<string[]>(
+      ExecManager.kApprovedEnvKey,
+      []
+    );
+    if (approved.includes(python.path)) {
+      return true;
+    }
+
+    const useIt: MessageItem = { title: "Use Environment" };
+    const cancel: MessageItem = { title: "Cancel", isCloseAffordance: true };
+    const choice = await window.showWarningMessage(
+      `Run ${this.profile_.target} using a Python environment discovered in your workspace?`,
+      {
+        modal: true,
+        detail:
+          `The interpreter at "${python.path}" was found in a subdirectory and ` +
+          `would be used instead of your selected interpreter. Only approve ` +
+          `environments you trust — a repository can ship a fake environment to ` +
+          `run arbitrary code.`,
+      },
+      useIt,
+      cancel
+    );
+    if (choice === useIt) {
+      await this.context_.workspaceState.update(ExecManager.kApprovedEnvKey, [
+        ...approved,
+        python.path,
+      ]);
+      return true;
+    }
+    return false;
   }
 }
 
