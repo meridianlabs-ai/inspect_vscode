@@ -1,7 +1,10 @@
+import * as os from "os";
+
 import {
   debug,
   DebugConfiguration,
   ExtensionContext,
+  MessageItem,
   Terminal,
   window,
   workspace,
@@ -20,7 +23,14 @@ import {
   workspaceRelativePath,
 } from "../path";
 import { findEnvPythonPath } from "../python";
-import { detectShellKind, quoteArg, quoteCommandLine } from "../shell-quote";
+import {
+  quoteArg,
+  quoteArgUnknownShell,
+  quoteCommandLine,
+  quoteCommandLineUnknownShell,
+  ShellKind,
+  shellKindFromPath,
+} from "../shell-quote";
 import { activeWorkspaceFolder } from "../workspace";
 
 export interface ExecProfile {
@@ -71,13 +81,22 @@ export class ExecManager {
     const docState = this.stateManager_.getTaskState(file.path, target);
     args.push(...this.profile_.execArgs(docState, debug));
 
-    // Find the python environment
+    // Find the python environment. A discovered subdirectory interpreter would
+    // be executed in place of the user's selected interpreter, so a repository
+    // can ship a fake environment (a directory with pyvenv.cfg plus an
+    // executable bin/python) to run arbitrary code on Run/Debug Task. Require
+    // explicit, remembered per-environment consent before executing it.
     const useSubdirectoryEnvironments = workspace
       .getConfiguration("inspect_ai")
       .get("useSubdirectoryEnvironments");
-    const pythonPath = useSubdirectoryEnvironments
+    const discoveredPython = useSubdirectoryEnvironments
       ? findEnvPythonPath(file.dirname(), activeWorkspacePath())
       : undefined;
+    const pythonPath =
+      discoveredPython &&
+      (await this.confirmSubdirectoryEnvironment(discoveredPython))
+        ? discoveredPython
+        : undefined;
 
     // If we're debugging, launch using the debugger
     if (debug) {
@@ -105,6 +124,52 @@ export class ExecManager {
         pythonPath ? pythonPath : undefined
       );
     }
+  }
+
+  // Approvals are remembered per interpreter path for the workspace so a trusted
+  // subdirectory environment (e.g. the user's own .venv) is only confirmed once.
+  private static readonly kApprovedEnvKey =
+    "inspect.approvedSubdirectoryEnvironments";
+
+  private async confirmSubdirectoryEnvironment(
+    python: AbsolutePath
+  ): Promise<boolean> {
+    const approved = this.context_.workspaceState.get<string[]>(
+      ExecManager.kApprovedEnvKey,
+      []
+    );
+    if (approved.includes(python.path)) {
+      return true;
+    }
+
+    const useIt: MessageItem = { title: "Use Workspace Environment" };
+    const cancel: MessageItem = {
+      title: "Use Selected Interpreter",
+      isCloseAffordance: true,
+    };
+    const choice = await window.showWarningMessage(
+      `Run ${this.profile_.target} with a workspace Python environment?`,
+      {
+        modal: true,
+        detail:
+          `Inspect found a Python environment inside the workspace and would run ` +
+          `it instead of your selected interpreter:\n\n${python.path}\n\n` +
+          `Running the ${this.profile_.target.toLowerCase()} executes code from ` +
+          `that environment, so only continue if you trust this workspace.\n\n` +
+          `Approval is remembered for this environment. To always use your ` +
+          `selected interpreter, turn off "inspect_ai.useSubdirectoryEnvironments".`,
+      },
+      useIt,
+      cancel
+    );
+    if (choice === useIt) {
+      await this.context_.workspaceState.update(ExecManager.kApprovedEnvKey, [
+        ...approved,
+        python.path,
+      ]);
+      return true;
+    }
+    return false;
   }
 }
 
@@ -199,17 +264,48 @@ const runCommand = async (
     kShellIntegrationTimeoutMs
   );
 
+  // Quote for the shell that actually runs in the terminal. The command line is
+  // sent verbatim, so quoting for a different shell than the one interpreting it
+  // is a command-injection vector — PowerShell single quotes are inert in
+  // cmd.exe, so an `&` in an attacker-controlled task path/name would execute.
+  // Identify the shell from the explicit creation path, then the actual shell
+  // reported after integration activates, then the configured default profile.
   const creationOptions = terminal.creationOptions;
-  const shellPath =
+  const creationShellPath =
     "shellPath" in creationOptions ? creationOptions.shellPath : undefined;
-  const shell = detectShellKind(shellPath);
-  const commandLine = quoteCommandLine([command, ...commandArgs], shell);
+  const actualShell = (terminal.state as { shell?: string }).shell;
+  const shell: ShellKind | undefined =
+    shellKindFromPath(creationShellPath) ??
+    shellKindFromPath(actualShell) ??
+    configuredDefaultShellKind();
+
+  // Build the command line (and optional `cd`). When the shell can't be
+  // identified, fall back to cross-shell-safe double quoting; if a token can't
+  // be safely quoted for an unknown shell, refuse to run rather than risk
+  // injection.
+  let commandLine: string;
+  let cdLine: string | undefined;
+  if (shell) {
+    commandLine = quoteCommandLine([command, ...commandArgs], shell);
+    cdLine = reusedTerminal ? `cd ${quoteArg(cwd, shell)}` : undefined;
+  } else {
+    const line = quoteCommandLineUnknownShell([command, ...commandArgs]);
+    const cwdQuoted = reusedTerminal ? quoteArgUnknownShell(cwd) : "";
+    if (line === null || cwdQuoted === null) {
+      await window.showErrorMessage(
+        `Unable to ${profile.target === "Scan" ? "run scan" : "run task"}: the task path or arguments contain characters that can't be safely quoted for this terminal's shell. Select a known shell profile (PowerShell, cmd, or a POSIX shell) or rename the offending file/parameters.`
+      );
+      return;
+    }
+    commandLine = line;
+    cdLine = reusedTerminal ? `cd ${cwdQuoted}` : undefined;
+  }
 
   if (integration) {
     // Shell integration is active: the env is ready. Emit a `cd` first on
     // reused terminals (executeCommand doesn't change the working directory).
-    if (reusedTerminal) {
-      integration.executeCommand(`cd ${quoteArg(cwd, shell)}`);
+    if (cdLine) {
+      integration.executeCommand(cdLine);
     }
     integration.executeCommand(commandLine);
   } else {
@@ -218,11 +314,62 @@ const runCommand = async (
     if (!reusedTerminal) {
       await sleep(2000);
     }
-    if (reusedTerminal) {
-      terminal.sendText(`cd ${quoteArg(cwd, shell)}`);
+    if (cdLine) {
+      terminal.sendText(cdLine);
     }
     terminal.sendText(commandLine);
   }
+};
+
+/**
+ * Best-effort identification of the shell VS Code's default terminal profile
+ * launches, used when the terminal itself doesn't report its shell. Consults the
+ * platform-appropriate defaultProfile so that, e.g., a pwsh default on macOS or
+ * Linux isn't quoted as POSIX. Returns POSIX as the fallback on unix-like
+ * platforms (their near-universal default) and `undefined` on Windows when the
+ * profile can't be mapped, so the caller uses cross-shell-safe quoting instead
+ * of guessing.
+ */
+const configuredDefaultShellKind = (): ShellKind | undefined => {
+  const platform = os.platform();
+  const key =
+    platform === "win32" ? "windows" : platform === "darwin" ? "osx" : "linux";
+  const unixFallback: ShellKind | undefined =
+    platform === "win32" ? undefined : "posix";
+
+  const cfg = workspace.getConfiguration("terminal.integrated");
+  const profileName = cfg.get<string>(`defaultProfile.${key}`) ?? undefined;
+  if (!profileName) {
+    return unixFallback;
+  }
+  const profiles =
+    cfg.get<Record<string, { path?: string | string[]; source?: string }>>(
+      `profiles.${key}`
+    ) ?? {};
+  const profile = profiles[profileName];
+  const pathVal = profile?.path;
+  const path = Array.isArray(pathVal) ? pathVal[0] : pathVal;
+  const byPath = shellKindFromPath(path) ?? shellKindFromPath(profile?.source);
+  if (byPath) {
+    return byPath;
+  }
+  const lower = profileName.toLowerCase();
+  if (lower.includes("command prompt") || lower === "cmd") {
+    return "cmd";
+  }
+  if (lower.includes("powershell") || lower.includes("pwsh")) {
+    return "powershell";
+  }
+  if (
+    lower.includes("git bash") ||
+    lower.includes("wsl") ||
+    lower.includes("bash") ||
+    lower.includes("zsh") ||
+    lower.includes("fish")
+  ) {
+    return "posix";
+  }
+  return unixFallback;
 };
 
 const runDebugger = async (

@@ -384,8 +384,8 @@
         },
         "inspect_ai.useSubdirectoryEnvironments": {
           "type": "boolean",
-          "default": true,
-          "description": "Run and debug commands using subdirectory environments when present.",
+          "default": false,
+          "description": "When enabled, Run/Debug Task uses a Python environment found in a subdirectory of the workspace (nearest the task file) instead of your selected interpreter. Off by default; enable only for workspaces you trust, since it can execute an environment shipped in the repository. You are still asked to confirm each discovered environment.",
           "order": 2
         }
       }

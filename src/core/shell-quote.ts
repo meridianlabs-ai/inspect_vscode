@@ -1,21 +1,23 @@
-import * as os from "os";
-
 // The kind of shell a command line will be sent to. We send run commands to a
 // VS Code integrated terminal via `terminal.sendText`, so the string must be
 // escaped according to the shell that terminal is actually running.
 export type ShellKind = "posix" | "powershell" | "cmd";
 
 /**
- * Maps a shell executable path to a {@link ShellKind}.
- *
- * When the shell is unknown (no path, or unrecognized), fall back to the
- * platform default: `cmd`/`powershell` on Windows, `posix` elsewhere. We pick
- * `powershell` on Windows because that is VS Code's modern default terminal
- * profile.
+ * Positively identify a {@link ShellKind} from a shell executable path, or
+ * `undefined` when the path is empty or unrecognized. Unlike
+ * {@link detectShellKind} this never guesses a platform default — the caller can
+ * distinguish "known to be X" from "could not determine", which matters because
+ * quoting for the wrong shell (PowerShell single quotes are inert in cmd.exe,
+ * letting an embedded `&` execute) is a command-injection vector.
  */
-export function detectShellKind(shellPath: string | undefined): ShellKind {
+export function shellKindFromPath(
+  shellPath: string | undefined
+): ShellKind | undefined {
   const name = (shellPath ?? "").toLowerCase();
-
+  if (!name) {
+    return undefined;
+  }
   if (/(^|[\\/])(bash|zsh|sh|fish|dash|ksh)(\.exe)?$/.test(name)) {
     return "posix";
   }
@@ -25,8 +27,60 @@ export function detectShellKind(shellPath: string | undefined): ShellKind {
   if (/(^|[\\/])cmd(\.exe)?$/.test(name)) {
     return "cmd";
   }
+  return undefined;
+}
 
-  return os.platform() === "win32" ? "powershell" : "posix";
+// Characters that neither cmd.exe nor PowerShell leaves inert inside a
+// double-quoted string: `$` and backtick (PowerShell expansion), `%` and `!`
+// (cmd variable / delayed expansion), the double quote itself, and newlines.
+// Everything else — including `&`, `|`, `<`, `>`, `(`, `)`, `^`, `'` — is
+// literal inside double quotes in BOTH shells.
+const kUnknownShellUnsafe = /[$`"%!\r\n]/;
+
+/**
+ * Quote a single argument for a Windows terminal whose shell we could not
+ * identify. Double quotes neutralize the command separators in both cmd.exe and
+ * PowerShell, closing the quoting mismatch. Returns `null` if the value contains
+ * a character that is not inert under double quoting in both shells, so the
+ * caller can refuse to run rather than risk injection.
+ */
+export function quoteArgUnknownShell(value: string): string | null {
+  // Leave tokens that are safe unquoted in the strictest shell (PowerShell) bare
+  // — this is what keeps the leading command (e.g. `inspect`) unquoted, so
+  // PowerShell actually executes it rather than parsing `"inspect"` as a string
+  // literal. A bare safe token is inert in cmd.exe and POSIX shells too.
+  if (isSafeUnquoted(value, "powershell")) {
+    return value;
+  }
+  if (kUnknownShellUnsafe.test(value)) {
+    return null;
+  }
+  return `"${value}"`;
+}
+
+/**
+ * Quote each part for an unidentified shell, or return `null` if any part cannot
+ * be safely quoted (see {@link quoteArgUnknownShell}).
+ */
+export function quoteCommandLineUnknownShell(parts: string[]): string | null {
+  const quoted: string[] = [];
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i] ?? "";
+    // The leading command token can't be double-quoted for an unknown shell:
+    // PowerShell parses a quoted first token as a string literal, not a command
+    // (invoking it would need the `&` operator). If it isn't safe bare — e.g. a
+    // discovered interpreter path containing a space — refuse rather than emit a
+    // line that errors in the terminal.
+    if (i === 0 && !isSafeUnquoted(part, "powershell")) {
+      return null;
+    }
+    const q = quoteArgUnknownShell(part);
+    if (q === null) {
+      return null;
+    }
+    quoted.push(q);
+  }
+  return quoted.join(" ");
 }
 
 // Characters that are safe to pass unquoted in any of our supported shells.

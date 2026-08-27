@@ -137,6 +137,9 @@ export class ScoutCodeLensProvider implements CodeLensProvider {
 const fromImportPattern =
   /from\s+inspect_scout\s+import\s+(?:\(\s*)?(?:\w+\s*,\s*)*(scanner|scanjob)\b(?:\s+as\s+(\w+))?/;
 const hasImportPattern = /import\s+inspect_scout\b/;
-const kFuncPattern = /^\s*def\s*(.*)\(.*$/;
+// Linear-time: the identifier is constrained to `[A-Za-z_]\w*` with the `(`
+// following immediately, so there are no adjacent overlapping quantifiers (see
+// the matching comment/finding in codelens-provider.ts).
+const kFuncPattern = /^\s*def\s+([A-Za-z_]\w*)\s*\(/;
 const kDecoratorPattern = /^\s*@(inspect_scout\.)?(scanner|scanjob)\b|@(\w+)\b/;
 const normalizeTextPattern = /\(([^)]*)\)/g;

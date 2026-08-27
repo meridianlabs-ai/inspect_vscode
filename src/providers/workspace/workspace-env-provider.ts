@@ -5,7 +5,7 @@ import { isEqual } from "lodash";
 import { Disposable, Event, EventEmitter, Uri } from "vscode";
 
 import { Command } from "../../core/command";
-import { clearEnv, readEnv, writeEnv } from "../../core/env";
+import { clearEnv, envFilePathIsSafe, readEnv, writeEnv } from "../../core/env";
 import { log } from "../../core/log";
 import {
   toAbsolutePath,
@@ -33,14 +33,14 @@ export interface EnvironmentChangedEvent {
 export class WorkspaceEnvManager implements Disposable {
   constructor() {
     const envUri = this.getEnvUri();
-    this.env = readEnv(envUri);
+    this.env = this.isEnvFileSafe(envUri) ? readEnv(envUri) : {};
     this.lastUpdated_ = Date.now();
     const envRelativePath = workspaceRelativePath(
       toAbsolutePath(envUri.fsPath)
     );
     log.appendLine(`Watching ${envRelativePath}`);
     this.envWatcher_ = setInterval(() => {
-      if (existsSync(envUri.fsPath)) {
+      if (existsSync(envUri.fsPath) && this.isEnvFileSafe(envUri)) {
         const envUpdated = statSync(envUri.fsPath).mtime.getTime();
         if (envUpdated > this.lastUpdated_) {
           this.lastUpdated_ = envUpdated;
@@ -67,8 +67,28 @@ export class WorkspaceEnvManager implements Disposable {
     return Uri.joinPath(workspaceFolder?.uri, ".env");
   }
 
+  // Refuse to read/write .env if it is a symlink or resolves outside the
+  // workspace, so a repository-shipped symlink can't redirect the extension's
+  // env reads/writes to an arbitrary user file. See CWE-59.
+  private isEnvFileSafe(envUri: Uri): boolean {
+    const workspaceFolder = activeWorkspaceFolder();
+    if (!workspaceFolder) {
+      return false;
+    }
+    const safe = envFilePathIsSafe(envUri.fsPath, workspaceFolder.uri.fsPath);
+    if (!safe) {
+      log.appendLine(
+        `Refusing to use .env: it is a symlink or resolves outside the workspace.`
+      );
+    }
+    return safe;
+  }
+
   public setValues(env: Record<string, string>) {
     const envUri = this.getEnvUri();
+    if (!this.isEnvFileSafe(envUri)) {
+      return;
+    }
     const keys = Object.keys(env);
     keys.forEach((key) => {
       const value = env[key] ?? "";
@@ -88,6 +108,9 @@ export class WorkspaceEnvManager implements Disposable {
     });
   }
 
+  // The workspace .env is trusted (the extension is disabled in untrusted
+  // workspaces), so its log/scan-results location — including remote schemes
+  // such as s3 — is honored directly, matching where the view server will read.
   public getDefaultLogDir() {
     // See if there is a log dir
     const envVals = this.getValues();
@@ -106,7 +129,7 @@ export class WorkspaceEnvManager implements Disposable {
   }
 
   public getDefaultScanResultsDir() {
-    // See if there is a log dir
+    // See if there is a results dir
     const envVals = this.getValues();
     const envResults = envVals[kScoutEnvValues.scanResults] ?? "";
 

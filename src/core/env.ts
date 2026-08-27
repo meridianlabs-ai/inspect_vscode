@@ -1,8 +1,42 @@
-import { readFileSync, writeFileSync } from "fs";
+import { lstatSync, readFileSync, realpathSync, writeFileSync } from "fs";
+import { sep } from "path";
 
 import { Uri } from "vscode";
 
 import { lines } from "./text";
+
+/**
+ * Whether the workspace `.env` at `fsPath` is safe to read from or write to: it
+ * must be a regular file (not a symlink) whose real path resolves inside
+ * `workspaceFsPath`. A repository can ship `.env` as a symlink to a file outside
+ * the workspace (git preserves symlinks and the executable/symlink bits), and
+ * following it would redirect the extension's env reads and — more seriously —
+ * its whole-file rewrites to an arbitrary user file. A `.env` that does not yet
+ * exist is safe to create. See CWE-59.
+ */
+export function envFilePathIsSafe(
+  fsPath: string,
+  workspaceFsPath: string
+): boolean {
+  let stat;
+  try {
+    stat = lstatSync(fsPath);
+  } catch (error) {
+    // No file or (dangling) symlink present → safe to create a regular file.
+    return (error as NodeJS.ErrnoException).code === "ENOENT";
+  }
+  if (stat.isSymbolicLink() || !stat.isFile()) {
+    return false;
+  }
+  try {
+    const realFile = realpathSync(fsPath);
+    const realRoot = realpathSync(workspaceFsPath);
+    const rootPrefix = realRoot.endsWith(sep) ? realRoot : realRoot + sep;
+    return realFile.startsWith(rootPrefix);
+  } catch {
+    return false;
+  }
+}
 
 export const readEnv = (file: Uri): Record<string, string> => {
   // Read the env file (empty if there is no env file)

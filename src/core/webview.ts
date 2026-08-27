@@ -12,6 +12,23 @@ import { getRelativeUri } from "./uri";
 // vscode://, file://, and OS-registered custom schemes are refused.
 const kOpenExternalSchemes = ["http", "https", "mailto"];
 
+/**
+ * Serialize a value to JSON for embedding inside an inline `<script>` element.
+ *
+ * `JSON.stringify` does not escape HTML-significant characters, so a string
+ * value containing `</script>` (e.g. an attacker-controlled field persisted via
+ * the webview's setState) would otherwise terminate the script element and
+ * inject live markup into the webview. Escaping `<`, `>`, `&` — plus the
+ * U+2028/U+2029 line separators that are invalid in JS string literals — keeps
+ * the serialized payload inert as HTML regardless of its contents.
+ */
+export function jsonForScript(value: unknown): string {
+  return JSON.stringify(value).replace(
+    /[<>&\u2028\u2029]/g,
+    (ch) => "\\u" + ch.charCodeAt(0).toString(16).padStart(4, "0")
+  );
+}
+
 // Whether an absolute path resolves inside one of the open workspace folders.
 function isWithinWorkspace(absPath: string): boolean {
   const target = Uri.file(absPath);

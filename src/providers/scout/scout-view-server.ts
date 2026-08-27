@@ -94,6 +94,18 @@ export class ScoutViewServer extends PackageViewServer {
     };
   }
 
+  // Directories the full Scout View's webview RPC methods are allowed to read
+  // from. Set at activation to the configured scan-results dir plus the open
+  // workspace folders; the per-scan custom editor supplies its own tighter
+  // scope directly to ScanviewPanel instead of using this.
+  private scanResultsScope_: () => Uri[] = () => [];
+  public setScanResultsScope(fn: () => Uri[]) {
+    this.scanResultsScope_ = fn;
+  }
+  public scanResultsScope(): Uri[] {
+    return this.scanResultsScope_();
+  }
+
   async getDistPath(): Promise<AbsolutePath | null> {
     const result = await this.api_json(
       "/api/v2/dist",

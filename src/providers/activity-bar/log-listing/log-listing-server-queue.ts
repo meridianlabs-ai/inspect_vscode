@@ -5,6 +5,7 @@ import { MarkdownString } from "vscode";
 import { stringify } from "yaml";
 
 import { EvalLog, EvalResults } from "../../../@types/log";
+import { codeFence, escapeMarkdown } from "../../../core/markdown";
 import { sleep } from "../../../core/wait";
 
 import { LogListing, LogNode } from "./log-listing";
@@ -243,7 +244,9 @@ export function evalSummary(log: EvalLog): MarkdownString | undefined {
 
 function evalHeader(log: EvalLog): string[] {
   const kMinWidth = 60;
-  const title = `### ${log.eval.task} - ${log.eval.model}`;
+  const title = `### ${escapeMarkdown(log.eval.task)} - ${escapeMarkdown(
+    log.eval.model
+  )}`;
   const padding = "&nbsp;".repeat(Math.max(kMinWidth - title.length, 0));
   return [`${title}${padding}`, evalTarget(log)];
 }
@@ -252,13 +255,13 @@ function evalTarget(log: EvalLog): string {
   // setup target
   const target: string[] = [];
   if (log.status !== "success") {
-    target.push(`status:&nbsp;${log.status}`);
+    target.push(`status:&nbsp;${escapeMarkdown(log.status ?? "")}`);
   }
 
   // dataset
   const dataset: string[] = ["dataset:"];
   if (log.eval.dataset.name) {
-    dataset.push(log.eval.dataset.name);
+    dataset.push(escapeMarkdown(log.eval.dataset.name));
   }
   if (log.eval.dataset.samples) {
     const eval_epochs = log.eval.config.epochs || 1;
@@ -279,7 +282,9 @@ function evalTarget(log: EvalLog): string {
     const scorer_names = new Set<string>(
       log.results.scores.map((score) => score.scorer)
     );
-    target.push("scorers: " + Array.from(scorer_names).join(", "));
+    target.push(
+      "scorers: " + Array.from(scorer_names).map(escapeMarkdown).join(", ")
+    );
   }
 
   return target.join("  \n");
@@ -306,7 +311,7 @@ function evalConfig(log: EvalLog): string[] | undefined {
   delete config["log_images"];
 
   if (Object.keys(config).length > 0) {
-    return ["```", `${stringify(config)}`, "```"];
+    return codeFence(stringify(config));
   } else {
     return undefined;
   }
@@ -347,7 +352,10 @@ function evalResults(results: EvalResults): string[] {
   const markdown: string[] = [];
   for (const key of Object.keys(output)) {
     const value = output[key];
-    markdown.push(`${key}: ${value}`);
+    // `key` is composed from attacker-influenceable scorer/metric/reducer
+    // names; `value` is a formatted number. Escape the name so it can't inject
+    // markdown into the tooltip.
+    markdown.push(`${escapeMarkdown(key)}: ${value}`);
   }
   return [`**${markdown.join(", ")}**`];
 }

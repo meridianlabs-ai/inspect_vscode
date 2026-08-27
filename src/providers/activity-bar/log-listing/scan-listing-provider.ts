@@ -3,6 +3,7 @@ import { Uri } from "vscode";
 import { stringify } from "yaml";
 
 import { Command } from "../../../core/command";
+import { codeFence, escapeMarkdown } from "../../../core/markdown";
 import { OutputWatcher } from "../../../core/package/output-watcher";
 import { workspaceUri } from "../../../core/path";
 import {
@@ -252,13 +253,13 @@ function scanToLogItem(scan: ScanRow): LogItem {
   // compute stats
   const transcripts = scan.transcript_count;
 
-  // build tooltip
+  // build tooltip (display_name/scan_id are attacker-influenceable log fields)
   const tooltip = [
-    `### ${display_name}`,
+    `### ${escapeMarkdown(display_name)}`,
     "",
     "",
     `${transcripts} transcripts  `,
-    `scan_id=${scan.scan_id}  `,
+    `scan_id=${escapeMarkdown(scan.scan_id)}  `,
     "",
     "",
   ];
@@ -286,7 +287,7 @@ function scanConfig(scan: ScanRow): string[] | undefined {
   }
 
   if (Object.keys(config).length > 0) {
-    return ["```", `\n${stringify(config)}`, "```"];
+    return codeFence(`\n${stringify(config)}`);
   } else {
     return undefined;
   }

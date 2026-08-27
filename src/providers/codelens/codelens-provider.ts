@@ -139,7 +139,12 @@ export class InspectCodeLensProvider implements CodeLensProvider {
 const fromImportPattern =
   /from\s+inspect_ai\s+import\s+(?:\(\s*)?(?:\w+\s*,\s*)*task\b(?:\s+as\s+(\w+))?/;
 const hasImportPattern = /import\s+inspect_ai\b/;
-const kFuncPattern = /^\s*def\s*(.*)\(.*$/;
+// Linear-time: the identifier is constrained to `[A-Za-z_]\w*` with the `(`
+// following immediately, so there are no adjacent overlapping quantifiers. The
+// previous `/^\s*def\s*(.*)\(.*$/` overlapped `\s*` and `(.*)` before a possibly
+// absent `\(`, backtracking O(n^2) on `def` + a long whitespace run (see the
+// ReDoS finding).
+const kFuncPattern = /^\s*def\s+([A-Za-z_]\w*)\s*\(/;
 const kDecoratorPattern = /^\s*@(inspect_ai\.)?task\b|@(\w+)\b/;
 // Linear-time: `[^)]*` has no adjacent overlapping quantifier, so it scans each
 // parenthesized group once (the previous `\(\s*\n\s*([^)]+)\s*\n\s*\)` had

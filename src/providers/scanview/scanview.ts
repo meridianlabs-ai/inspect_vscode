@@ -1,4 +1,4 @@
-import { ExtensionContext } from "vscode";
+import { ExtensionContext, Uri, workspace } from "vscode";
 
 import { Command } from "../../core/command";
 import { PackageManager } from "../../core/package/manager";
@@ -15,6 +15,17 @@ export function activateScanview(
   envMgr: WorkspaceEnvManager,
   context: ExtensionContext
 ): [Command[], ScoutViewManager] {
+  // Confine the full Scout View's webview RPC methods to the configured scan
+  // results directory plus the open workspace folders, so injected webview
+  // script can't read arbitrary paths/URIs via the token-authorized server.
+  server.setScanResultsScope(() => {
+    const roots: Uri[] = [envMgr.getDefaultScanResultsDir()];
+    for (const folder of workspace.workspaceFolders ?? []) {
+      roots.push(folder.uri);
+    }
+    return roots;
+  });
+
   // activate the log viewer editor
   activateScanviewEditor(context, server);
 

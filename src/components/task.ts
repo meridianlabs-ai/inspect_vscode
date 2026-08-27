@@ -21,7 +21,14 @@ export interface TaskData {
 // This can't properly deal with things like selection, so this should only
 // be used when no selection behavior is warranted
 const kTaskPattern = /@task/;
-const kFunctionNamePattern = /def\s+(.*)\((.*)$/;
+// Linear-time: the identifier is constrained to `[A-Za-z_]\w*` and the `(` must
+// follow immediately (after optional spaces), so there are no adjacent
+// overlapping quantifiers around a possibly-absent literal. The previous
+// `/def\s+(.*)\((.*)$/` paired `\s+` with a greedy `(.*)` before a `\(` a
+// crafted line could omit, backtracking O(n^2) on `def` + a long space/`def x `
+// run (see the ReDoS finding). The parameter text is derived by slicing the
+// remainder of the line after this match rather than a second overlapping group.
+const kFunctionNamePattern = /def\s+([A-Za-z_]\w*)\s*\(/;
 
 /**
  * Whether a parsed task/function name is a plain Python identifier.
@@ -71,9 +78,17 @@ export function readTaskData(document: TextDocument): TaskData[] {
         break;
       case "seeking-function":
         {
-          const match = line.match(kFunctionNamePattern);
+          // Bound the text handed to the matcher on every entry path (including
+          // notebook cells via cellTasks) so a pathological line can't block the
+          // extension host even if a pattern regresses.
+          const fnLine =
+            line.length > kMaxParamsLineLength
+              ? line.slice(0, kMaxParamsLineLength)
+              : line;
+          const match = fnLine.match(kFunctionNamePattern);
           if (match) {
-            const fnName = (match[1] ?? "").trim();
+            // The capture is `[A-Za-z_]\w*`, so it never contains whitespace.
+            const fnName = match[1] ?? "";
             // A crafted `def <flags/metacharacters>(` is not a real task; only
             // surface identifier-named functions so the name can't carry an
             // injection payload onto the run command line.
@@ -88,7 +103,9 @@ export function readTaskData(document: TextDocument): TaskData[] {
             };
             tasks.push(task);
 
-            const restOfLine = match[2] ?? "";
+            const restOfLine = fnLine.slice(
+              (match.index ?? 0) + match[0].length
+            );
             const keepReading = readParams(restOfLine, task);
             if (keepReading) {
               state = "reading-params";

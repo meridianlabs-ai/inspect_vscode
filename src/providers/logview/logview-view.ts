@@ -17,7 +17,7 @@ import { selectLogDirectory } from "../activity-bar/log-listing/log-directory-se
 import { InspectViewServer } from "../inspect/inspect-view-server";
 import { WorkspaceEnvManager } from "../workspace/workspace-env-provider";
 
-import { LogviewPanel } from "./logview-panel";
+import { logPathInScope, LogviewPanel } from "./logview-panel";
 import { LogviewState } from "./logview-state";
 
 const kLogViewId = "inspect.logview";
@@ -102,33 +102,55 @@ export class InspectViewWebviewManager extends InspectWebviewManager<
       InspectViewWebview
     );
   }
-  private activeLogDir_: Uri | null = null;
+  // Identifies the active panel's authorization scope. A "file"-scoped panel is
+  // keyed by its file, a "dir"-scoped panel by its directory, so the panel is
+  // recreated when the requested scope changes (not only when the directory
+  // changes) — otherwise a legacy file-scoped panel reused for a different file
+  // would reject it via the RPC scope guard.
+  private activeScopeKey_: string | null = null;
 
   public async showLogFile(uri: Uri, activation?: "open" | "activate") {
     // Get the directory name using posix path methods
     const log_dir = dirname(uri);
 
-    await this.showLogview({ log_file: uri, log_dir }, activation);
+    // Single-file open (the legacy path): confine the panel's RPC scope to this
+    // one file, not its entire parent directory, matching the hardened
+    // custom-editor path. See CWE-863.
+    await this.showLogview(
+      { log_file: uri, log_dir, scopeType: "file" },
+      activation
+    );
+  }
+
+  // Whether an updated log falls within the panel's actual scope. A "file"-scoped
+  // panel (legacy single-file open) only matches its own file; a "dir" panel
+  // matches any descendant. Using the panel scope avoids background-refreshing a
+  // file-scoped panel toward a sibling, which the RPC guard would then reject.
+  private logFileInScope(
+    state: LogviewState | undefined,
+    log_file: Uri
+  ): boolean {
+    if (!state?.log_dir) {
+      return false;
+    }
+    if (state.scopeType === "file") {
+      return state.log_file?.toString() === log_file.toString();
+    }
+    return getRelativeUri(state.log_dir, log_file) !== null;
   }
 
   public logFileIsWithinLogDir(log_file: Uri) {
-    const state = this.getWorkspaceState();
-    return (
-      state?.log_dir !== undefined &&
-      getRelativeUri(state?.log_dir, log_file) !== null
-    );
+    return this.logFileInScope(this.getWorkspaceState(), log_file);
   }
 
   public async showLogFileIfWithinLogDir(log_file: Uri) {
     const state = this.getWorkspaceState();
-    if (state?.log_dir) {
-      if (getRelativeUri(state?.log_dir, log_file) !== null) {
-        await this.displayLogFile({
-          log_file: log_file,
-          log_dir: state?.log_dir,
-          background_refresh: true,
-        });
-      }
+    if (state?.log_dir && this.logFileInScope(state, log_file)) {
+      await this.displayLogFile({
+        log_file: log_file,
+        log_dir: state.log_dir,
+        background_refresh: true,
+      });
     }
   }
 
@@ -177,19 +199,23 @@ export class InspectViewWebviewManager extends InspectWebviewManager<
     state: LogviewState,
     activation?: "open" | "activate"
   ) {
-    // Determine whether we are showing a log viewer for this directory
-    // If we aren't close the log viewer so a fresh one can be opened.
-    if (
-      this.activeLogDir_ !== null &&
-      state.log_dir.toString() !== this.activeLogDir_.toString()
-    ) {
+    // Recreate the panel whenever the requested authorization scope changes —
+    // by directory for a dir view, or by file for a single-file (legacy) view.
+    // Keying only on log_dir would reuse a file-scoped panel for a different
+    // file in the same directory, and its fixed RPC scope guard would then
+    // reject the new file.
+    const scopeKey =
+      state.scopeType === "file" && state.log_file
+        ? `file:${state.log_file.toString()}`
+        : `dir:${state.log_dir.toString()}`;
+    if (this.activeScopeKey_ !== null && scopeKey !== this.activeScopeKey_) {
       // Close it
       this.activeView_?.dispose();
       this.activeView_ = undefined;
     }
 
-    // Note the log directory that we are showing
-    this.activeLogDir_ = state.log_dir || null;
+    // Note the scope that we are showing
+    this.activeScopeKey_ = scopeKey;
 
     // Update the view state
     this.updateViewState(state);
@@ -202,7 +228,7 @@ export class InspectViewWebviewManager extends InspectWebviewManager<
     // If the view is closed, clear the state
     this.setOnClose(() => {
       this.lastState_ = undefined;
-      this.activeLogDir_ = null;
+      this.activeScopeKey_ = null;
     });
 
     // Actually reveal or show the webview
@@ -245,15 +271,31 @@ export class InspectViewWebviewManager extends InspectWebviewManager<
       this.kInspectViewState,
       {}
     );
-    if (data) {
+    // Only treat this as trusted state when a real log_dir was persisted.
+    // Uri.parse("") resolves to file:/// (whole filesystem), so an empty/never-
+    // set value must NOT become a panel scope — fall back to the in-memory
+    // last state (undefined on a fresh restore, which disposes the panel).
+    if (data && data["log_dir"]) {
       return {
-        log_dir: Uri.parse(data["log_dir"] ?? ""),
+        log_dir: Uri.parse(data["log_dir"]),
         log_file: data["log_file"] ? Uri.parse(data["log_file"]) : undefined,
         background_refresh: !!data["background_refresh"],
+        // Persist the scope type so a restored single-file panel keeps its
+        // tight "file" scope rather than defaulting back to "dir" (its parent).
+        scopeType: data["scopeType"] === "file" ? "file" : undefined,
       };
     } else {
       return this.lastState_;
     }
+  }
+
+  // The log view's panel scope (log_dir) is security-relevant, so on restore it
+  // must come only from extension-managed workspaceState — never from the
+  // webview-persisted state, which a compromised viewer can forge via setState.
+  // Returning undefined (no trusted state) disposes the panel rather than
+  // restoring it with an attacker-chosen scope. See CWE-642.
+  protected override restoreState(): LogviewState | undefined {
+    return this.getWorkspaceState();
   }
 
   protected setWorkspaceState(state: LogviewState) {
@@ -261,6 +303,7 @@ export class InspectViewWebviewManager extends InspectWebviewManager<
       log_dir: state.log_dir.toString(),
       log_file: state.log_file?.toString(),
       background_refresh: state.background_refresh,
+      scopeType: state.scopeType,
     });
   }
 
@@ -295,12 +338,23 @@ class InspectViewWebview extends InspectWebview<LogviewState> {
   ) {
     super(context, webviewPanel);
 
+    // The panel's authorization scope is fixed here at construction. A "file"
+    // scope (legacy single-file open) confines the RPC surface to log_file; the
+    // default "dir" scope confines it to descendants of log_dir. The webview
+    // cannot change this afterwards (see the displayLogFile handler below).
+    this.scopeType_ = state.scopeType ?? "dir";
+    this.scopeUri_ =
+      this.scopeType_ === "file" && state.log_file
+        ? state.log_file
+        : state.log_dir;
+    this.trustedLogDir_ = state.log_dir;
+
     this.logviewPanel_ = new LogviewPanel(
       webviewPanel,
       context,
       server,
-      "dir",
-      state.log_dir
+      this.scopeType_,
+      this.scopeUri_
     );
     this._register(this.logviewPanel_);
 
@@ -310,15 +364,31 @@ class InspectViewWebview extends InspectWebview<LogviewState> {
           switch (e.type) {
             case "displayLogFile":
               {
-                if (e.log_dir && this._manager) {
-                  const state: LogviewState = {
-                    log_file: Uri.parse(e.url),
-                    log_dir: Uri.parse(e.log_dir as string),
-                  };
-                  await this._manager.displayLogFile(state, "open");
+                if (this._manager) {
+                  // Messages from the webview are untrusted. Ignore any
+                  // webview-supplied log_dir (it would let injected script widen
+                  // the panel's scope to an arbitrary directory) and require the
+                  // requested file to be within this panel's fixed scope.
+                  const requestedFile = Uri.parse(e.url);
+                  if (
+                    logPathInScope(
+                      this.scopeType_,
+                      this.scopeUri_,
+                      requestedFile.toString()
+                    )
+                  ) {
+                    await this._manager.displayLogFile(
+                      { log_file: requestedFile, log_dir: this.trustedLogDir_ },
+                      "open"
+                    );
+                  } else {
+                    await showError(
+                      "Refusing to display a log outside the current log directory."
+                    );
+                  }
                 } else {
                   await showError(
-                    "Unable to display log file because of a missing log_dir or manager. This is an unexpected error, please report it."
+                    "Unable to display log file because of a missing manager. This is an unexpected error, please report it."
                   );
                 }
               }
@@ -330,6 +400,10 @@ class InspectViewWebview extends InspectWebview<LogviewState> {
 
     void this.show(state);
   }
+
+  private readonly scopeType_: "file" | "dir";
+  private readonly scopeUri_: Uri;
+  private readonly trustedLogDir_: Uri;
 
   public setManager(manager: InspectViewWebviewManager) {
     if (this._manager !== manager) {

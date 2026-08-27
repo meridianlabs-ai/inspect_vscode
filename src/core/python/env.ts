@@ -11,14 +11,24 @@ export function findEnvPythonPath(
 ): AbsolutePath | null {
   let currentDir = startDir;
   while (currentDir.path !== baseDir.path) {
-    // Look for a pythong environment
+    // Look for a python environment
     const pythonPath = findEnvPython(currentDir);
     if (pythonPath) {
       return toAbsolutePath(pythonPath);
     }
 
-    // Move to the parent directory
-    currentDir = currentDir.dirname();
+    // Move to the parent directory. The exact-equality exit above is only
+    // reached when startDir is a descendant of baseDir; for an out-of-tree start
+    // point (a second multi-root folder, a loose file, or a drive-letter case
+    // mismatch on Windows) the walk would otherwise descend to the filesystem
+    // root, where dirname() is a fixed point ('/' -> '/', 'C:\' -> 'C:\'), and
+    // spin forever on a synchronous readdir/stat loop that freezes the extension
+    // host. Stop as soon as the parent stops changing.
+    const parent = currentDir.dirname();
+    if (parent.path === currentDir.path) {
+      return null;
+    }
+    currentDir = parent;
   }
 
   // No Python environment found
@@ -27,12 +37,26 @@ export function findEnvPythonPath(
 
 // Helper function to search for Python environment in a given directory
 function findEnvPython(directory: AbsolutePath): string | null {
-  const items = fs.readdirSync(directory.path);
+  // The walk can reach system directories (up to the filesystem root), so an
+  // unreadable directory or a broken entry must degrade to "no env" rather than
+  // throwing and failing the run.
+  let items: string[];
+  try {
+    items = fs.readdirSync(directory.path);
+  } catch {
+    return null;
+  }
 
   // Filter only directories and check if any is an environment directory
   const envDir = items
     .map((item) => path.join(directory.path, item))
-    .filter((filePath) => fs.statSync(filePath).isDirectory())
+    .filter((filePath) => {
+      try {
+        return fs.statSync(filePath).isDirectory();
+      } catch {
+        return false;
+      }
+    })
     .find(isEnvDir);
 
   if (envDir) {

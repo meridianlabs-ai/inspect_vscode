@@ -1,54 +1,14 @@
 import * as assert from "assert";
-import * as os from "os";
 
 import {
-  detectShellKind,
   quoteArg,
+  quoteArgUnknownShell,
   quoteCommandLine,
+  quoteCommandLineUnknownShell,
+  shellKindFromPath,
 } from "../../core/shell-quote";
 
 suite("Shell Quote Test Suite", () => {
-  suite("detectShellKind", () => {
-    test("recognizes posix shells by path", () => {
-      assert.strictEqual(detectShellKind("/bin/bash"), "posix");
-      assert.strictEqual(detectShellKind("/usr/bin/zsh"), "posix");
-      assert.strictEqual(detectShellKind("/bin/sh"), "posix");
-      assert.strictEqual(detectShellKind("/usr/local/bin/fish"), "posix");
-    });
-
-    test("recognizes git-bash on Windows as posix", () => {
-      assert.strictEqual(
-        detectShellKind("C:\\Program Files\\Git\\bin\\bash.exe"),
-        "posix"
-      );
-    });
-
-    test("recognizes powershell", () => {
-      assert.strictEqual(detectShellKind("pwsh"), "powershell");
-      assert.strictEqual(
-        detectShellKind(
-          "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"
-        ),
-        "powershell"
-      );
-    });
-
-    test("recognizes cmd", () => {
-      assert.strictEqual(
-        detectShellKind("C:\\Windows\\System32\\cmd.exe"),
-        "cmd"
-      );
-    });
-
-    test("falls back to the platform default when the shell is unknown", () => {
-      // An unknown/undefined shell falls back to the platform default:
-      // powershell on Windows, posix elsewhere.
-      const expected = os.platform() === "win32" ? "powershell" : "posix";
-      assert.strictEqual(detectShellKind(undefined), expected);
-      assert.strictEqual(detectShellKind("/some/unknown/shell"), expected);
-    });
-  });
-
   suite("quoteArg - posix", () => {
     test("returns safe tokens unchanged", () => {
       assert.strictEqual(quoteArg("inspect", "posix"), "inspect");
@@ -157,6 +117,79 @@ suite("Shell Quote Test Suite", () => {
       assert.strictEqual(
         quoteCommandLine(["inspect", "eval", "task.py@my_task"], "cmd"),
         "inspect eval task.py@my_task"
+      );
+    });
+  });
+
+  suite("shellKindFromPath", () => {
+    test("returns undefined when the shell can't be identified", () => {
+      assert.strictEqual(shellKindFromPath(undefined), undefined);
+      assert.strictEqual(shellKindFromPath(""), undefined);
+      assert.strictEqual(
+        shellKindFromPath("C:\\some\\custom-shell.exe"),
+        undefined
+      );
+    });
+
+    test("positively identifies known shells", () => {
+      assert.strictEqual(shellKindFromPath("/bin/bash"), "posix");
+      assert.strictEqual(shellKindFromPath("cmd.exe"), "cmd");
+      assert.strictEqual(shellKindFromPath("pwsh"), "powershell");
+    });
+  });
+
+  suite("unknown-shell quoting", () => {
+    test("double-quotes so `&` is inert in both cmd.exe and PowerShell", () => {
+      // The exploited case: a task file named `x & calc & y.py`. Double quotes
+      // render `&` literal in both shells, so nothing executes.
+      assert.strictEqual(
+        quoteArgUnknownShell("x & calc & y.py"),
+        '"x & calc & y.py"'
+      );
+    });
+
+    test("refuses tokens neither shell can quote safely", () => {
+      // $/backtick (PowerShell expansion), %/! (cmd expansion), embedded quote.
+      assert.strictEqual(quoteArgUnknownShell("a$b"), null);
+      assert.strictEqual(quoteArgUnknownShell("a`b"), null);
+      assert.strictEqual(quoteArgUnknownShell("%PATH%"), null);
+      assert.strictEqual(quoteArgUnknownShell('a"b'), null);
+    });
+
+    test("leaves safe tokens bare so the command stays executable", () => {
+      // Safe tokens (incl. the leading command) must stay bare — a quoted
+      // leading token is a string literal, not a command, in PowerShell.
+      assert.strictEqual(
+        quoteCommandLineUnknownShell(["python", "eval", "ok.py"]),
+        "python eval ok.py"
+      );
+    });
+
+    test("leaves safe tokens bare and double-quotes unsafe ones", () => {
+      assert.strictEqual(
+        quoteCommandLineUnknownShell(["inspect", "eval", "x & y.py"]),
+        'inspect eval "x & y.py"'
+      );
+    });
+
+    test("command line is null if any token can't be quoted safely", () => {
+      assert.strictEqual(
+        quoteCommandLineUnknownShell(["python", "$(evil)"]),
+        null
+      );
+    });
+
+    test("refuses when the leading command isn't safe bare", () => {
+      // A quoted first token isn't executed by PowerShell (needs `&`), so a
+      // command that would need quoting (e.g. an interpreter path with a space)
+      // is refused rather than emitted as a broken line.
+      assert.strictEqual(
+        quoteCommandLineUnknownShell([
+          "/opt/py env/bin/python",
+          "eval",
+          "x.py",
+        ]),
+        null
       );
     });
   });
