@@ -80,11 +80,13 @@ const kRouteGrammar =
  * Validate/normalize a RouteMessage before it is embedded in the webview HTML.
  *
  * The panel serializer restores this message from state the (untrusted) webview
- * persisted via setState(), so a compromised viewer could otherwise persist an
- * arbitrary route (e.g. a /scan/<base64> whose decoded dir points at an attacker
- * URL, re-ingested on restore) or non-conforming field values. Anything that
- * does not match the shape the extension itself produces is discarded in favor
- * of a safe default route.
+ * persisted via setState(). This checks the message shape and constrains the
+ * route's characters to the grammar the extension itself produces, so a restored
+ * route can't carry markup into the embedded state; anything else is replaced
+ * with a safe default route. It does NOT decode or authorize the base64 scan
+ * directory inside a /scan route — which location a scan may actually be read
+ * from is enforced by the per-request RPC scope check (scanLocationInScope),
+ * not by this grammar.
  */
 export function sanitizeRouteMessage(message: unknown): RouteMessage {
   const fallback = viewRouteMessage("scans");

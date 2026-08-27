@@ -178,5 +178,19 @@ suite("Shell Quote Test Suite", () => {
         null
       );
     });
+
+    test("refuses when the leading command isn't safe bare", () => {
+      // A quoted first token isn't executed by PowerShell (needs `&`), so a
+      // command that would need quoting (e.g. an interpreter path with a space)
+      // is refused rather than emitted as a broken line.
+      assert.strictEqual(
+        quoteCommandLineUnknownShell([
+          "/opt/py env/bin/python",
+          "eval",
+          "x.py",
+        ]),
+        null
+      );
+    });
   });
 });

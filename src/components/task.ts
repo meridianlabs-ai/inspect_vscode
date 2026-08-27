@@ -87,7 +87,8 @@ export function readTaskData(document: TextDocument): TaskData[] {
               : line;
           const match = fnLine.match(kFunctionNamePattern);
           if (match) {
-            const fnName = (match[1] ?? "").trim();
+            // The capture is `[A-Za-z_]\w*`, so it never contains whitespace.
+            const fnName = match[1] ?? "";
             // A crafted `def <flags/metacharacters>(` is not a real task; only
             // surface identifier-named functions so the name can't carry an
             // injection payload onto the run command line.

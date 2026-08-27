@@ -64,7 +64,16 @@ export function quoteArgUnknownShell(value: string): string | null {
  */
 export function quoteCommandLineUnknownShell(parts: string[]): string | null {
   const quoted: string[] = [];
-  for (const part of parts) {
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i] ?? "";
+    // The leading command token can't be double-quoted for an unknown shell:
+    // PowerShell parses a quoted first token as a string literal, not a command
+    // (invoking it would need the `&` operator). If it isn't safe bare — e.g. a
+    // discovered interpreter path containing a space — refuse rather than emit a
+    // line that errors in the terminal.
+    if (i === 0 && !isSafeUnquoted(part, "powershell")) {
+      return null;
+    }
     const q = quoteArgUnknownShell(part);
     if (q === null) {
       return null;

@@ -102,7 +102,12 @@ export class InspectViewWebviewManager extends InspectWebviewManager<
       InspectViewWebview
     );
   }
-  private activeLogDir_: Uri | null = null;
+  // Identifies the active panel's authorization scope. A "file"-scoped panel is
+  // keyed by its file, a "dir"-scoped panel by its directory, so the panel is
+  // recreated when the requested scope changes (not only when the directory
+  // changes) — otherwise a legacy file-scoped panel reused for a different file
+  // would reject it via the RPC scope guard.
+  private activeScopeKey_: string | null = null;
 
   public async showLogFile(uri: Uri, activation?: "open" | "activate") {
     // Get the directory name using posix path methods
@@ -194,19 +199,23 @@ export class InspectViewWebviewManager extends InspectWebviewManager<
     state: LogviewState,
     activation?: "open" | "activate"
   ) {
-    // Determine whether we are showing a log viewer for this directory
-    // If we aren't close the log viewer so a fresh one can be opened.
-    if (
-      this.activeLogDir_ !== null &&
-      state.log_dir.toString() !== this.activeLogDir_.toString()
-    ) {
+    // Recreate the panel whenever the requested authorization scope changes —
+    // by directory for a dir view, or by file for a single-file (legacy) view.
+    // Keying only on log_dir would reuse a file-scoped panel for a different
+    // file in the same directory, and its fixed RPC scope guard would then
+    // reject the new file.
+    const scopeKey =
+      state.scopeType === "file" && state.log_file
+        ? `file:${state.log_file.toString()}`
+        : `dir:${state.log_dir.toString()}`;
+    if (this.activeScopeKey_ !== null && scopeKey !== this.activeScopeKey_) {
       // Close it
       this.activeView_?.dispose();
       this.activeView_ = undefined;
     }
 
-    // Note the log directory that we are showing
-    this.activeLogDir_ = state.log_dir || null;
+    // Note the scope that we are showing
+    this.activeScopeKey_ = scopeKey;
 
     // Update the view state
     this.updateViewState(state);
@@ -219,7 +228,7 @@ export class InspectViewWebviewManager extends InspectWebviewManager<
     // If the view is closed, clear the state
     this.setOnClose(() => {
       this.lastState_ = undefined;
-      this.activeLogDir_ = null;
+      this.activeScopeKey_ = null;
     });
 
     // Actually reveal or show the webview

@@ -156,7 +156,7 @@ export class ExecManager {
           `it instead of your selected interpreter:\n\n${python.path}\n\n` +
           `Running the ${this.profile_.target.toLowerCase()} executes code from ` +
           `that environment, so only continue if you trust this workspace.\n\n` +
-          `Your choice is remembered for this environment. To always use your ` +
+          `Approval is remembered for this environment. To always use your ` +
           `selected interpreter, turn off "inspect_ai.useSubdirectoryEnvironments".`,
       },
       useIt,
@@ -323,23 +323,28 @@ const runCommand = async (
 
 /**
  * Best-effort identification of the shell VS Code's default terminal profile
- * launches, used when the terminal itself doesn't report its shell. Returns
- * `undefined` on Windows when the default profile can't be mapped, so the caller
- * uses cross-shell-safe quoting instead of guessing. On other platforms the
- * default shells are POSIX-family.
+ * launches, used when the terminal itself doesn't report its shell. Consults the
+ * platform-appropriate defaultProfile so that, e.g., a pwsh default on macOS or
+ * Linux isn't quoted as POSIX. Returns POSIX as the fallback on unix-like
+ * platforms (their near-universal default) and `undefined` on Windows when the
+ * profile can't be mapped, so the caller uses cross-shell-safe quoting instead
+ * of guessing.
  */
 const configuredDefaultShellKind = (): ShellKind | undefined => {
-  if (os.platform() !== "win32") {
-    return "posix";
-  }
+  const platform = os.platform();
+  const key =
+    platform === "win32" ? "windows" : platform === "darwin" ? "osx" : "linux";
+  const unixFallback: ShellKind | undefined =
+    platform === "win32" ? undefined : "posix";
+
   const cfg = workspace.getConfiguration("terminal.integrated");
-  const profileName = cfg.get<string>("defaultProfile.windows") ?? undefined;
+  const profileName = cfg.get<string>(`defaultProfile.${key}`) ?? undefined;
   if (!profileName) {
-    return undefined;
+    return unixFallback;
   }
   const profiles =
     cfg.get<Record<string, { path?: string | string[]; source?: string }>>(
-      "profiles.windows"
+      `profiles.${key}`
     ) ?? {};
   const profile = profiles[profileName];
   const pathVal = profile?.path;
@@ -359,11 +364,12 @@ const configuredDefaultShellKind = (): ShellKind | undefined => {
     lower.includes("git bash") ||
     lower.includes("wsl") ||
     lower.includes("bash") ||
-    lower.includes("zsh")
+    lower.includes("zsh") ||
+    lower.includes("fish")
   ) {
     return "posix";
   }
-  return undefined;
+  return unixFallback;
 };
 
 const runDebugger = async (
