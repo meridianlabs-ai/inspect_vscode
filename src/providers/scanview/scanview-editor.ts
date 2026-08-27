@@ -97,11 +97,13 @@ class ScoutScanReadonlyEditor implements vscode.CustomReadonlyEditorProvider {
       localResourceRoots,
     };
 
-    // editor panel implementation
+    // editor panel implementation — confine the webview's scan RPC surface to
+    // the directory holding the scan this editor was opened for.
     this.scanviewPanel_ = new ScanviewPanel(
       webviewPanel as HostWebviewPanel,
       this.context_,
-      this.server_
+      this.server_,
+      () => [scanDir]
     );
 
     // set html

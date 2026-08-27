@@ -12,6 +12,7 @@ import {
 import { log } from "../../core/log";
 import { HttpProxyRpcRequest } from "../../core/package/view-server";
 import { AbsolutePath } from "../../core/path";
+import { getRelativeUri, resolveToUri } from "../../core/uri";
 import {
   getWebviewPanelHtml,
   handleWebviewPanelOpenMessages,
@@ -23,27 +24,70 @@ import { ScoutViewServer } from "../scout/scout-view-server";
 
 import { RouteMessage, sanitizeRouteMessage } from "./scanview-message";
 
+/** Whether a webview-supplied scan location is within one of the allowed roots. */
+function scanLocationInScope(scope: Uri[], location: string): boolean {
+  let target: Uri;
+  try {
+    target = resolveToUri(location);
+  } catch {
+    return false;
+  }
+  const targetStr = target.toString();
+  return scope.some(
+    (root) =>
+      root.toString() === targetStr ||
+      location === root.toString() ||
+      getRelativeUri(root, target) !== null
+  );
+}
+
 export class ScanviewPanel extends Disposable {
   constructor(
     private panel_: HostWebviewPanel,
     private context_: ExtensionContext,
-    private server_: ScoutViewServer
+    private server_: ScoutViewServer,
+    // Directories this panel may read scans from. The per-scan custom editor
+    // passes the scan's directory; the full Scout View falls back to the
+    // server's configured scan-results scope.
+    scope?: () => Uri[]
   ) {
     super();
+
+    const scopeResolver = scope ?? (() => server_.scanResultsScope());
+
+    // The scan webview renders untrusted scan results and its RPC surface is
+    // reachable from injected script, while the token-authorized scout server
+    // reads ANY path/URL by design. Confine every location-bearing method to
+    // the scan(s) this panel was opened for, mirroring logPathInScope in the
+    // sibling log view. Requests for out-of-scope paths are rejected before any
+    // request reaches the server.
+    const requireScanScope = (location: unknown): string => {
+      if (
+        typeof location !== "string" ||
+        !scanLocationInScope(scopeResolver(), location)
+      ) {
+        throw new Error(
+          `Refusing to access scan "${String(
+            location
+          )}": outside the scope of this view.`
+        );
+      }
+      return location;
+    };
 
     // serve eval log api to webview
     this._rpcDisconnect = webviewPanelJsonRpcServer(panel_, {
       [kMethodGetScans]: async () => server_.legacy.getScans(),
       [kMethodGetScan]: async (params: unknown[]) =>
-        server_.legacy.getScan(params[0] as string),
+        server_.legacy.getScan(requireScanScope(params[0])),
       [kMethodGetScannerDataframe]: async (params: unknown[]) =>
         server_.legacy.getScannerDataframe(
-          params[0] as string,
+          requireScanScope(params[0]),
           params[1] as string
         ),
       [kMethodGetScannerDataframeInput]: async (params: unknown[]) =>
         server_.legacy.getScannerDataframeInput(
-          params[0] as string,
+          requireScanScope(params[0]),
           params[1] as string,
           params[2] as string
         ),
