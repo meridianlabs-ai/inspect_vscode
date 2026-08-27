@@ -38,6 +38,15 @@ export interface HttpProxyRpcResponse {
   bodyEncoding: "utf8" | "base64";
 }
 
+// Connect to the loopback address by its literal IPv4 form rather than the name
+// "localhost". On hosts where "localhost" resolves to ::1 ahead of 127.0.0.1, a
+// co-resident user can pre-bind [::1]:<port> (the port probe in port.ts only
+// checks 127.0.0.1, and the child binds 127.0.0.1), and every token-bearing
+// request to "localhost" would then be delivered to the attacker's socket. Using
+// the same literal address the child binds and the probe checks removes that
+// name-resolution gap. See CWE-923.
+const kServerHost = "127.0.0.1";
+
 export class PackageViewServer implements Disposable {
   constructor(
     context: ExtensionContext,
@@ -111,7 +120,7 @@ export class PackageViewServer implements Disposable {
     requestHeaders.set("Cache-Control", "no-cache");
 
     const response = await fetch(
-      `http://localhost:${this.serverPort_}${path}`,
+      `http://${kServerHost}:${this.serverPort_}${path}`,
       { method, headers: requestHeaders, body }
     );
     const { status, headers: responseHeaders } = response;
@@ -187,7 +196,7 @@ export class PackageViewServer implements Disposable {
 
     // make request
     const response = await fetch(
-      `http://localhost:${this.serverPort_}${path}`,
+      `http://${kServerHost}:${this.serverPort_}${path}`,
       { method: method, headers }
     );
     if (response.ok) {
