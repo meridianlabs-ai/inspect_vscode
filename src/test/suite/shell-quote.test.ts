@@ -199,11 +199,23 @@ suite("Shell Quote Test Suite", () => {
       assert.strictEqual(quoteArgUnknownShell('a"b'), null);
     });
 
-    test("command line is null if any token is unsafe", () => {
+    test("leaves safe tokens bare so the command stays executable", () => {
+      // Safe tokens (incl. the leading command) must stay bare — a quoted
+      // leading token is a string literal, not a command, in PowerShell.
       assert.strictEqual(
         quoteCommandLineUnknownShell(["python", "eval", "ok.py"]),
-        '"python" "eval" "ok.py"'
+        "python eval ok.py"
       );
+    });
+
+    test("leaves safe tokens bare and double-quotes unsafe ones", () => {
+      assert.strictEqual(
+        quoteCommandLineUnknownShell(["inspect", "eval", "x & y.py"]),
+        'inspect eval "x & y.py"'
+      );
+    });
+
+    test("command line is null if any token can't be quoted safely", () => {
       assert.strictEqual(
         quoteCommandLineUnknownShell(["python", "$(evil)"]),
         null

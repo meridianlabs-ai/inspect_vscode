@@ -62,6 +62,13 @@ const kUnknownShellUnsafe = /[$`"%!\r\n]/;
  * caller can refuse to run rather than risk injection.
  */
 export function quoteArgUnknownShell(value: string): string | null {
+  // Leave tokens that are safe unquoted in the strictest shell (PowerShell) bare
+  // — this is what keeps the leading command (e.g. `inspect`) unquoted, so
+  // PowerShell actually executes it rather than parsing `"inspect"` as a string
+  // literal. A bare safe token is inert in cmd.exe and POSIX shells too.
+  if (isSafeUnquoted(value, "powershell")) {
+    return value;
+  }
   if (kUnknownShellUnsafe.test(value)) {
     return null;
   }
