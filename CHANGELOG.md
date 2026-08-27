@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.18](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.9.17...v0.9.18) (2026-08-27)
+
+
+### Bug Fixes
+
+* harden log/scan viewers, task execution, listings, and .env handling ([#171](https://github.com/meridianlabs-ai/inspect_vscode/issues/171)) ([b136b33](https://github.com/meridianlabs-ai/inspect_vscode/commit/b136b333ddcf2fe9ab41c7f4fd073db96c6570cd))
+
 ## [0.9.17](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.9.16...v0.9.17) (2026-08-26)
 
 
