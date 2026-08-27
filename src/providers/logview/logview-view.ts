@@ -117,24 +117,35 @@ export class InspectViewWebviewManager extends InspectWebviewManager<
     );
   }
 
+  // Whether an updated log falls within the panel's actual scope. A "file"-scoped
+  // panel (legacy single-file open) only matches its own file; a "dir" panel
+  // matches any descendant. Using the panel scope avoids background-refreshing a
+  // file-scoped panel toward a sibling, which the RPC guard would then reject.
+  private logFileInScope(
+    state: LogviewState | undefined,
+    log_file: Uri
+  ): boolean {
+    if (!state?.log_dir) {
+      return false;
+    }
+    if (state.scopeType === "file") {
+      return state.log_file?.toString() === log_file.toString();
+    }
+    return getRelativeUri(state.log_dir, log_file) !== null;
+  }
+
   public logFileIsWithinLogDir(log_file: Uri) {
-    const state = this.getWorkspaceState();
-    return (
-      state?.log_dir !== undefined &&
-      getRelativeUri(state?.log_dir, log_file) !== null
-    );
+    return this.logFileInScope(this.getWorkspaceState(), log_file);
   }
 
   public async showLogFileIfWithinLogDir(log_file: Uri) {
     const state = this.getWorkspaceState();
-    if (state?.log_dir) {
-      if (getRelativeUri(state?.log_dir, log_file) !== null) {
-        await this.displayLogFile({
-          log_file: log_file,
-          log_dir: state?.log_dir,
-          background_refresh: true,
-        });
-      }
+    if (state?.log_dir && this.logFileInScope(state, log_file)) {
+      await this.displayLogFile({
+        log_file: log_file,
+        log_dir: state.log_dir,
+        background_refresh: true,
+      });
     }
   }
 

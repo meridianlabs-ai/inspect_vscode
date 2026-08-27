@@ -1,24 +1,7 @@
-import * as os from "os";
-
 // The kind of shell a command line will be sent to. We send run commands to a
 // VS Code integrated terminal via `terminal.sendText`, so the string must be
 // escaped according to the shell that terminal is actually running.
 export type ShellKind = "posix" | "powershell" | "cmd";
-
-/**
- * Maps a shell executable path to a {@link ShellKind}.
- *
- * When the shell is unknown (no path, or unrecognized), fall back to the
- * platform default: `cmd`/`powershell` on Windows, `posix` elsewhere. We pick
- * `powershell` on Windows because that is VS Code's modern default terminal
- * profile.
- */
-export function detectShellKind(shellPath: string | undefined): ShellKind {
-  return (
-    shellKindFromPath(shellPath) ??
-    (os.platform() === "win32" ? "powershell" : "posix")
-  );
-}
 
 /**
  * Positively identify a {@link ShellKind} from a shell executable path, or

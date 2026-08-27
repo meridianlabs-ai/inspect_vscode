@@ -1,8 +1,6 @@
 import * as assert from "assert";
-import * as os from "os";
 
 import {
-  detectShellKind,
   quoteArg,
   quoteArgUnknownShell,
   quoteCommandLine,
@@ -11,47 +9,6 @@ import {
 } from "../../core/shell-quote";
 
 suite("Shell Quote Test Suite", () => {
-  suite("detectShellKind", () => {
-    test("recognizes posix shells by path", () => {
-      assert.strictEqual(detectShellKind("/bin/bash"), "posix");
-      assert.strictEqual(detectShellKind("/usr/bin/zsh"), "posix");
-      assert.strictEqual(detectShellKind("/bin/sh"), "posix");
-      assert.strictEqual(detectShellKind("/usr/local/bin/fish"), "posix");
-    });
-
-    test("recognizes git-bash on Windows as posix", () => {
-      assert.strictEqual(
-        detectShellKind("C:\\Program Files\\Git\\bin\\bash.exe"),
-        "posix"
-      );
-    });
-
-    test("recognizes powershell", () => {
-      assert.strictEqual(detectShellKind("pwsh"), "powershell");
-      assert.strictEqual(
-        detectShellKind(
-          "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"
-        ),
-        "powershell"
-      );
-    });
-
-    test("recognizes cmd", () => {
-      assert.strictEqual(
-        detectShellKind("C:\\Windows\\System32\\cmd.exe"),
-        "cmd"
-      );
-    });
-
-    test("falls back to the platform default when the shell is unknown", () => {
-      // An unknown/undefined shell falls back to the platform default:
-      // powershell on Windows, posix elsewhere.
-      const expected = os.platform() === "win32" ? "powershell" : "posix";
-      assert.strictEqual(detectShellKind(undefined), expected);
-      assert.strictEqual(detectShellKind("/some/unknown/shell"), expected);
-    });
-  });
-
   suite("quoteArg - posix", () => {
     test("returns safe tokens unchanged", () => {
       assert.strictEqual(quoteArg("inspect", "posix"), "inspect");

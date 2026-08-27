@@ -37,12 +37,26 @@ export function findEnvPythonPath(
 
 // Helper function to search for Python environment in a given directory
 function findEnvPython(directory: AbsolutePath): string | null {
-  const items = fs.readdirSync(directory.path);
+  // The walk can reach system directories (up to the filesystem root), so an
+  // unreadable directory or a broken entry must degrade to "no env" rather than
+  // throwing and failing the run.
+  let items: string[];
+  try {
+    items = fs.readdirSync(directory.path);
+  } catch {
+    return null;
+  }
 
   // Filter only directories and check if any is an environment directory
   const envDir = items
     .map((item) => path.join(directory.path, item))
-    .filter((filePath) => fs.statSync(filePath).isDirectory())
+    .filter((filePath) => {
+      try {
+        return fs.statSync(filePath).isDirectory();
+      } catch {
+        return false;
+      }
+    })
     .find(isEnvDir);
 
   if (envDir) {
