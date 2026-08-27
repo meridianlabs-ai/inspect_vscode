@@ -142,24 +142,22 @@ export class ExecManager {
       return true;
     }
 
-    const useIt: MessageItem = { title: "Use Environment" };
+    const useIt: MessageItem = { title: "Use Subdirectory Environment" };
     const cancel: MessageItem = {
       title: "Use Selected Interpreter",
       isCloseAffordance: true,
     };
     const choice = await window.showWarningMessage(
-      `Run ${this.profile_.target} with a Python environment from this workspace?`,
+      `Run ${this.profile_.target} with a subdirectory Python environment?`,
       {
         modal: true,
         detail:
-          `Inspect found this environment inside the workspace and would run it ` +
-          `instead of your selected interpreter:\n\n${python.path}\n\n` +
+          `Inspect found a Python environment inside the workspace and would run ` +
+          `it instead of your selected interpreter:\n\n${python.path}\n\n` +
           `Running the ${this.profile_.target.toLowerCase()} executes code from ` +
-          `that environment, so only continue if you trust this workspace — a ` +
-          `project can plant an environment here to run arbitrary code on your ` +
-          `machine.\n\nYour choice is remembered for this environment. To always ` +
-          `use your selected interpreter, turn off ` +
-          `"inspect_ai.useSubdirectoryEnvironments".`,
+          `that environment, so only continue if you trust this workspace.\n\n` +
+          `Your choice is remembered for this environment. To always use your ` +
+          `selected interpreter, turn off "inspect_ai.useSubdirectoryEnvironments".`,
       },
       useIt,
       cancel
