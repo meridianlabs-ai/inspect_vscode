@@ -81,7 +81,7 @@ export async function activate(context: ExtensionContext) {
 
   // For now, create an output channel for env changes
   start("Monitor Workspace Env");
-  const workspaceActivationResult = activateWorkspaceEnv();
+  const workspaceActivationResult = activateWorkspaceEnv(context);
   const [envComands, workspaceEnvManager] = workspaceActivationResult;
   context.subscriptions.push(workspaceEnvManager);
   end("Monitor Workspace Env");
