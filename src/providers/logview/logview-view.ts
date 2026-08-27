@@ -251,9 +251,13 @@ export class InspectViewWebviewManager extends InspectWebviewManager<
       this.kInspectViewState,
       {}
     );
-    if (data) {
+    // Only treat this as trusted state when a real log_dir was persisted.
+    // Uri.parse("") resolves to file:/// (whole filesystem), so an empty/never-
+    // set value must NOT become a panel scope — fall back to the in-memory
+    // last state (undefined on a fresh restore, which disposes the panel).
+    if (data && data["log_dir"]) {
       return {
-        log_dir: Uri.parse(data["log_dir"] ?? ""),
+        log_dir: Uri.parse(data["log_dir"]),
         log_file: data["log_file"] ? Uri.parse(data["log_file"]) : undefined,
         background_refresh: !!data["background_refresh"],
         // Persist the scope type so a restored single-file panel keeps its
@@ -263,6 +267,15 @@ export class InspectViewWebviewManager extends InspectWebviewManager<
     } else {
       return this.lastState_;
     }
+  }
+
+  // The log view's panel scope (log_dir) is security-relevant, so on restore it
+  // must come only from extension-managed workspaceState — never from the
+  // webview-persisted state, which a compromised viewer can forge via setState.
+  // Returning undefined (no trusted state) disposes the panel rather than
+  // restoring it with an attacker-chosen scope. See CWE-642.
+  protected override restoreState(): LogviewState | undefined {
+    return this.getWorkspaceState();
   }
 
   protected setWorkspaceState(state: LogviewState) {
