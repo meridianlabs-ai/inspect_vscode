@@ -66,7 +66,7 @@ export function validateLogUri(uri: Uri): string | null {
  * handler, naming the host/bucket so the user can see who they are fetching
  * from. Returns true only if the user explicitly chooses to open it.
  */
-async function confirmRemoteOpen(logUri: Uri): Promise<boolean> {
+export async function confirmRemoteOpen(logUri: Uri): Promise<boolean> {
   const location = logUri.authority || logUri.toString(true);
   const open: MessageItem = { title: "Open Log" };
   const cancel: MessageItem = { title: "Cancel", isCloseAffordance: true };

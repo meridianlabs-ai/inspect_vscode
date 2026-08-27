@@ -1,9 +1,11 @@
 import { commands, ExtensionContext, MessageItem, Uri, window } from "vscode";
 
+import { showError } from "../components/error";
 import { OutputWatcher } from "../core/package/output-watcher";
 import { basename } from "../core/uri";
 
 import { InspectViewManager } from "./logview/logview-view";
+import { confirmRemoteOpen, validateLogUri } from "./protocol-handler";
 import { InspectSettingsManager } from "./settings/inspect-settings";
 
 /**
@@ -52,6 +54,18 @@ export function activateLogNotify(
         dontShowAgain
       );
       if (result === viewLog) {
+        // The log location comes from a signal file writable by any same-user
+        // process, so validate it as an Inspect log and — for remote locations
+        // whose host the user did not choose — confirm the host before the view
+        // server fetches it with the user's ambient credentials.
+        const validationError = validateLogUri(e.log);
+        if (validationError) {
+          await showError(validationError);
+          return;
+        }
+        if (e.log.scheme !== "file" && !(await confirmRemoteOpen(e.log))) {
+          return;
+        }
         // open the editor
         await commands.executeCommand("inspect.openLogViewer", e.log);
       } else if (result === dontShowAgain) {

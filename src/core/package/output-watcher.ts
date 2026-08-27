@@ -8,7 +8,23 @@ import { kInspectChangeEvalSignalVersion } from "../../providers/inspect/inspect
 import { WorkspaceStateManager } from "../../providers/workspace/workspace-state-provider";
 import { scoutLastScanPaths } from "../../scout/props";
 import { log } from "../log";
-import { resolveToUri } from "../uri";
+import { isUncPath, resolveToUri } from "../uri";
+
+// Signal files live at fixed paths under the user data/runtime dir and are
+// writable by any same-user or data-dir-mounted process, so their `location`
+// is untrusted. Only accept the schemes Inspect supports, and reject file://
+// URIs carrying an authority or a UNC path (dereferencing one leaks NTLM
+// credentials on Windows) before the location reaches the log viewer.
+const kAcceptableSignalSchemes = ["file", "http", "https", "s3"];
+function isAcceptableSignalUri(uri: Uri): boolean {
+  if (!kAcceptableSignalSchemes.includes(uri.scheme)) {
+    return false;
+  }
+  if (uri.scheme === "file" && (uri.authority || isUncPath(uri.fsPath))) {
+    return false;
+  }
+  return true;
+}
 
 export interface InspectLogCreatedEvent {
   log: Uri;
@@ -103,6 +119,12 @@ export class OutputWatcher implements Disposable {
               // fire event
               try {
                 const logUri = resolveToUri(evalLogPath);
+                if (!isAcceptableSignalUri(logUri)) {
+                  log.appendLine(
+                    `Ignoring signal-file location with unsupported/unsafe URI: ${evalLogPath}`
+                  );
+                  continue;
+                }
                 if (evalSignalFile.type === "log") {
                   this.onInspectLogCreated_.fire({
                     log: logUri,
