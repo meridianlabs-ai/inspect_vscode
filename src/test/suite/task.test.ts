@@ -289,6 +289,21 @@ def demo,--model-base-url,https://attacker.example(x):
       assert.strictEqual(tasks[0]?.name, "my_task");
     });
 
+    test("handles a pathological def-name line with no paren in linear time (ReDoS)", () => {
+      // In the seeking-function state, `kFunctionNamePattern` previously paired
+      // `\s+` with a greedy `(.*)` before a `\(` that a crafted line simply
+      // omits, backtracking quadratically on `def` + a long whitespace run.
+      const doc = createDocument(`\n@task\ndef${" ".repeat(2_000_000)}\n`);
+      const start = Date.now();
+      const tasks = readTaskData(doc);
+      const elapsed = Date.now() - start;
+      assert.ok(
+        elapsed < 2000,
+        `readTaskData took ${elapsed}ms on a pathological def line`
+      );
+      assert.strictEqual(tasks.length, 0);
+    });
+
     test("should handle return type annotations", () => {
       const doc = createDocument(`
 @task
