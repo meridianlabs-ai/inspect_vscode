@@ -1,3 +1,5 @@
+import * as os from "os";
+
 import {
   debug,
   DebugConfiguration,
@@ -20,7 +22,14 @@ import {
   workspaceRelativePath,
 } from "../path";
 import { findEnvPythonPath } from "../python";
-import { detectShellKind, quoteArg, quoteCommandLine } from "../shell-quote";
+import {
+  quoteArg,
+  quoteArgUnknownShell,
+  quoteCommandLine,
+  quoteCommandLineUnknownShell,
+  ShellKind,
+  shellKindFromPath,
+} from "../shell-quote";
 import { activeWorkspaceFolder } from "../workspace";
 
 export interface ExecProfile {
@@ -199,17 +208,48 @@ const runCommand = async (
     kShellIntegrationTimeoutMs
   );
 
+  // Quote for the shell that actually runs in the terminal. The command line is
+  // sent verbatim, so quoting for a different shell than the one interpreting it
+  // is a command-injection vector — PowerShell single quotes are inert in
+  // cmd.exe, so an `&` in an attacker-controlled task path/name would execute.
+  // Identify the shell from the explicit creation path, then the actual shell
+  // reported after integration activates, then the configured default profile.
   const creationOptions = terminal.creationOptions;
-  const shellPath =
+  const creationShellPath =
     "shellPath" in creationOptions ? creationOptions.shellPath : undefined;
-  const shell = detectShellKind(shellPath);
-  const commandLine = quoteCommandLine([command, ...commandArgs], shell);
+  const actualShell = (terminal.state as { shell?: string }).shell;
+  const shell: ShellKind | undefined =
+    shellKindFromPath(creationShellPath) ??
+    shellKindFromPath(actualShell) ??
+    configuredDefaultShellKind();
+
+  // Build the command line (and optional `cd`). When the shell can't be
+  // identified, fall back to cross-shell-safe double quoting; if a token can't
+  // be safely quoted for an unknown shell, refuse to run rather than risk
+  // injection.
+  let commandLine: string;
+  let cdLine: string | undefined;
+  if (shell) {
+    commandLine = quoteCommandLine([command, ...commandArgs], shell);
+    cdLine = reusedTerminal ? `cd ${quoteArg(cwd, shell)}` : undefined;
+  } else {
+    const line = quoteCommandLineUnknownShell([command, ...commandArgs]);
+    const cwdQuoted = reusedTerminal ? quoteArgUnknownShell(cwd) : "";
+    if (line === null || cwdQuoted === null) {
+      await window.showErrorMessage(
+        `Unable to ${profile.target === "Scan" ? "run scan" : "run task"}: the task path or arguments contain characters that can't be safely quoted for this terminal's shell. Select a known shell profile (PowerShell, cmd, or a POSIX shell) or rename the offending file/parameters.`
+      );
+      return;
+    }
+    commandLine = line;
+    cdLine = reusedTerminal ? `cd ${cwdQuoted}` : undefined;
+  }
 
   if (integration) {
     // Shell integration is active: the env is ready. Emit a `cd` first on
     // reused terminals (executeCommand doesn't change the working directory).
-    if (reusedTerminal) {
-      integration.executeCommand(`cd ${quoteArg(cwd, shell)}`);
+    if (cdLine) {
+      integration.executeCommand(cdLine);
     }
     integration.executeCommand(commandLine);
   } else {
@@ -218,11 +258,56 @@ const runCommand = async (
     if (!reusedTerminal) {
       await sleep(2000);
     }
-    if (reusedTerminal) {
-      terminal.sendText(`cd ${quoteArg(cwd, shell)}`);
+    if (cdLine) {
+      terminal.sendText(cdLine);
     }
     terminal.sendText(commandLine);
   }
+};
+
+/**
+ * Best-effort identification of the shell VS Code's default terminal profile
+ * launches, used when the terminal itself doesn't report its shell. Returns
+ * `undefined` on Windows when the default profile can't be mapped, so the caller
+ * uses cross-shell-safe quoting instead of guessing. On other platforms the
+ * default shells are POSIX-family.
+ */
+const configuredDefaultShellKind = (): ShellKind | undefined => {
+  if (os.platform() !== "win32") {
+    return "posix";
+  }
+  const cfg = workspace.getConfiguration("terminal.integrated");
+  const profileName = cfg.get<string>("defaultProfile.windows") ?? undefined;
+  if (!profileName) {
+    return undefined;
+  }
+  const profiles =
+    cfg.get<Record<string, { path?: string | string[]; source?: string }>>(
+      "profiles.windows"
+    ) ?? {};
+  const profile = profiles[profileName];
+  const pathVal = profile?.path;
+  const path = Array.isArray(pathVal) ? pathVal[0] : pathVal;
+  const byPath = shellKindFromPath(path) ?? shellKindFromPath(profile?.source);
+  if (byPath) {
+    return byPath;
+  }
+  const lower = profileName.toLowerCase();
+  if (lower.includes("command prompt") || lower === "cmd") {
+    return "cmd";
+  }
+  if (lower.includes("powershell") || lower.includes("pwsh")) {
+    return "powershell";
+  }
+  if (
+    lower.includes("git bash") ||
+    lower.includes("wsl") ||
+    lower.includes("bash") ||
+    lower.includes("zsh")
+  ) {
+    return "posix";
+  }
+  return undefined;
 };
 
 const runDebugger = async (

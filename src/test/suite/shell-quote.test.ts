@@ -4,7 +4,10 @@ import * as os from "os";
 import {
   detectShellKind,
   quoteArg,
+  quoteArgUnknownShell,
   quoteCommandLine,
+  quoteCommandLineUnknownShell,
+  shellKindFromPath,
 } from "../../core/shell-quote";
 
 suite("Shell Quote Test Suite", () => {
@@ -157,6 +160,53 @@ suite("Shell Quote Test Suite", () => {
       assert.strictEqual(
         quoteCommandLine(["inspect", "eval", "task.py@my_task"], "cmd"),
         "inspect eval task.py@my_task"
+      );
+    });
+  });
+
+  suite("shellKindFromPath", () => {
+    test("returns undefined when the shell can't be identified", () => {
+      assert.strictEqual(shellKindFromPath(undefined), undefined);
+      assert.strictEqual(shellKindFromPath(""), undefined);
+      assert.strictEqual(
+        shellKindFromPath("C:\\some\\custom-shell.exe"),
+        undefined
+      );
+    });
+
+    test("positively identifies known shells", () => {
+      assert.strictEqual(shellKindFromPath("/bin/bash"), "posix");
+      assert.strictEqual(shellKindFromPath("cmd.exe"), "cmd");
+      assert.strictEqual(shellKindFromPath("pwsh"), "powershell");
+    });
+  });
+
+  suite("unknown-shell quoting", () => {
+    test("double-quotes so `&` is inert in both cmd.exe and PowerShell", () => {
+      // The exploited case: a task file named `x & calc & y.py`. Double quotes
+      // render `&` literal in both shells, so nothing executes.
+      assert.strictEqual(
+        quoteArgUnknownShell("x & calc & y.py"),
+        '"x & calc & y.py"'
+      );
+    });
+
+    test("refuses tokens neither shell can quote safely", () => {
+      // $/backtick (PowerShell expansion), %/! (cmd expansion), embedded quote.
+      assert.strictEqual(quoteArgUnknownShell("a$b"), null);
+      assert.strictEqual(quoteArgUnknownShell("a`b"), null);
+      assert.strictEqual(quoteArgUnknownShell("%PATH%"), null);
+      assert.strictEqual(quoteArgUnknownShell('a"b'), null);
+    });
+
+    test("command line is null if any token is unsafe", () => {
+      assert.strictEqual(
+        quoteCommandLineUnknownShell(["python", "eval", "ok.py"]),
+        '"python" "eval" "ok.py"'
+      );
+      assert.strictEqual(
+        quoteCommandLineUnknownShell(["python", "$(evil)"]),
+        null
       );
     });
   });
