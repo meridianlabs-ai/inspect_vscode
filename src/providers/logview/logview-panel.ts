@@ -28,6 +28,7 @@ import { getRelativeUri, resolveToUri } from "../../core/uri";
 import {
   getWebviewPanelHtml,
   handleWebviewPanelOpenMessages,
+  jsonForScript,
 } from "../../core/webview";
 import { HostWebviewPanel } from "../../hooks";
 import { inspectViewPath } from "../../inspect/props";
@@ -60,25 +61,9 @@ export function logPathInScope(
   return type === "dir" && getRelativeUri(panelUri, targetUri) !== null;
 }
 
-/**
- * Serialize a value to JSON for embedding inside an inline `<script>` element.
- *
- * `JSON.stringify` does not escape HTML-significant characters, so a string
- * value containing `</script>` (e.g. an attacker-controlled sample id supplied
- * via the log URI query string) would otherwise terminate the script element
- * and inject live markup into the webview. Escaping `<`, `>`, and `&` — plus
- * the U+2028/U+2029 line separators that are invalid in JS string literals —
- * keeps the serialized payload inert as HTML regardless of its contents.
- */
-export function jsonForScript(value: unknown): string {
-  // Match `<`, `>`, `&` and the U+2028/U+2029 line separators, replacing each
-  // with its `\uXXXX` escape so the result is inert as HTML and valid inside a
-  // JS string literal. `JSON.stringify` escapes none of these on its own.
-  return JSON.stringify(value).replace(
-    /[<>&\u2028\u2029]/g,
-    (ch) => "\\u" + ch.charCodeAt(0).toString(16).padStart(4, "0")
-  );
-}
+// jsonForScript now lives in core/webview.ts (shared with the scan view). It
+// is re-exported here so existing importers/tests keep working.
+export { jsonForScript };
 
 export class LogviewPanel extends Disposable {
   constructor(

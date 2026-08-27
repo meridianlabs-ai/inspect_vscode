@@ -67,3 +67,46 @@ const getScansRoute = (scanDir: Uri): string => {
   const base64ScanDir = Buffer.from(scanDir.toString()).toString("base64");
   return `/scan/${base64ScanDir}`;
 };
+
+// Grammar of routes the extension itself produces:
+//   /scans | /transcripts | /validation | /project
+//   /scan/<base64>[/<url-encoded-job>][?scanner=<url-encoded>]
+// The character classes deliberately exclude HTML/whitespace metacharacters so
+// a restored route can never carry markup even before serialization.
+const kRouteGrammar =
+  /^\/(?:scans|transcripts|validation|project|scan\/[A-Za-z0-9+/=]+(?:\/[A-Za-z0-9%._~-]+)?(?:\?scanner=[A-Za-z0-9%._~-]+)?)$/;
+
+/**
+ * Validate/normalize a RouteMessage before it is embedded in the webview HTML.
+ *
+ * The panel serializer restores this message from state the (untrusted) webview
+ * persisted via setState(), so a compromised viewer could otherwise persist an
+ * arbitrary route (e.g. a /scan/<base64> whose decoded dir points at an attacker
+ * URL, re-ingested on restore) or non-conforming field values. Anything that
+ * does not match the shape the extension itself produces is discarded in favor
+ * of a safe default route.
+ */
+export function sanitizeRouteMessage(message: unknown): RouteMessage {
+  const fallback = viewRouteMessage("scans");
+  if (typeof message !== "object" || message === null) {
+    return fallback;
+  }
+  const m = message as Record<string, unknown>;
+  if (
+    m.type !== "updateRoute" ||
+    (m.mode !== "full" && m.mode !== "single-file") ||
+    typeof m.route !== "string" ||
+    !kRouteGrammar.test(m.route)
+  ) {
+    return fallback;
+  }
+  return {
+    type: "updateRoute",
+    route: m.route,
+    mode: m.mode,
+    extensionProtocolVersion:
+      typeof m.extensionProtocolVersion === "number"
+        ? m.extensionProtocolVersion
+        : 2,
+  };
+}

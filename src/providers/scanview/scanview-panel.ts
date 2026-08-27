@@ -15,12 +15,13 @@ import { AbsolutePath } from "../../core/path";
 import {
   getWebviewPanelHtml,
   handleWebviewPanelOpenMessages,
+  jsonForScript,
 } from "../../core/webview";
 import { HostWebviewPanel } from "../../hooks";
 import { scoutViewPath } from "../../scout/props";
 import { ScoutViewServer } from "../scout/scout-view-server";
 
-import { RouteMessage } from "./scanview-message";
+import { RouteMessage, sanitizeRouteMessage } from "./scanview-message";
 
 export class ScanviewPanel extends Disposable {
   constructor(
@@ -60,8 +61,13 @@ export class ScanviewPanel extends Disposable {
   }
 
   public async getHtml(message: RouteMessage): Promise<string> {
-    const stateScript = `<script id="scanview-state" type="application/json">${JSON.stringify(
-      message
+    // `message` may have been restored from webview-persisted state, so validate
+    // its shape/route grammar and serialize with an HTML-inert encoder (raw
+    // JSON.stringify does not escape '<', letting a '</script>' in any field
+    // break out of the inline script element).
+    const safeMessage = sanitizeRouteMessage(message);
+    const stateScript = `<script id="scanview-state" type="application/json">${jsonForScript(
+      safeMessage
     )}</script>`;
 
     // Try to resolve the dist path from the server (handles LFS resolution),
