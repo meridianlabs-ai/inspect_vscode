@@ -44,9 +44,9 @@ export class InspectWebviewManager<
     context_.subscriptions.push(
       window.registerWebviewPanelSerializer(this.viewType_, {
         deserializeWebviewPanel: (panel: WebviewPanel, state?: S) => {
-          state = state || this.getWorkspaceState();
-          if (state) {
-            this.restoreWebview(panel as HostWebviewPanel, state);
+          const restored = this.restoreState(state);
+          if (restored) {
+            this.restoreWebview(panel as HostWebviewPanel, restored);
           } else {
             setTimeout(() => {
               panel.dispose();
@@ -110,6 +110,23 @@ export class InspectWebviewManager<
 
   protected getWorkspaceState(): S | undefined {
     return undefined;
+  }
+
+  /**
+   * Choose the state used to restore a panel on window reload.
+   *
+   * VS Code delivers the state the webview itself persisted via
+   * acquireVsCodeApi().setState() — attacker-controlled JSON if the webview was
+   * compromised by a malicious rendered log. Prefer the extension-managed
+   * workspaceState, which the extension controls and which carries the trusted
+   * scope (e.g. the log-view log_dir that bounds file access); fall back to the
+   * webview-persisted state only when there is no extension state. Subclasses
+   * that hold security-relevant state override getWorkspaceState() (and may
+   * override this to additionally validate webview-persisted state). See
+   * CWE-642.
+   */
+  protected restoreState(webviewState: S | undefined): S | undefined {
+    return this.getWorkspaceState() ?? webviewState;
   }
 
   private resolveOnShow() {
