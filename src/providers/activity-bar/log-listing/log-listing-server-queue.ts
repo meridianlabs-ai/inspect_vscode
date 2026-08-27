@@ -255,7 +255,7 @@ function evalTarget(log: EvalLog): string {
   // setup target
   const target: string[] = [];
   if (log.status !== "success") {
-    target.push(`status:&nbsp;${log.status}`);
+    target.push(`status:&nbsp;${escapeMarkdown(log.status ?? "")}`);
   }
 
   // dataset
