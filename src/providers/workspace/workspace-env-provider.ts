@@ -39,6 +39,23 @@ export function activateWorkspaceEnv(
 // for this workspace. Keyed by the raw .env value string.
 const kApprovedRemoteEnvKey = "inspect.approvedRemoteEnvDirs";
 
+// Remote storage schemes Inspect actually supports as a log/scan-results
+// backend (its fsspec configuration). Only these are honored from the workspace
+// .env — and only after approval, since they carry credential/scope-root risk.
+// Any other scheme (http/https and anything unrecognized) is not a real backend
+// and is ignored outright, so it is never handed to the view server: this
+// removes the SSRF vector (e.g. a repo-shipped http://169.254.169.254/ metadata
+// URL) structurally rather than relying on a prompt.
+const kApprovableRemoteSchemes = new Set([
+  "s3",
+  "gs",
+  "gcs",
+  "az",
+  "abfs",
+  "abfss",
+  "hf",
+]);
+
 // Fired when the active task changes
 export interface EnvironmentChangedEvent {
   mtime: number;
@@ -165,7 +182,15 @@ export class WorkspaceEnvManager implements Disposable {
     if (uri.scheme === "file") {
       return uri;
     }
-    // Remote scheme: require approval.
+    // Unsupported scheme (http/https/unknown): not a real Inspect backend, and
+    // a fetch target we must never hand to the view server. Ignore it.
+    if (!kApprovableRemoteSchemes.has(uri.scheme)) {
+      log.appendLine(
+        `Ignoring .env location with unsupported scheme "${uri.scheme}:" (${value}); using the local default.`
+      );
+      return localDefault();
+    }
+    // Supported remote storage scheme: require one-time approval.
     if (this.getApprovedRemoteDirs().includes(value)) {
       return uri;
     }
