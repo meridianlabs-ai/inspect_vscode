@@ -142,13 +142,13 @@ export class ExecManager {
       return true;
     }
 
-    const useIt: MessageItem = { title: "Use Subdirectory Environment" };
+    const useIt: MessageItem = { title: "Use Workspace Environment" };
     const cancel: MessageItem = {
       title: "Use Selected Interpreter",
       isCloseAffordance: true,
     };
     const choice = await window.showWarningMessage(
-      `Run ${this.profile_.target} with a subdirectory Python environment?`,
+      `Run ${this.profile_.target} with a workspace Python environment?`,
       {
         modal: true,
         detail:
