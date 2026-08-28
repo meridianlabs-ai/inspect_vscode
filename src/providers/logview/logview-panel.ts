@@ -154,11 +154,13 @@ export class LogviewPanel extends Disposable {
         ),
       [kMethodGetUserInfo]: () => server_.getUserInfo(),
       [kMethodAppConfig]: () => server_.getAppConfig(),
-      // The transcript-search methods carry a webview-supplied transcript
-      // directory; confine it to the panel scope like every file-content method,
-      // so injected script can't search/read transcripts outside the viewed log.
+      // list_searches carries only a search type + count (no path), so it needs
+      // no scope check. post_search / get_search_result DO carry a
+      // webview-supplied transcript directory; confine it to the panel scope
+      // like every file-content method so injected script can't search/read
+      // transcripts outside the viewed log.
       [kMethodListSearches]: (params: unknown[]) =>
-        server_.listSearches(requireScope(params[0]), params[1] as number),
+        server_.listSearches(params[0] as string, params[1] as number),
       [kMethodPostSearch]: (params: unknown[]) =>
         server_.postSearch(
           requireScope(params[0]),
