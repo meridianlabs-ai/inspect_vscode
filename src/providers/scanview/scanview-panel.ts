@@ -10,6 +10,7 @@ import {
   webviewPanelJsonRpcServer,
 } from "../../core/jsonrpc";
 import { log } from "../../core/log";
+import { assertScanProxyInScope } from "../../core/package/proxy-scope";
 import { HttpProxyRpcRequest } from "../../core/package/view-server";
 import { AbsolutePath } from "../../core/path";
 import { getRelativeUri, resolveToUri } from "../../core/uri";
@@ -91,8 +92,14 @@ export class ScanviewPanel extends Disposable {
           params[1] as string,
           params[2] as string
         ),
-      [kMethodHttpRequest]: async (params: unknown[]) =>
-        server_.proxyRpcRequest(params[0] as HttpProxyRpcRequest),
+      [kMethodHttpRequest]: async (params: unknown[]) => {
+        // Confine the generic proxy to the panel scope like the named methods.
+        const request = params[0] as HttpProxyRpcRequest;
+        assertScanProxyInScope(request, (location) =>
+          scanLocationInScope(scopeResolver(), location)
+        );
+        return server_.proxyRpcRequest(request);
+      },
     });
 
     // serve post message api to webview
