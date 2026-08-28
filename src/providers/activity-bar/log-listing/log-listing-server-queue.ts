@@ -236,7 +236,11 @@ export function evalSummary(log: EvalLog): MarkdownString | undefined {
   }
 
   if (summary.length > 0) {
-    return new MarkdownString(summary.join("\n  "), true);
+    // supportThemeIcons is intentionally off: the tooltip never uses theme
+    // icons, and enabling it would let an untrusted field's `$(icon)` sequence
+    // render a codicon (backslash-escaping doesn't survive the icon pass). See
+    // CWE-838.
+    return new MarkdownString(summary.join("\n  "));
   } else {
     return undefined;
   }

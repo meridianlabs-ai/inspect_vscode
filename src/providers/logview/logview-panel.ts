@@ -141,7 +141,7 @@ export class LogviewPanel extends Disposable {
           params[4] as number | undefined
         ),
       [kMethodLogMessage]: async (params: unknown[]) => {
-        const log_file = params[0] as string;
+        const log_file = requireScope(params[0]);
         const message = params[1] as string | undefined;
         log.info(`[CLIENT LOG] (${log_file}): ${message}`);
         await server_.logMessage(log_file, message);
@@ -154,13 +154,20 @@ export class LogviewPanel extends Disposable {
         ),
       [kMethodGetUserInfo]: () => server_.getUserInfo(),
       [kMethodAppConfig]: () => server_.getAppConfig(),
+      // The transcript-search methods carry a webview-supplied transcript
+      // directory; confine it to the panel scope like every file-content method,
+      // so injected script can't search/read transcripts outside the viewed log.
       [kMethodListSearches]: (params: unknown[]) =>
-        server_.listSearches(params[0] as string, params[1] as number),
+        server_.listSearches(requireScope(params[0]), params[1] as number),
       [kMethodPostSearch]: (params: unknown[]) =>
-        server_.postSearch(params[0] as string, params[1] as string, params[2]),
+        server_.postSearch(
+          requireScope(params[0]),
+          params[1] as string,
+          params[2]
+        ),
       [kMethodGetSearchResult]: (params: unknown[]) =>
         server_.getSearchResult(
-          params[0] as string,
+          requireScope(params[0]),
           params[1] as string,
           params[2] as string,
           params[3] as { events?: string; messages?: string } | undefined

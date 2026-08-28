@@ -12,9 +12,11 @@ import {
   workspace,
 } from "vscode";
 
+import { showError } from "../../components/error";
 import { OutputWatcher } from "../../core/package/output-watcher";
 import { workspacePath } from "../../core/path";
 import { isUncPath, isUri, parseTerminalLinkUri } from "../../core/uri";
+import { confirmRemoteOpen, validateLogUri } from "../protocol-handler";
 
 const kLogFilePattern = /^.*Log: (\S*?\.json|\S*?\.eval)\s*/g;
 const kEvalJsonPattern = /(?:^|\s)(\S*?\.json|\S*?\.eval)\s*/g;
@@ -120,6 +122,19 @@ export const logviewTerminalLinkProvider = (
       // Resolve the clicked link into a complete Uri to the file
       const logUri = await resolveLogFile(link.data);
       if (logUri) {
+        // Terminal output is attacker-influenceable, and the target may be a
+        // remote URI (including one hidden behind a local-looking filename via
+        // the signal-file source). Apply the same validation and host-naming
+        // confirmation the protocol handler / notification paths use before the
+        // view server fetches a location the user didn't choose. See CWE-918.
+        const validationError = validateLogUri(logUri);
+        if (validationError) {
+          await showError(validationError);
+          return;
+        }
+        if (logUri.scheme !== "file" && !(await confirmRemoteOpen(logUri))) {
+          return;
+        }
         await commands.executeCommand("inspect.openLogViewer", logUri);
       } else {
         // Since we couldn't resolve the log file, just let the user know
