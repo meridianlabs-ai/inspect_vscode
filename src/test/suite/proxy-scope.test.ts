@@ -34,6 +34,14 @@ suite("Proxy Scope Test Suite", () => {
       ok("/api/scout/searches?type=events&count=10");
     });
 
+    test("allows a listing with no explicit location (server default)", () => {
+      // The viewer requests these during config load; a missing location uses
+      // the server's own default, not an attacker path.
+      ok("/api/logs");
+      ok("/api/log-files");
+      ok("/api/log-headers");
+    });
+
     test("allows in-scope file/dir locations", () => {
       ok(`/api/logs/${enc("file:///w/logs/run.eval")}?header-only=false`);
       ok(`/api/log-bytes/${enc("file:///w/logs/run.eval")}?start=0&end=9`);

@@ -78,22 +78,30 @@ export function assertLogProxyInScope(
     return;
   }
 
-  // Endpoints whose location is a query parameter.
+  // Endpoints whose location is a query parameter. A missing location means the
+  // server lists/uses its own configured default (not an attacker-chosen path),
+  // which the viewer requests during config load — allow it; only enforce scope
+  // when a location is actually supplied.
   if (pathname === "/api/logs" || pathname === "/api/log-files") {
-    return check(params.get("log_dir"));
+    const logDir = params.get("log_dir");
+    if (logDir) {
+      check(logDir);
+    }
+    return;
   }
   if (
     pathname === "/api/pending-samples" ||
     pathname === "/api/pending-sample-data"
   ) {
-    return check(params.get("log"));
+    const logParam = params.get("log");
+    if (logParam) {
+      check(logParam);
+    }
+    return;
   }
   if (pathname === "/api/log-headers") {
-    const files = params.getAll("file");
-    if (files.length === 0) {
-      throw proxyError(request.path);
-    }
-    files.forEach(check);
+    // Each requested file must be in scope; an empty request is a no-op.
+    params.getAll("file").forEach(check);
     return;
   }
 
