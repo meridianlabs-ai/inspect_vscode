@@ -40,14 +40,26 @@ suite("Proxy Scope Test Suite", () => {
       ok("/api/logs");
       ok("/api/log-files");
       ok("/api/log-headers");
+      ok("/api/events?last_eval_time=123");
     });
 
     test("allows in-scope file/dir locations", () => {
       ok(`/api/logs/${enc("file:///w/logs/run.eval")}?header-only=false`);
+      ok(`/api/log-info/${enc("file:///w/logs/run.eval")}`);
+      ok(`/api/log-download/${enc("file:///w/logs/run.eval")}`);
       ok(`/api/log-bytes/${enc("file:///w/logs/run.eval")}?start=0&end=9`);
       ok(`/api/log-edit/${enc("file:///w/logs/run.eval")}`);
       ok(`/api/logs?log_dir=${enc("file:///w/logs")}`);
       ok(`/api/pending-samples?log=${enc("file:///w/logs/run.eval")}`);
+      ok(
+        `/api/pending-sample-data-urls?log=${enc(
+          "file:///w/logs/run.eval"
+        )}&id=1&epoch=1`
+      );
+      ok(
+        `/api/log-message?log_file=${enc("file:///w/logs/run.eval")}&message=x`
+      );
+      ok(`/api/eval-set?log_dir=${enc("file:///w/logs")}&dir=set-a`);
       ok(
         `/api/log-headers?file=${enc("file:///w/logs/a.eval")}&file=${enc(
           "file:///w/logs/b.eval"
@@ -58,8 +70,11 @@ suite("Proxy Scope Test Suite", () => {
 
     test("rejects out-of-scope locations on every route", () => {
       rejects(`/api/logs/${enc("file:///etc/passwd")}`);
+      rejects(`/api/log-info/${enc("file:///etc/passwd")}`);
+      rejects(`/api/log-download/${enc("file:///etc/passwd")}`);
       rejects(`/api/log-bytes/${enc("file:///home/v/.ssh/id_rsa")}`);
       rejects(`/api/log-edit/${enc("file:///etc/cron.d/x")}`);
+      rejects(`/api/eval-set?log_dir=${enc("file:///w/logs")}&dir=../../etc`);
       rejects(`/api/logs?log_dir=${enc("file:///")}`);
       rejects(`/api/pending-samples?log=${enc("file:///etc/passwd")}`);
       // one in-scope and one out-of-scope file → rejected

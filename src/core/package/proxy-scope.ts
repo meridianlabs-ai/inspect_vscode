@@ -71,6 +71,7 @@ export function assertLogProxyInScope(
     "/api/log-dir",
     "/api/user-info",
     "/api/app-config",
+    "/api/events", // last_eval_time only
     "/api/dist",
     "/api/scout/searches", // type + count only
   ]);
@@ -91,11 +92,20 @@ export function assertLogProxyInScope(
   }
   if (
     pathname === "/api/pending-samples" ||
-    pathname === "/api/pending-sample-data"
+    pathname === "/api/pending-sample-data" ||
+    pathname === "/api/pending-sample-data-urls"
   ) {
     const logParam = params.get("log");
     if (logParam) {
       check(logParam);
+    }
+    return;
+  }
+  if (pathname === "/api/log-message") {
+    // POST form: the log file is the `log_file` query parameter.
+    const logFile = params.get("log_file");
+    if (logFile) {
+      check(logFile);
     }
     return;
   }
@@ -104,13 +114,29 @@ export function assertLogProxyInScope(
     params.getAll("file").forEach(check);
     return;
   }
+  // eval-set / flow resolve a directory from log_dir (+ an optional `dir`
+  // subdirectory joined onto it); confine the effective directory.
+  if (pathname === "/api/eval-set" || pathname === "/api/flow") {
+    const base = params.get("log_dir") ?? "";
+    const sub = params.get("dir") ?? "";
+    if (base && sub) {
+      check(base.replace(/\/+$/, "") + "/" + sub.replace(/^\/+/, ""));
+    } else if (base) {
+      check(base);
+    } else if (sub) {
+      check(sub);
+    }
+    return;
+  }
 
-  // Endpoints of the form /api/<name>/<encoded location>.
+  // Endpoints of the form /api/<name>/<encoded file>.
   const kSegmentRoutes = [
     "/api/logs/",
+    "/api/log-info/",
     "/api/log-size/",
     "/api/log-delete/",
     "/api/log-bytes/",
+    "/api/log-download/",
     "/api/log-edit/",
     "/api/log-message/",
   ];
