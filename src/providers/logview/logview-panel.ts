@@ -170,8 +170,18 @@ export class LogviewPanel extends Disposable {
         // The generic proxy reaches every view-server endpoint with the auth
         // token, so confine it to the panel scope like the named methods.
         const request = params[0] as HttpProxyRpcRequest;
-        assertLogProxyInScope(request, (target) =>
-          logPathInScope(type, uri, target)
+        try {
+          assertLogProxyInScope(request, (target) =>
+            logPathInScope(type, uri, target)
+          );
+        } catch (error) {
+          log.appendLine(
+            `[proxy-scope] BLOCKED ${request.method} ${request.path}`
+          );
+          throw error;
+        }
+        log.appendLine(
+          `[proxy-scope] allowed ${request.method} ${request.path}`
         );
         return server_.proxyRpcRequest(request);
       },

@@ -95,8 +95,18 @@ export class ScanviewPanel extends Disposable {
       [kMethodHttpRequest]: async (params: unknown[]) => {
         // Confine the generic proxy to the panel scope like the named methods.
         const request = params[0] as HttpProxyRpcRequest;
-        assertScanProxyInScope(request, (location) =>
-          scanLocationInScope(scopeResolver(), location)
+        try {
+          assertScanProxyInScope(request, (location) =>
+            scanLocationInScope(scopeResolver(), location)
+          );
+        } catch (error) {
+          log.appendLine(
+            `[proxy-scope] BLOCKED ${request.method} ${request.path}`
+          );
+          throw error;
+        }
+        log.appendLine(
+          `[proxy-scope] allowed ${request.method} ${request.path}`
         );
         return server_.proxyRpcRequest(request);
       },
