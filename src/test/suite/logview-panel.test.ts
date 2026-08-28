@@ -5,6 +5,7 @@ import { Uri } from "vscode";
 import {
   jsonForScript,
   logPathInScope,
+  logPathInScopeAllowingEncoded,
 } from "../../providers/logview/logview-panel";
 
 suite("logview-panel Test Suite", () => {
@@ -62,6 +63,38 @@ suite("logview-panel Test Suite", () => {
     test("rejects unparseable targets", () => {
       const uri = Uri.file("/w/logs/run.eval");
       assert.strictEqual(logPathInScope("file", uri, ""), false);
+    });
+  });
+
+  suite("logPathInScopeAllowingEncoded", () => {
+    test("accepts a scheme-stripped, percent-encoded in-scope path", () => {
+      // The viewer passes transcriptDir = stripFileScheme(logFile), which keeps
+      // percent-encoding (e.g. a space -> %20). The plain scope check would
+      // reject it; the encoding-tolerant one must accept it.
+      const uri = Uri.file("/w/my run/logs/run.eval");
+      const transcriptDir = uri.toString().replace(/^file:\/\//, ""); // "/w/my%20run/logs/run.eval"
+      assert.strictEqual(logPathInScope("file", uri, transcriptDir), false);
+      assert.strictEqual(
+        logPathInScopeAllowingEncoded("file", uri, transcriptDir),
+        true
+      );
+    });
+
+    test("still rejects an out-of-scope encoded path (incl. traversal)", () => {
+      const dir = Uri.file("/w/logs");
+      assert.strictEqual(
+        logPathInScopeAllowingEncoded("dir", dir, "/etc/passwd"),
+        false
+      );
+      // %2e%2e -> .. must still be caught after decoding.
+      assert.strictEqual(
+        logPathInScopeAllowingEncoded(
+          "dir",
+          dir,
+          "/w/logs/%2e%2e/%2e%2e/etc/passwd"
+        ),
+        false
+      );
     });
   });
 

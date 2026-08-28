@@ -20,8 +20,10 @@ const kAllowedLogSchemes = ["file", "https", "http", "s3"];
 // A remote authority must look like a plain host[:port] (optionally an IPv6
 // literal in brackets). Uri.parse percent-decodes the authority, so this also
 // rejects userinfo (`spoof@host`) and any decoded whitespace/control/bidi
-// characters that could spoof the confirmation dialog. See CWE-451.
-const kValidAuthorityPattern = /^[A-Za-z0-9._~:[\]-]+$/;
+// characters that could spoof the confirmation dialog. Underscores are allowed
+// (docker-compose service names, some internal DNS) — they carry no spoofing
+// power. See CWE-451.
+const kValidAuthorityPattern = /^[A-Za-z0-9._~:[\]_-]+$/;
 
 // Recognized Inspect log file extensions.
 const kAllowedLogExtensions = [".eval", ".json"];
@@ -86,11 +88,18 @@ export function validateLogUri(uri: Uri): string | null {
 }
 
 /**
- * Confirm opening a remote log requested via the (externally-invokable) URI
- * handler, naming the host/bucket so the user can see who they are fetching
- * from. Returns true only if the user explicitly chooses to open it.
+ * Confirm opening a remote log/scan, naming the host/bucket so the user can see
+ * who they are fetching from. `source` describes what triggered the open (a
+ * drive-by website, a terminal link, …) and `noun` what is being opened
+ * ("Inspect log", "scan results") so the prompt matches its caller. Returns true
+ * only if the user explicitly chooses to open it.
  */
-export async function confirmRemoteOpen(logUri: Uri): Promise<boolean> {
+export async function confirmRemoteOpen(
+  logUri: Uri,
+  opts?: { source?: string; noun?: string }
+): Promise<boolean> {
+  const source = opts?.source ?? "A website";
+  const noun = opts?.noun ?? "an Inspect log";
   // Display only the real host: drop any userinfo (everything before the final
   // '@') and refuse to render decoded control/whitespace, so the named location
   // can't be spoofed even if a caller reaches here without validateLogUri.
@@ -101,10 +110,10 @@ export async function confirmRemoteOpen(logUri: Uri): Promise<boolean> {
       : logUri.authority
         ? "an unrecognized host"
         : logUri.toString(true);
-  const open: MessageItem = { title: "Open Log" };
+  const open: MessageItem = { title: "Open" };
   const cancel: MessageItem = { title: "Cancel", isCloseAffordance: true };
   const choice = await window.showWarningMessage(
-    `A website asked VS Code to open an Inspect log from "${location}". ` +
+    `${source} asked VS Code to open ${noun} from "${location}". ` +
       `Opening it will fetch content from that location. Open it?`,
     { modal: true },
     open,

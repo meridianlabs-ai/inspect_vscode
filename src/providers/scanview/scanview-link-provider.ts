@@ -61,7 +61,10 @@ export const scanviewTerminalLinkProvider = (_context: ExtensionContext) => {
         // other untrusted entry points do. See CWE-918.
         if (
           scanDirUri.scheme !== "file" &&
-          !(await confirmRemoteOpen(scanDirUri))
+          !(await confirmRemoteOpen(scanDirUri, {
+            source: "A terminal link",
+            noun: "scan results",
+          }))
         ) {
           return;
         }

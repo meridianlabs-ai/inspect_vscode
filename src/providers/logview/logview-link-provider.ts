@@ -132,7 +132,10 @@ export const logviewTerminalLinkProvider = (
           await showError(validationError);
           return;
         }
-        if (logUri.scheme !== "file" && !(await confirmRemoteOpen(logUri))) {
+        if (
+          logUri.scheme !== "file" &&
+          !(await confirmRemoteOpen(logUri, { source: "A terminal link" }))
+        ) {
           return;
         }
         await commands.executeCommand("inspect.openLogViewer", logUri);

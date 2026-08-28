@@ -61,6 +61,32 @@ export function logPathInScope(
   return type === "dir" && getRelativeUri(panelUri, targetUri) !== null;
 }
 
+/**
+ * Scope check for a scheme-stripped, percent-encoded path — the form the viewer
+ * passes as `transcriptDir` (stripFileScheme of the log file). The plain
+ * {@link logPathInScope} runs such a value through `Uri.file`, which treats
+ * `%XX` literally, so it both wrongly rejects a legitimate path containing a
+ * space (`%20`) and wrongly *accepts* `%2e%2e` traversal that the server would
+ * decode to `..` and escape with. The server percent-decodes the value, so the
+ * check must too: validate the decoded form (which matches encoded paths and
+ * lets getRelativeUri reject the revealed `..`). The raw value is still what's
+ * forwarded to the server.
+ */
+export function logPathInScopeAllowingEncoded(
+  type: "file" | "dir",
+  panelUri: Uri,
+  target: string
+): boolean {
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(target);
+  } catch {
+    // malformed percent-encoding
+    return false;
+  }
+  return logPathInScope(type, panelUri, decoded);
+}
+
 // jsonForScript now lives in core/webview.ts (shared with the scan view). It
 // is re-exported here so existing importers/tests keep working.
 export { jsonForScript };
@@ -85,6 +111,23 @@ export class LogviewPanel extends Disposable {
     // rejected before the path ever reaches the server.
     const requireScope = (target: unknown): string => {
       if (typeof target !== "string" || !logPathInScope(type, uri, target)) {
+        throw new Error(
+          `Refusing to access "${String(
+            target
+          )}": outside the scope of this log view.`
+        );
+      }
+      return target;
+    };
+
+    // post_search/get_search_result receive `transcriptDir` as a scheme-stripped,
+    // still-percent-encoded path, so use the encoding-tolerant scope check (the
+    // raw value is returned unchanged — that is what the server uses).
+    const requireScopeAllowingEncoded = (target: unknown): string => {
+      if (
+        typeof target !== "string" ||
+        !logPathInScopeAllowingEncoded(type, uri, target)
+      ) {
         throw new Error(
           `Refusing to access "${String(
             target
@@ -163,13 +206,13 @@ export class LogviewPanel extends Disposable {
         server_.listSearches(params[0] as string, params[1] as number),
       [kMethodPostSearch]: (params: unknown[]) =>
         server_.postSearch(
-          requireScope(params[0]),
+          requireScopeAllowingEncoded(params[0]),
           params[1] as string,
           params[2]
         ),
       [kMethodGetSearchResult]: (params: unknown[]) =>
         server_.getSearchResult(
-          requireScope(params[0]),
+          requireScopeAllowingEncoded(params[0]),
           params[1] as string,
           params[2] as string,
           params[3] as { events?: string; messages?: string } | undefined
