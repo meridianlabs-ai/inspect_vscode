@@ -10,7 +10,6 @@ import {
 
 const enc = encodeURIComponent;
 const b64url = (v: string) => Buffer.from(v, "utf-8").toString("base64url");
-const b64 = (v: string) => Buffer.from(v, "utf-8").toString("base64");
 
 // A scope that admits only locations under file:///w/logs (or the dir itself).
 const IN = "file:///w/logs";
@@ -101,27 +100,42 @@ suite("Proxy Scope Test Suite", () => {
     const rejects = (path: string) =>
       assert.throws(() => assertScanProxyInScope(req(path), scanInScope));
 
-    test("allows dist and default listing", () => {
+    test("allows no-location and default listing endpoints", () => {
       ok("/api/v2/dist");
       ok("/api/scans");
+      ok("/api/v2/app-config");
+      ok("/api/v2/project/config");
+      ok("/api/v2/scanners");
+      ok("/api/v2/searches");
+      ok("/api/v2/scans/active");
+      ok("/api/v2/topics/stream");
+      ok("/api/v2/startscan");
+      ok("/api/v2/validations");
     });
 
-    test("allows in-scope scan locations", () => {
+    test("allows in-scope scan/transcript/validation locations", () => {
       ok(`/api/scan/${enc("file:///w/scans/scan_id=x")}?status_only=true`);
       ok(`/api/scanner_df/${enc("file:///w/scans/scan_id=x")}?scanner=s`);
-      ok(`/api/v2/scans/${enc(b64("file:///w/scans"))}`);
+      // v2 {dir}/{uri} segments are base64url-encoded.
+      ok(`/api/v2/scans/${b64url("file:///w/scans")}`);
+      ok(`/api/v2/scans/${b64url("file:///w/scans")}/distinct`);
+      ok(`/api/v2/transcripts/${b64url("file:///w/scans")}/tid/info`);
+      ok(`/api/v2/validations/${b64url("file:///w/scans/v.csv")}`);
     });
 
     test("rejects out-of-scope scan locations", () => {
       rejects(`/api/scan/${enc("file:///etc/passwd")}`);
       rejects(`/api/scan-delete/${enc("file:///w/other/scan_id=x")}`);
       rejects(`/api/scans?results_dir=${enc("file:///")}`);
-      rejects(`/api/v2/scans/${enc(b64("file:///elsewhere"))}`);
+      rejects(`/api/v2/scans/${b64url("file:///elsewhere")}`);
+      rejects(`/api/v2/transcripts/${b64url("file:///etc")}/tid/info`);
+      rejects(`/api/v2/validations/${b64url("file:///etc/shadow")}`);
     });
 
     test("rejects unknown routes by default", () => {
       rejects("/api/logs/whatever");
       rejects("/api/evil");
+      rejects("/api/v2/evil");
     });
   });
 });

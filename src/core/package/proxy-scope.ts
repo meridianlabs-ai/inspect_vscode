@@ -41,10 +41,6 @@ function decodeBase64Url(value: string): string {
   return Buffer.from(value, "base64url").toString("utf-8");
 }
 
-function decodeBase64(value: string): string {
-  return Buffer.from(value, "base64").toString("utf-8");
-}
-
 /**
  * Throw unless the proxied Inspect **log** view request stays within the panel
  * scope. `inScope` is the panel's `logPathInScope` bound to its file/dir scope.
@@ -177,38 +173,61 @@ export function assertScanProxyInScope(
     }
   };
 
-  if (pathname === "/api/v2/dist") {
+  // No-location config/listing/compute endpoints. The mutating ones
+  // (/startscan, /validations create) are constrained by the scout server's own
+  // project containment and carry no directory in the URL, so there is nothing
+  // to scope here.
+  const kNoLocation = new Set([
+    "/api/v2/dist",
+    "/api/v2/app-config",
+    "/api/v2/project/config",
+    "/api/v2/topics",
+    "/api/v2/topics/stream",
+    "/api/v2/scanners",
+    "/api/v2/code",
+    "/api/v2/searches",
+    "/api/v2/scans/active",
+    "/api/v2/startscan",
+    "/api/v2/validations",
+  ]);
+  if (kNoLocation.has(pathname)) {
     return;
   }
 
-  // Scan listing: with no results_dir it lists the server default; with one it
-  // must be in scope.
+  // Legacy scan listing: with no results_dir it lists the server default; with
+  // one it must be in scope.
   if (pathname === "/api/scans") {
     const resultsDir = params.get("results_dir");
     if (resultsDir) {
-      return check(resultsDir);
+      check(resultsDir);
     }
     return;
   }
 
-  // /api/<name>/<encoded location> (plain URI/path segment).
-  const kSegmentRoutes = [
+  // Legacy /api/<name>/<encoded location> (plain URI/path segment).
+  const kLegacySegmentRoutes = [
     "/api/scan/",
     "/api/scanner_df/",
     "/api/scanner_df_input/",
     "/api/scan-delete/",
   ];
-  if (kSegmentRoutes.some((route) => pathname.startsWith(route))) {
+  if (kLegacySegmentRoutes.some((route) => pathname.startsWith(route))) {
     return check(segments[3]);
   }
 
-  // /api/v2/scans/<base64 dir>[/<base64 file>] — the dir is the scope-bearing part.
-  if (pathname.startsWith("/api/v2/scans/")) {
+  // v2 directory-scoped routes: /api/v2/{scans,transcripts,validations}/<dir>/…
+  // where <dir> (segments[4]) is base64url-encoded (decode_base64url server-side).
+  const kV2DirRoutes = [
+    "/api/v2/scans/",
+    "/api/v2/transcripts/",
+    "/api/v2/validations/",
+  ];
+  if (kV2DirRoutes.some((route) => pathname.startsWith(route))) {
     const dirSegment = segments[4];
     if (!dirSegment) {
       throw proxyError(request.path);
     }
-    return check(decodeBase64(dirSegment));
+    return check(decodeBase64Url(dirSegment));
   }
 
   throw proxyError(request.path);
