@@ -213,6 +213,16 @@ suite("URI Utilities Test Suite", () => {
       assert.strictEqual(getRelativeUri(parent, child), null);
     });
 
+    test("should return null for backslash '..' traversal (Windows)", () => {
+      // Backslash is a separator for downstream Windows consumers; a child using
+      // it to escape must be rejected even though path.posix ignores it.
+      const parent = Uri.parse("file:///c:/repo/logs");
+      const child = Uri.parse(
+        "file:///c:/repo/logs/..%5C..%5C..%5CUsers/victim/.ssh/id_rsa"
+      );
+      assert.strictEqual(getRelativeUri(parent, child), null);
+    });
+
     test("should resolve interior '..' that stays within the parent", () => {
       const parent = Uri.file("/w/logs");
       const child = Uri.file("/w/logs/sub/../a.eval");

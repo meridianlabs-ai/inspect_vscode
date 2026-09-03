@@ -133,6 +133,12 @@ function readEnvLines(file: Uri) {
 }
 
 function toLine(key: string, value: string) {
+  // Strip CR/LF so a value can never smuggle extra `KEY=VALUE` lines into the
+  // line-oriented .env file — that would let a hostile webview message create
+  // arbitrary env entries past the caller's key whitelist. See CWE-93.
+  key = key.replace(/[\r\n]/g, "");
+  value = value.replace(/[\r\n]/g, "");
+
   const needsQuote = [" ", "'", '"'].some((char) => {
     return value.indexOf(char) > -1;
   });

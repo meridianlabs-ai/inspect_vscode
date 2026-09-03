@@ -274,7 +274,8 @@ function scanToLogItem(scan: ScanRow): LogItem {
     mtime: new Date(scan.timestamp).getTime(),
     display_name,
     item_id: scan.scan_id,
-    tooltip: new vscode.MarkdownString(tooltip.join("\n"), true),
+    // supportThemeIcons off — see the CWE-838 note in log-listing-server-queue.ts.
+    tooltip: new vscode.MarkdownString(tooltip.join("\n")),
   };
 }
 

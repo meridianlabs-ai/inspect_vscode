@@ -10,11 +10,20 @@ import {
 } from "vscode";
 
 import { showError } from "../components/error";
+import { isUncPath } from "../core/uri";
 
 // Schemes we are willing to open a log from. Anyone can invoke this URI
 // handler, so we restrict it to local files and the remote backends Inspect
 // itself supports rather than forwarding arbitrary URIs to the view server.
 const kAllowedLogSchemes = ["file", "https", "http", "s3"];
+
+// A remote authority must look like a plain host[:port] (optionally an IPv6
+// literal in brackets). Uri.parse percent-decodes the authority, so this also
+// rejects userinfo (`spoof@host`) and any decoded whitespace/control/bidi
+// characters that could spoof the confirmation dialog. Underscores are allowed
+// (docker-compose service names, some internal DNS) — they carry no spoofing
+// power. See CWE-451.
+const kValidAuthorityPattern = /^[A-Za-z0-9._~:[\]-]+$/;
 
 // Recognized Inspect log file extensions.
 const kAllowedLogExtensions = [".eval", ".json"];
@@ -36,6 +45,23 @@ export function activateProtocolHandler(context: ExtensionContext) {
 export function validateLogUri(uri: Uri): string | null {
   if (!kAllowedLogSchemes.includes(uri.scheme)) {
     return `Unable to open log: unsupported location "${uri.scheme}:".`;
+  }
+  // A file URI with an authority (or a UNC-form path) designates a remote host;
+  // dereferencing it — even existsSync — triggers an implicit SMB/WebDAV NTLM
+  // handshake on Windows that leaks the user's credentials. Reject it before any
+  // filesystem touch, matching parseTerminalLinkUri / isAcceptableSignalUri.
+  // See CWE-522.
+  if (uri.scheme === "file" && (uri.authority || isUncPath(uri.fsPath))) {
+    return `Unable to open log: file URLs with a host are not supported.`;
+  }
+  // For remote schemes, require a clean host[:port] authority so the fetch
+  // target is unambiguous and the confirmation dialog can't be spoofed.
+  if (
+    uri.scheme !== "file" &&
+    uri.authority &&
+    !kValidAuthorityPattern.test(uri.authority)
+  ) {
+    return `Unable to open log: the log URL has an invalid host.`;
   }
   const lowerPath = uri.path.toLowerCase();
   if (!kAllowedLogExtensions.some((ext) => lowerPath.endsWith(ext))) {
@@ -62,16 +88,32 @@ export function validateLogUri(uri: Uri): string | null {
 }
 
 /**
- * Confirm opening a remote log requested via the (externally-invokable) URI
- * handler, naming the host/bucket so the user can see who they are fetching
- * from. Returns true only if the user explicitly chooses to open it.
+ * Confirm opening a remote log/scan, naming the host/bucket so the user can see
+ * who they are fetching from. `source` describes what triggered the open (a
+ * drive-by website, a terminal link, …) and `noun` what is being opened
+ * ("Inspect log", "scan results") so the prompt matches its caller. Returns true
+ * only if the user explicitly chooses to open it.
  */
-export async function confirmRemoteOpen(logUri: Uri): Promise<boolean> {
-  const location = logUri.authority || logUri.toString(true);
-  const open: MessageItem = { title: "Open Log" };
+export async function confirmRemoteOpen(
+  logUri: Uri,
+  opts?: { source?: string; noun?: string }
+): Promise<boolean> {
+  const source = opts?.source ?? "A website";
+  const noun = opts?.noun ?? "an Inspect log";
+  // Display only the real host: drop any userinfo (everything before the final
+  // '@') and refuse to render decoded control/whitespace, so the named location
+  // can't be spoofed even if a caller reaches here without validateLogUri.
+  const authorityHost = (logUri.authority || "").split("@").pop() ?? "";
+  const location =
+    authorityHost && kValidAuthorityPattern.test(authorityHost)
+      ? authorityHost
+      : logUri.authority
+        ? "an unrecognized host"
+        : logUri.toString(true);
+  const open: MessageItem = { title: "Open" };
   const cancel: MessageItem = { title: "Cancel", isCloseAffordance: true };
   const choice = await window.showWarningMessage(
-    `A website asked VS Code to open an Inspect log from "${location}". ` +
+    `${source} asked VS Code to open ${noun} from "${location}". ` +
       `Opening it will fetch content from that location. Open it?`,
     { modal: true },
     open,

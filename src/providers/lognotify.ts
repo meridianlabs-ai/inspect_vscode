@@ -63,7 +63,12 @@ export function activateLogNotify(
           await showError(validationError);
           return;
         }
-        if (e.log.scheme !== "file" && !(await confirmRemoteOpen(e.log))) {
+        if (
+          e.log.scheme !== "file" &&
+          !(await confirmRemoteOpen(e.log, {
+            source: "The eval-complete notification",
+          }))
+        ) {
           return;
         }
         // open the editor

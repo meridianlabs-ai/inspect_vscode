@@ -86,5 +86,32 @@ suite("Protocol Handler Test Suite", () => {
       );
       assert.ok(err && err.includes("invalid epoch"));
     });
+
+    test("rejects a file URI with a remote authority (NTLM leak vector)", () => {
+      // file://host/share/x.eval → UNC on Windows; existsSync would trigger an
+      // SMB/WebDAV NTLM handshake to the attacker host.
+      const err = validateLogUri(
+        Uri.parse("file://attacker.example/share/run.eval")
+      );
+      assert.ok(err && err.includes("host"));
+    });
+
+    test("rejects a remote authority carrying userinfo (host spoof)", () => {
+      const err = validateLogUri(
+        Uri.parse("https://logs.victim-corp.com@evil.example/run.eval")
+      );
+      assert.ok(err && err.includes("invalid host"));
+    });
+
+    test("still accepts a normal remote host and local file", () => {
+      assert.strictEqual(
+        validateLogUri(Uri.parse("s3://bucket/run.eval")),
+        null
+      );
+      assert.strictEqual(
+        validateLogUri(Uri.parse("file:///logs/run.eval")),
+        null
+      );
+    });
   });
 });

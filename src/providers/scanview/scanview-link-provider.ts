@@ -13,6 +13,7 @@ import {
 
 import { workspacePath } from "../../core/path";
 import { isUncPath, parseTerminalLinkUri } from "../../core/uri";
+import { confirmRemoteOpen } from "../protocol-handler";
 
 const kScanResultPattern =
   /([^\s"]*scan_id=[23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]{22})/g;
@@ -54,6 +55,19 @@ export const scanviewTerminalLinkProvider = (_context: ExtensionContext) => {
     handleTerminalLink: async (link: ScanViewTerminalLink) => {
       const scanDirUri = await resolveScanDirLink(link.data);
       if (scanDirUri) {
+        // Terminal output is attacker-influenceable; a remote scan location
+        // would be fetched by the scout view server with the user's ambient
+        // credentials. Require host-naming confirmation before opening, as the
+        // other untrusted entry points do. See CWE-918.
+        if (
+          scanDirUri.scheme !== "file" &&
+          !(await confirmRemoteOpen(scanDirUri, {
+            source: "A terminal link",
+            noun: "scan results",
+          }))
+        ) {
+          return;
+        }
         await commands.executeCommand("inspect.openScanViewer", scanDirUri);
       } else {
         // Since we couldn't resolve the log file, just let the user know
