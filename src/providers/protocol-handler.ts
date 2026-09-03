@@ -23,7 +23,7 @@ const kAllowedLogSchemes = ["file", "https", "http", "s3"];
 // characters that could spoof the confirmation dialog. Underscores are allowed
 // (docker-compose service names, some internal DNS) — they carry no spoofing
 // power. See CWE-451.
-const kValidAuthorityPattern = /^[A-Za-z0-9._~:[\]_-]+$/;
+const kValidAuthorityPattern = /^[A-Za-z0-9._~:[\]-]+$/;
 
 // Recognized Inspect log file extensions.
 const kAllowedLogExtensions = [".eval", ".json"];
