@@ -12,6 +12,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
+        vscode: ["1.93.0", "stable"]
 
     runs-on: ${{ matrix.os }}
 
@@ -49,6 +50,7 @@ jobs:
         if: runner.os == 'Linux'
         env:
           REQUIRE_FISH_TESTS: "1"
+          VSCODE_TEST_VERSION: ${{ matrix.vscode }}
         run: |
           sudo apt-get update
           sudo apt-get install -y xvfb fish
@@ -56,6 +58,8 @@ jobs:
 
       - name: Run tests (Windows)
         if: runner.os == 'Windows'
+        env:
+          VSCODE_TEST_VERSION: ${{ matrix.vscode }}
         run: pnpm test
 
       - name: Package extension
@@ -63,7 +67,7 @@ jobs:
 
       - name: Upload extension artifact
         # Only one OS needs to publish the .vsix artifact.
-        if: runner.os == 'Linux'
+        if: runner.os == 'Linux' && matrix.vscode == 'stable'
         uses: actions/upload-artifact@v7
         with:
           name: vscode-extension

