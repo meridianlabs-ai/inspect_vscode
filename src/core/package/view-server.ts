@@ -1,6 +1,6 @@
 import { ChildProcess, SpawnOptions } from "child_process";
 import { randomUUID } from "crypto";
-import { realpathSync } from "fs";
+import { existsSync, realpathSync } from "fs";
 import * as os from "os";
 import { isAbsolute, join, relative, sep } from "path";
 
@@ -14,6 +14,7 @@ import {
 } from "../../core/path";
 import { findOpenPort } from "../../core/port";
 import { runProcess, spawnProcess } from "../../core/process";
+import { runPython } from "../../core/python/exec";
 import { shQuote } from "../../core/string";
 
 import { PackageManager } from "./manager";
@@ -72,7 +73,8 @@ export class PackageViewServer implements Disposable {
     private packageBin_: string,
     private packageBinPath_: () => AbsolutePath | null,
     private viewArgs_: string[],
-    private logLevel_: string | undefined
+    private logLevel_: string | undefined,
+    private packageName_: "inspect_ai" | "inspect_scout"
   ) {
     // create output channel for debugging
     this.outputChannel_ = window.createOutputChannel(
@@ -312,11 +314,13 @@ export class PackageViewServer implements Disposable {
             }
           };
           instance.cancelStartup = finish;
-          const timer = setTimeout(
-            () =>
-              finish(new Error(`${this.packageBin_} view startup timed out`)),
-            this.startupTimeoutMs_
-          );
+          const timer = setTimeout(() => {
+            const error = new Error(
+              `${this.packageBin_} view startup timed out after ${this.startupTimeoutMs_ / 1000} seconds`
+            );
+            this.outputChannel_.appendLine(error.message);
+            finish(error);
+          }, this.startupTimeoutMs_);
           const launch = async () => {
             const port = await findOpenPort(this.defaultPort_);
             // Shutdown can happen while probing a port.
@@ -413,12 +417,18 @@ export class PackageViewServer implements Disposable {
     if (typeof candidate !== "string" || !isAbsolute(candidate) || !binary) {
       throw new Error("Invalid view resource path");
     }
-    const info = JSON.parse(
-      runProcess(binary, ["info", "version", "--json"])
-    ) as { path: string };
-    const root = realpathSync(info.path);
+    // Cache local discovery per binary/package lifetime, not per panel open.
+    if (this.resourceRoots_?.binary !== binary.path) {
+      const info = JSON.parse(
+        runProcess(binary, ["info", "version", "--json"])
+      ) as { path: string };
+      this.resourceRoots_ = {
+        binary: binary.path,
+        package: realpathSync(info.path),
+      };
+    }
     const dist = realpathSync(candidate);
-    const confined = (path: string) => {
+    const confined = (root: string, path: string) => {
       const rel = relative(root, path);
       return (
         rel !== "" &&
@@ -427,10 +437,40 @@ export class PackageViewServer implements Disposable {
         !isAbsolute(rel)
       );
     };
-    if (!confined(dist) || !confined(realpathSync(join(dist, "index.html")))) {
-      throw new Error("View resource path is outside the installed package");
+    let root = this.resourceRoots_.package;
+    if (!confined(root, dist)) {
+      // LFS-backed viewers live in precisely platformdirs' package cache/dist,
+      // not below the installation. Ask the selected local Python environment
+      // for that path; neither the HTTP response nor the whole cache is trusted.
+      // The extension's appdirs helper differs from platformdirs on macOS/Windows.
+      if (!this.resourceRoots_.cache) {
+        const cache: unknown = JSON.parse(
+          runPython([
+            "-c",
+            "import json, sys; from platformdirs import user_cache_path; print(json.dumps(str(user_cache_path(sys.argv[1]) / 'dist')))",
+            this.packageName_,
+          ])
+        );
+        if (typeof cache !== "string" || !isAbsolute(cache)) {
+          throw new Error("Invalid local view cache path");
+        }
+        this.resourceRoots_.cache = cache;
+      }
+      const cache = this.resourceRoots_.cache;
+      if (!existsSync(cache) || dist !== realpathSync(cache)) {
+        throw new Error(
+          "View resource path is outside the installed package or its dist cache"
+        );
+      }
+      root = dist;
     }
-    return toAbsolutePath(dist);
+    if (!confined(root, realpathSync(join(dist, "index.html")))) {
+      throw new Error(
+        "View resource path is outside the installed package or its dist cache"
+      );
+    }
+    // Keep the reported spelling for asset URIs and registered resource roots.
+    return toAbsolutePath(candidate);
   }
 
   private stop(instance: ServerInstance) {
@@ -454,6 +494,7 @@ export class PackageViewServer implements Disposable {
   }
 
   private shutdown() {
+    this.resourceRoots_ = undefined;
     if (this.server_) this.stop(this.server_);
   }
 
@@ -467,5 +508,7 @@ export class PackageViewServer implements Disposable {
   private serverStartupLock_ = new AsyncLock();
   private server_?: ServerInstance;
   private disposed_ = false;
-  private startupTimeoutMs_ = 30_000;
+  // Initial LFS resolution downloads viewer assets before the readiness banner.
+  private startupTimeoutMs_ = 180_000;
+  private resourceRoots_?: { binary: string; package: string; cache?: string };
 }

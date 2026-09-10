@@ -1,25 +1,21 @@
 import * as assert from "assert";
 import { ChildProcess, spawn } from "child_process";
 import { once } from "events";
-import {
-  mkdirSync,
-  mkdtempSync,
-  realpathSync,
-  rmSync,
-  symlinkSync,
-  writeFileSync,
-} from "fs";
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "fs";
 import { createServer } from "http";
 import { tmpdir } from "os";
 import { join } from "path";
 
-import { ExtensionContext, window } from "vscode";
+import { ExtensionContext, Uri, window } from "vscode";
 
 import { PackageManager } from "../../core/package/manager";
 import { PackageViewServer } from "../../core/package/view-server";
 import * as paths from "../../core/path";
 import * as ports from "../../core/port";
 import * as processes from "../../core/process";
+import * as python from "../../core/python/exec";
+import { HostWebviewPanel } from "../../hooks";
+import { LogviewPanel } from "../../providers/logview/logview-panel";
 
 import {
   MockChildProcess,
@@ -30,7 +26,10 @@ import {
 } from "./view-server-mocks";
 
 class TestServer extends PackageViewServer {
-  constructor(manager: MockPackageManager) {
+  constructor(
+    manager: MockPackageManager,
+    packageName: "inspect_ai" | "inspect_scout" = "inspect_ai"
+  ) {
     super(
       new MockExtensionContext() as unknown as ExtensionContext,
       manager as unknown as PackageManager,
@@ -40,7 +39,8 @@ class TestServer extends PackageViewServer {
       "test",
       () => paths.toAbsolutePath(process.execPath),
       [],
-      undefined
+      undefined,
+      packageName
     );
   }
   start() {
@@ -64,6 +64,8 @@ suite("PackageViewServer lifecycle", () => {
   let outputs: Array<NonNullable<Parameters<typeof processes.spawnProcess>[3]>>;
   let tokens: string[];
   let calls: Array<{ url: string; options?: RequestInit }>;
+  let outputChannel: MockOutputChannel;
+  let originalPython: typeof python.runPython;
   let originalFetch: typeof fetch;
   let originalOutputChannel: typeof window.createOutputChannel;
   let originals: {
@@ -80,10 +82,17 @@ suite("PackageViewServer lifecycle", () => {
       findOpenPort: ports.findOpenPort,
       activeWorkspacePath: paths.activeWorkspacePath,
     };
+    originalPython = python.runPython;
+    Object.assign(python, {
+      runPython: () => JSON.stringify(join(tmpdir(), "unused-view-cache")),
+    });
     originalFetch = global.fetch;
     originalOutputChannel = window.createOutputChannel;
     Object.assign(window, {
-      createOutputChannel: (name: string) => new MockOutputChannel(name),
+      createOutputChannel: (name: string) => {
+        outputChannel = new MockOutputChannel(name);
+        return outputChannel;
+      },
     });
     children = [];
     outputs = [];
@@ -132,6 +141,7 @@ suite("PackageViewServer lifecycle", () => {
   });
   teardown(() => {
     server.dispose();
+    Object.assign(python, { runPython: originalPython });
     Object.assign(processes, {
       spawnProcess: originals.spawnProcess,
       runProcess: originals.runProcess,
@@ -216,6 +226,7 @@ suite("PackageViewServer lifecycle", () => {
     Object.assign(server, { startupTimeoutMs_: 25 });
     await assert.rejects(server.start(), /timed out/);
     assert.strictEqual(children[0]!.killed, true);
+    assert.match(outputChannel.getOutput(), /startup timed out after/);
     Object.assign(server, { startupTimeoutMs_: 1000 });
     const retry = server.json();
     await ready(1);
@@ -400,10 +411,7 @@ suite("PackageViewServer lifecycle", () => {
       Object.assign(processes, {
         runProcess: () => JSON.stringify({ path: root }),
       });
-      assert.strictEqual(
-        server.resource({ path: dist })?.path,
-        realpathSync(dist)
-      );
+      assert.strictEqual(server.resource({ path: dist })?.path, dist);
       assert.strictEqual(server.resource(null), null);
       for (const value of [
         { path: outside },
@@ -422,6 +430,118 @@ suite("PackageViewServer lifecycle", () => {
       rmSync(join(dist, "index.html"));
       symlinkSync(join(outside, "index.html"), join(dist, "index.html"));
       assert.throws(() => server.resource({ path: dist }), /outside/);
+    } finally {
+      rmSync(temp, { recursive: true, force: true });
+    }
+  });
+  for (const packageName of ["inspect_ai", "inspect_scout"] as const) {
+    test(`${packageName} accepts only its locally discovered LFS dist cache and caches discovery until package change`, () => {
+      server.dispose();
+      server = new TestServer(manager, packageName);
+      const temp = mkdtempSync(join(tmpdir(), "view-lfs-"));
+      try {
+        const root = join(temp, "checkout", packageName);
+        const dist = join(root, "_view", "dist");
+        const cache = join(temp, "user-cache", packageName, "dist");
+        const unrelated = join(temp, "user-cache", "unrelated");
+        for (const dir of [dist, cache, unrelated, join(cache, "nested")]) {
+          mkdirSync(dir, { recursive: true });
+          writeFileSync(join(dir, "index.html"), "<html>resolved</html>");
+        }
+        writeFileSync(
+          join(dist, "index.html"),
+          "version https://git-lfs.github.com/spec/v1\noid sha256:abc\nsize 123\n"
+        );
+        let cliCalls = 0;
+        let cacheCalls = 0;
+        Object.assign(processes, {
+          runProcess: () => {
+            cliCalls++;
+            return JSON.stringify({ path: root });
+          },
+        });
+        Object.assign(python, {
+          runPython: (args: string[]) => {
+            cacheCalls++;
+            assert.strictEqual(args[args.length - 1], packageName);
+            assert.ok(args[1]!.includes("user_cache_path"));
+            return JSON.stringify(cache);
+          },
+        });
+        for (let i = 0; i < 3; i++)
+          assert.strictEqual(server.resource({ path: cache })?.path, cache);
+        assert.strictEqual(cliCalls, 1);
+        assert.strictEqual(cacheCalls, 1);
+        for (const path of [
+          unrelated,
+          join(cache, ".."),
+          join(cache, "nested"),
+        ]) {
+          assert.throws(() => server.resource({ path }), /outside/);
+        }
+        rmSync(join(cache, "index.html"));
+        symlinkSync(join(unrelated, "index.html"), join(cache, "index.html"));
+        assert.throws(() => server.resource({ path: cache }), /outside/);
+        rmSync(join(cache, "index.html"));
+        writeFileSync(join(cache, "index.html"), "resolved");
+        manager.triggerChange();
+        assert.strictEqual(server.resource({ path: cache })?.path, cache);
+        assert.strictEqual(cliCalls, 2);
+        assert.strictEqual(cacheCalls, 2);
+      } finally {
+        rmSync(temp, { recursive: true, force: true });
+      }
+    });
+  }
+
+  test("preserves a validated symlink path and registers the selected assets in the log webview", async () => {
+    const temp = mkdtempSync(join(tmpdir(), "view-symlink-"));
+    try {
+      const root = join(temp, "package");
+      const dist = join(root, "dist");
+      const alias = join(temp, "package-alias");
+      mkdirSync(dist, { recursive: true });
+      writeFileSync(
+        join(dist, "index.html"),
+        '<html><script src="./assets/view.js"></script></html>'
+      );
+      symlinkSync(root, alias, "junction");
+      Object.assign(processes, {
+        runProcess: () => JSON.stringify({ path: alias }),
+      });
+      const candidate = join(alias, "dist");
+      const validated = server.resource({ path: candidate });
+      assert.strictEqual(validated?.path, candidate);
+      const host = {
+        webview: {
+          options: {
+            enableScripts: true,
+            localResourceRoots: [Uri.file(join(temp, "old-assets"))],
+          },
+          asWebviewUri: (uri: Uri) => uri,
+          cspSource: "https://test.invalid",
+        },
+      } as unknown as HostWebviewPanel;
+      const panel = Object.create(LogviewPanel.prototype) as LogviewPanel;
+      Object.assign(panel, {
+        panel_: host,
+        server_: { getDistPath: () => Promise.resolve(validated) },
+        context_: {
+          extensionUri: Uri.file(temp),
+          extension: { packageJSON: { version: "1.0" } },
+        },
+      });
+      const state = { log_dir: Uri.file(temp) };
+      const html = await panel.getHtml(state);
+      assert.ok(html.includes("view.js"));
+      assert.ok(
+        host.webview.options.localResourceRoots?.some(
+          (uri) => uri.fsPath === candidate
+        )
+      );
+      await panel.getHtml(state);
+      assert.strictEqual(host.webview.options.localResourceRoots?.length, 2);
+      assert.strictEqual(host.webview.options.enableScripts, true);
     } finally {
       rmSync(temp, { recursive: true, force: true });
     }

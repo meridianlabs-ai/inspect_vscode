@@ -32,7 +32,8 @@ export class ScoutViewServer extends PackageViewServer {
       "scout",
       scoutBinPath,
       ["--display", "rich"],
-      "http"
+      "http",
+      "inspect_scout"
     );
 
     this.legacy = {

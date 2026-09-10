@@ -44,7 +44,8 @@ export class InspectViewServer extends PackageViewServer {
       "inspect",
       inspectBinPath,
       ["--no-ansi"],
-      "http"
+      "http",
+      "inspect_ai"
     );
   }
 

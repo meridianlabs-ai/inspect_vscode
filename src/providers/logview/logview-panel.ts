@@ -261,6 +261,20 @@ export class LogviewPanel extends Disposable {
     }
     const viewDir = distDir ?? inspectViewPath();
 
+    // Update localResourceRoots to include the resolved dist path,
+    // which may differ from the initially registered inspectViewPath().
+    if (viewDir) {
+      const existingRoots =
+        this.panel_.webview.options.localResourceRoots ?? [];
+      const distUri = Uri.file(viewDir.path);
+      if (!existingRoots.some((r) => r.toString() === distUri.toString())) {
+        this.panel_.webview.options = {
+          ...this.panel_.webview.options,
+          localResourceRoots: [...existingRoots, distUri],
+        };
+      }
+    }
+
     // get override css path (used for older unbundled version of view)
     const overrideCssPath = this.extensionResourceUrl([
       "assets",
