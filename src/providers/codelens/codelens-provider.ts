@@ -5,6 +5,7 @@ import {
   Command,
   ExtensionContext,
   languages,
+  Range,
   TextDocument,
   Uri,
 } from "vscode";
@@ -55,17 +56,13 @@ export class InspectCodeLensProvider implements CodeLensProvider {
     alias?: string;
   } {
     const text = document.getText();
-    // Handle multiline imports by collapsing whitespace within parentheses
-    const normalizedText = text.replace(
-      normalizeTextPattern,
-      (_m, inner: string) => `(${inner.replace(/\s+/g, " ")})`
-    );
-
-    const fromImportMatch = normalizedText.match(fromImportPattern);
+    // The import patterns already accept newlines; no document-wide
+    // parenthesis normalization is needed (unclosed groups can be quadratic).
+    const fromImportMatch = text.match(fromImportPattern);
     if (fromImportMatch) {
       return { hasImport: true, alias: fromImportMatch[1] };
     }
-    if (hasImportPattern.test(normalizedText)) {
+    if (hasImportPattern.test(text)) {
       return { hasImport: true };
     }
     return { hasImport: false };
@@ -90,8 +87,24 @@ export class InspectCodeLensProvider implements CodeLensProvider {
 
     // Go through line by line and show a lens
     // for any task decorated functions
+    const pendingDecorators: Range[] = [];
     for (let i = 0; i < document.lineCount; i++) {
+      if (token.isCancellationRequested) {
+        return [];
+      }
       const line = document.lineAt(i);
+      const functionMatch = line.text.match(kFuncPattern);
+      if (functionMatch?.[1]) {
+        const name = functionMatch[1];
+        if (isValidTaskName(name)) {
+          for (const range of pendingDecorators) {
+            for (const command of taskCommands(document.uri, name)) {
+              lenses.push(new CodeLens(range, command));
+            }
+          }
+        }
+        pendingDecorators.length = 0;
+      }
       const decoratorMatch = line.text.match(kDecoratorPattern);
 
       if (decoratorMatch) {
@@ -104,25 +117,9 @@ export class InspectCodeLensProvider implements CodeLensProvider {
           continue;
         }
 
-        // Get the function name from the next line
-        let j = i + 1;
-        while (j < document.lineCount) {
-          const funcLine = document.lineAt(j);
-          const match = funcLine.text.match(kFuncPattern);
-          if (match && match[1]) {
-            // Only offer a Run lens for identifier-named tasks; a loosely
-            // parsed name carrying flags/metacharacters must not reach the
-            // run command line.
-            const name = match[1].trim();
-            if (isValidTaskName(name)) {
-              taskCommands(document.uri, name).forEach((cmd) => {
-                lenses.push(new CodeLens(line.range, cmd));
-              });
-            }
-            break;
-          }
-          j++;
-        }
+        // Resolve all preceding decorators at the next function in one pass,
+        // rather than searching the remaining document from each decorator.
+        pendingDecorators.push(line.range);
       }
     }
     return lenses;
@@ -146,8 +143,3 @@ const hasImportPattern = /import\s+inspect_ai\b/;
 // ReDoS finding).
 const kFuncPattern = /^\s*def\s+([A-Za-z_]\w*)\s*\(/;
 const kDecoratorPattern = /^\s*@(inspect_ai\.)?task\b|@(\w+)\b/;
-// Linear-time: `[^)]*` has no adjacent overlapping quantifier, so it scans each
-// parenthesized group once (the previous `\(\s*\n\s*([^)]+)\s*\n\s*\)` had
-// overlapping `\s*`/`[^)]+` quantifiers that backtracked quadratically on an
-// unclosed '(' followed by a long whitespace run).
-const normalizeTextPattern = /\(([^)]*)\)/g;
