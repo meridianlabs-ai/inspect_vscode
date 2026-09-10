@@ -25,7 +25,7 @@ import { log } from "../../core/log";
 import { assertLogProxyInScope } from "../../core/package/proxy-scope";
 import { HttpProxyRpcRequest } from "../../core/package/view-server";
 import { AbsolutePath } from "../../core/path";
-import { getRelativeUri, resolveServerLocation } from "../../core/uri";
+import { getRelativeUri, resolveToUri } from "../../core/uri";
 import {
   getWebviewPanelHtml,
   handleWebviewPanelOpenMessages,
@@ -52,7 +52,7 @@ export function logPathInScope(
   const panelUriStr = panelUri.toString();
   let targetUri: Uri;
   try {
-    targetUri = resolveServerLocation(target);
+    targetUri = resolveToUri(target);
   } catch {
     return false;
   }
@@ -220,11 +220,13 @@ export class LogviewPanel extends Disposable {
         ),
       [kMethodHttpRequest]: async (params: unknown[]) => {
         // The generic proxy reaches every view-server endpoint with the auth
-        // token, so confine it to the panel scope like the named methods.
+        // token, so confine it to the panel scope like the named methods. The
+        // server percent-decodes the locations it receives (normalize_uri), so
+        // use the encoding-tolerant check to scope the decoded form.
         const request = params[0] as HttpProxyRpcRequest;
         try {
           assertLogProxyInScope(request, (target) =>
-            logPathInScope(type, uri, target)
+            logPathInScopeAllowingEncoded(type, uri, target)
           );
         } catch (error) {
           log.warn(`[proxy-scope] blocked ${request.method} ${request.path}`);

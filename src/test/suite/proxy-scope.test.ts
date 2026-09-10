@@ -10,8 +10,8 @@ import {
   assertScanProxyInScope,
 } from "../../core/package/proxy-scope";
 import type { HttpProxyRpcRequest } from "../../core/package/view-server";
-import { logPathInScope } from "../../providers/logview/logview-panel";
-import { scanLocationInScope } from "../../providers/scanview/scanview-panel";
+import { logPathInScopeAllowingEncoded } from "../../providers/logview/logview-panel";
+import { scanLocationInScopeAllowingEncoded } from "../../providers/scanview/scanview-panel";
 
 const enc = encodeURIComponent;
 const b64url = (v: string) => Buffer.from(v, "utf-8").toString("base64url");
@@ -19,7 +19,8 @@ const b64url = (v: string) => Buffer.from(v, "utf-8").toString("base64url");
 // Use the panels' real scope predicates (which normalize ".." traversal) so the
 // tests exercise the same checks the proxy is wired to in production.
 const logDir = Uri.parse("file:///w/logs");
-const inScope = (loc: string) => logPathInScope("dir", logDir, loc);
+const inScope = (loc: string) =>
+  logPathInScopeAllowingEncoded("dir", logDir, loc);
 
 type Method = HttpProxyRpcRequest["method"];
 const req = (path: string, method: Method = "GET") => ({ method, path });
@@ -138,9 +139,10 @@ suite("Proxy Scope Test Suite", () => {
   suite("assertScanProxyInScope", () => {
     const scanDir = Uri.parse("file:///w/scans");
     const transcriptsDir = Uri.parse("s3://bucket/logs");
-    const scanInScope = (loc: string) => scanLocationInScope([scanDir], loc);
+    const scanInScope = (loc: string) =>
+      scanLocationInScopeAllowingEncoded([scanDir], loc);
     const transcriptsInScope = (loc: string) =>
-      scanLocationInScope([scanDir, transcriptsDir], loc);
+      scanLocationInScopeAllowingEncoded([scanDir, transcriptsDir], loc);
     const ok = (path: string, method?: Method) =>
       assert.doesNotThrow(() =>
         assertScanProxyInScope(

@@ -13,7 +13,7 @@ import { log } from "../../core/log";
 import { assertScanProxyInScope } from "../../core/package/proxy-scope";
 import { HttpProxyRpcRequest } from "../../core/package/view-server";
 import { AbsolutePath } from "../../core/path";
-import { getRelativeUri, resolveServerLocation } from "../../core/uri";
+import { getRelativeUri, resolveToUri } from "../../core/uri";
 import {
   getWebviewPanelHtml,
   handleWebviewPanelOpenMessages,
@@ -29,7 +29,7 @@ import { RouteMessage, sanitizeRouteMessage } from "./scanview-message";
 export function scanLocationInScope(scope: Uri[], location: string): boolean {
   let target: Uri;
   try {
-    target = resolveServerLocation(location);
+    target = resolveToUri(location);
   } catch {
     return false;
   }
@@ -40,6 +40,26 @@ export function scanLocationInScope(scope: Uri[], location: string): boolean {
       location === root.toString() ||
       getRelativeUri(root, target) !== null
   );
+}
+
+/**
+ * Encoding-tolerant variant of {@link scanLocationInScope} for locations that
+ * reach the scout server percent-encoded and are decoded there: validates the
+ * decoded form so `%2e%2e` traversal is caught and a legitimate `%20` accepted
+ * (mirrors `logPathInScopeAllowingEncoded` in the sibling log view).
+ */
+export function scanLocationInScopeAllowingEncoded(
+  scope: Uri[],
+  location: string
+): boolean {
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(location);
+  } catch {
+    // malformed percent-encoding
+    return false;
+  }
+  return scanLocationInScope(scope, decoded);
 }
 
 export class ScanviewPanel extends Disposable {
@@ -101,9 +121,10 @@ export class ScanviewPanel extends Disposable {
         try {
           assertScanProxyInScope(
             request,
-            (location) => scanLocationInScope(scopeResolver(), location),
             (location) =>
-              scanLocationInScope(
+              scanLocationInScopeAllowingEncoded(scopeResolver(), location),
+            (location) =>
+              scanLocationInScopeAllowingEncoded(
                 [...scopeResolver(), ...server_.transcriptsScope()],
                 location
               )

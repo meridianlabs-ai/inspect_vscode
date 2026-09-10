@@ -22,19 +22,6 @@ export function resolveToUri(pathOrUri: string): Uri {
   }
 }
 
-/**
- * Resolve a webview-supplied location the way the view server will interpret
- * it. The server percent-decodes bare (non-URI) paths once more than the HTTP
- * layer already did (`normalize_uri` → `unquote`), so `..%2F..%2Fetc` must be
- * scoped in its decoded form rather than as an odd literal file name. URIs are
- * left to `Uri.parse`, which already decodes their path components.
- */
-export function resolveServerLocation(location: string): Uri {
-  return resolveToUri(
-    isUri(location) ? location : decodeURIComponent(location)
-  );
-}
-
 export function dirname(uri: Uri): Uri {
   if (uri.scheme === "file") {
     // Handle file URIs
