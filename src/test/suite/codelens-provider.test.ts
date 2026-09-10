@@ -12,6 +12,8 @@ import {
 
 import { InspectCodeLensProvider } from "../../providers/codelens/codelens-provider";
 
+import { assertBoundedCodeLensScan } from "./codelens-performance";
+
 class MockTextLine implements TextLine {
   constructor(
     private lineText: string,
@@ -274,16 +276,11 @@ def my_task():
       "Should return lenses for task decorator without import"
     );
   });
-  test("unclosed parentheses complete within a bounded time", () => {
-    const document = createDocument("(".repeat(128_000));
-    const start = performance.now();
-    assert.deepStrictEqual(
-      provider.provideCodeLenses(document, cancellationToken),
-      []
-    );
-    assert.ok(
-      performance.now() - start < 1_000,
-      "import detection exceeded 1 second"
+  test("unclosed parentheses complete within a bounded time", async function () {
+    this.timeout(10_000);
+    await assertBoundedCodeLensScan(
+      require.resolve("../../providers/codelens/codelens-provider"),
+      "InspectCodeLensProvider"
     );
   });
 
