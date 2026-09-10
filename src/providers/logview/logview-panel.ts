@@ -22,6 +22,7 @@ import {
   webviewPanelJsonRpcServer,
 } from "../../core/jsonrpc";
 import { log } from "../../core/log";
+import { assertLogProxyInScope } from "../../core/package/proxy-scope";
 import { HttpProxyRpcRequest } from "../../core/package/view-server";
 import { AbsolutePath } from "../../core/path";
 import { getRelativeUri, resolveToUri } from "../../core/uri";
@@ -217,8 +218,23 @@ export class LogviewPanel extends Disposable {
           params[2] as string,
           params[3] as { events?: string; messages?: string } | undefined
         ),
-      [kMethodHttpRequest]: async (params: unknown[]) =>
-        server_.proxyRpcRequest(params[0] as HttpProxyRpcRequest),
+      [kMethodHttpRequest]: async (params: unknown[]) => {
+        // The generic proxy reaches every view-server endpoint with the auth
+        // token, so confine it to the panel scope like the named methods. The
+        // server percent-decodes the locations it receives (normalize_uri), so
+        // use the encoding-tolerant check to scope the decoded form.
+        const request = params[0] as HttpProxyRpcRequest;
+        try {
+          assertLogProxyInScope(request, (target) =>
+            logPathInScopeAllowingEncoded(type, uri, target)
+          );
+        } catch (error) {
+          log.warn(`[proxy-scope] blocked ${request.method} ${request.path}`);
+          throw error;
+        }
+        log.trace(`[proxy-scope] allowed ${request.method} ${request.path}`);
+        return server_.proxyRpcRequest(request);
+      },
     });
 
     // serve post message api to webview

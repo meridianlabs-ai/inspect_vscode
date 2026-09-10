@@ -18,6 +18,19 @@ import { kScoutEnvValues } from "../scout/scout-constants";
 
 import { workspaceEnvCommands } from "./workspace-env-commands";
 
+/**
+ * Resolve a scout location setting (a URI such as `s3://bucket/scans`, or a
+ * path relative to the workspace such as `./scans`) to a Uri.
+ */
+export function scoutLocationToUri(location: string): Uri {
+  try {
+    return Uri.parse(location, true);
+  } catch {
+    // Not a URI: treat as a (possibly relative) file path
+    return Uri.file(workspacePath(location).path);
+  }
+}
+
 export function activateWorkspaceEnv(): [Command[], WorkspaceEnvManager] {
   // Monitor changes to the file
   const envManager = new WorkspaceEnvManager();
@@ -133,16 +146,9 @@ export class WorkspaceEnvManager implements Disposable {
     const envVals = this.getValues();
     const envResults = envVals[kScoutEnvValues.scanResults] ?? "";
 
-    // If there is a results dir, try to parse and use it
-    try {
-      return Uri.parse(envResults, true);
-    } catch {
-      // This isn't a uri, bud
-      const resultsDir = envResults
-        ? workspacePath(envResults).path
-        : join(workspacePath().path, "scans");
-      return Uri.file(resultsDir);
-    }
+    return envResults
+      ? scoutLocationToUri(envResults)
+      : Uri.file(join(workspacePath().path, "scans"));
   }
 
   private readonly onEnvironmentChanged_ =

@@ -106,6 +106,16 @@ export class ScoutViewServer extends PackageViewServer {
     return this.scanResultsScope_();
   }
 
+  // Locations the scan webviews may read transcripts from (the project's
+  // configured transcripts dir), in addition to their scan scope.
+  private transcriptsScope_: () => Uri[] = () => [];
+  public setTranscriptsScope(fn: () => Uri[]) {
+    this.transcriptsScope_ = fn;
+  }
+  public transcriptsScope(): Uri[] {
+    return this.transcriptsScope_();
+  }
+
   async getDistPath(): Promise<AbsolutePath | null> {
     const result = await this.api_json(
       "/api/v2/dist",

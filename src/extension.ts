@@ -248,6 +248,7 @@ export async function activateScout(
     scoutManager,
     server,
     workspaceEnvManager,
+    scoutProjectManager,
     context
   );
   activateOpenScan(context);

@@ -1,0 +1,85 @@
+name: Proxy routes
+
+# The webview http_request proxy (src/core/package/proxy-scope.ts) rejects any
+# view-server route it does not recognize. This job installs the latest
+# inspect-ai and inspect-scout releases, dumps the routes they serve, and checks
+# every one against that table, so a new upstream endpoint is caught here rather
+# than as a silently broken panel. It runs on a schedule because the drift comes
+# from upstream releases, not from commits to this repository; it also runs on
+# pull requests that touch the route table or the checker itself.
+
+on:
+  schedule:
+    - cron: "23 6 * * *"
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "src/core/package/proxy-scope.ts"
+      - "scripts/proxy-routes/**"
+      - ".github/workflows/proxy-routes.yml"
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check-routes:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6.0.10
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: "pnpm"
+
+      - name: Setup Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install latest inspect-ai and inspect-scout
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install inspect-ai inspect-scout
+          python -m pip show inspect-ai inspect-scout | grep -E '^(Name|Version):'
+
+      - name: Dump view-server routes
+        run: python scripts/proxy-routes/dump-openapi.py --out out/proxy-routes
+
+      - name: Compile proxy-scope
+        run: pnpm compile-tests
+
+      - name: Check routes against the proxy table
+        run: node scripts/proxy-routes/check.mjs
+
+      - name: Open or update a tracking issue
+        # Only for unattended runs; a pull request already shows the failure.
+        if: failure() && github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh label create proxy-routes --force \
+            --description "View-server routes the webview proxy does not recognize" \
+            --color D93F0B
+          title="Proxy route check failed: view server has routes the proxy does not recognize"
+          body="The scheduled proxy route check found view-server routes that \`src/core/package/proxy-scope.ts\` neither allows nor deliberately denies. See the run summary for the route list: ${RUN_URL}
+
+          Fix: add each route to the proxy's route table (scoping any location it carries), or to the DENY list in \`scripts/proxy-routes/check.mjs\` with a reason."
+          existing=$(gh issue list --label proxy-routes --state open --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "Still failing: ${RUN_URL}"
+          else
+            gh issue create --title "$title" --body "$body" --label proxy-routes
+          fi

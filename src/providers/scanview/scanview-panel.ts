@@ -10,6 +10,7 @@ import {
   webviewPanelJsonRpcServer,
 } from "../../core/jsonrpc";
 import { log } from "../../core/log";
+import { assertScanProxyInScope } from "../../core/package/proxy-scope";
 import { HttpProxyRpcRequest } from "../../core/package/view-server";
 import { AbsolutePath } from "../../core/path";
 import { getRelativeUri, resolveToUri } from "../../core/uri";
@@ -25,7 +26,7 @@ import { ScoutViewServer } from "../scout/scout-view-server";
 import { RouteMessage, sanitizeRouteMessage } from "./scanview-message";
 
 /** Whether a webview-supplied scan location is within one of the allowed roots. */
-function scanLocationInScope(scope: Uri[], location: string): boolean {
+export function scanLocationInScope(scope: Uri[], location: string): boolean {
   let target: Uri;
   try {
     target = resolveToUri(location);
@@ -39,6 +40,26 @@ function scanLocationInScope(scope: Uri[], location: string): boolean {
       location === root.toString() ||
       getRelativeUri(root, target) !== null
   );
+}
+
+/**
+ * Encoding-tolerant variant of {@link scanLocationInScope} for locations that
+ * reach the scout server percent-encoded and are decoded there: validates the
+ * decoded form so `%2e%2e` traversal is caught and a legitimate `%20` accepted
+ * (mirrors `logPathInScopeAllowingEncoded` in the sibling log view).
+ */
+export function scanLocationInScopeAllowingEncoded(
+  scope: Uri[],
+  location: string
+): boolean {
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(location);
+  } catch {
+    // malformed percent-encoding
+    return false;
+  }
+  return scanLocationInScope(scope, decoded);
 }
 
 export class ScanviewPanel extends Disposable {
@@ -91,8 +112,30 @@ export class ScanviewPanel extends Disposable {
           params[1] as string,
           params[2] as string
         ),
-      [kMethodHttpRequest]: async (params: unknown[]) =>
-        server_.proxyRpcRequest(params[0] as HttpProxyRpcRequest),
+      [kMethodHttpRequest]: async (params: unknown[]) => {
+        // Confine the generic proxy to the panel scope like the named methods.
+        // Transcripts are read from the project's configured transcripts
+        // location (not the scan results dir), so those routes get a scope
+        // that also admits it.
+        const request = params[0] as HttpProxyRpcRequest;
+        try {
+          assertScanProxyInScope(
+            request,
+            (location) =>
+              scanLocationInScopeAllowingEncoded(scopeResolver(), location),
+            (location) =>
+              scanLocationInScopeAllowingEncoded(
+                [...scopeResolver(), ...server_.transcriptsScope()],
+                location
+              )
+          );
+        } catch (error) {
+          log.warn(`[proxy-scope] blocked ${request.method} ${request.path}`);
+          throw error;
+        }
+        log.trace(`[proxy-scope] allowed ${request.method} ${request.path}`);
+        return server_.proxyRpcRequest(request);
+      },
     });
 
     // serve post message api to webview

@@ -2,8 +2,13 @@ import { ExtensionContext, Uri, workspace } from "vscode";
 
 import { Command } from "../../core/command";
 import { PackageManager } from "../../core/package/manager";
+import { kScoutEnvValues } from "../scout/scout-constants";
+import { ScoutProjectManager } from "../scout/scout-project";
 import { ScoutViewServer } from "../scout/scout-view-server";
-import { WorkspaceEnvManager } from "../workspace/workspace-env-provider";
+import {
+  scoutLocationToUri,
+  WorkspaceEnvManager,
+} from "../workspace/workspace-env-provider";
 
 import { scanviewCommands } from "./commands";
 import { activateScanviewEditor } from "./scanview-editor";
@@ -13,6 +18,7 @@ export function activateScanview(
   scoutManager: PackageManager,
   server: ScoutViewServer,
   envMgr: WorkspaceEnvManager,
+  scoutProjectManager: ScoutProjectManager,
   context: ExtensionContext
 ): [Command[], ScoutViewManager] {
   // Confine the full Scout View's webview RPC methods to the configured scan
@@ -22,6 +28,22 @@ export function activateScanview(
     const roots: Uri[] = [envMgr.getDefaultScanResultsDir()];
     for (const folder of workspace.workspaceFolders ?? []) {
       roots.push(folder.uri);
+    }
+    return roots;
+  });
+
+  // The scan webviews read transcripts from the project's configured
+  // transcripts location (scout.yaml, or the SCOUT_SCAN_TRANSCRIPTS override),
+  // which is usually not under the scan results dir — admit it for the
+  // transcripts routes only.
+  server.setTranscriptsScope(() => {
+    const roots: Uri[] = [];
+    const configured = scoutProjectManager.getConfig().transcripts;
+    const fromEnv = envMgr.getValues()[kScoutEnvValues.scanTranscripts];
+    for (const location of [configured, fromEnv]) {
+      if (typeof location === "string" && location) {
+        roots.push(scoutLocationToUri(location));
+      }
     }
     return roots;
   });
