@@ -121,6 +121,46 @@ suite("Proxy Scope Test Suite", () => {
       rejects(`/api/log-bytes/${enc("/w/logs/%E0%A4%A")}`);
     });
 
+    test("checks every occurrence of a query location (FastAPI takes the last)", () => {
+      const inDir = enc("file:///w/logs");
+      const outDir = enc("file:///etc");
+      rejects(`/api/logs?log_dir=${inDir}&log_dir=${outDir}`);
+      rejects(`/api/log-files?log_dir=${outDir}&log_dir=${inDir}`);
+      rejects(
+        `/api/pending-samples?log=${enc("file:///w/logs/a.eval")}&log=${enc(
+          "file:///etc/passwd"
+        )}`
+      );
+      rejects(
+        `/api/log-message?log_file=${enc("file:///w/logs/a.eval")}&log_file=${enc(
+          "file:///etc/x"
+        )}&message=m`,
+        "POST"
+      );
+      rejects(`/api/eval-set?log_dir=${inDir}&log_dir=${outDir}&dir=sub`);
+      rejects(`/api/eval-set?log_dir=${inDir}&dir=sub&dir=../../etc`);
+      // repeats that are all in scope are fine
+      ok(`/api/logs?log_dir=${inDir}&log_dir=${inDir}`);
+    });
+
+    test("rejects an empty query location (the server does not treat it as the default)", () => {
+      rejects("/api/logs?log_dir=");
+      rejects("/api/log-files?log_dir=");
+      rejects("/api/pending-samples?log=");
+      rejects("/api/log-headers?file=");
+    });
+
+    test("rejects non-canonical base64url segments", () => {
+      const dir = b64url("file:///w/logs");
+      // a lenient decoder would drop the stray character and see the in-scope dir
+      rejects(`/api/scout/transcripts/${dir}!/tid/search`);
+      rejects(`/api/scout/transcripts/${dir}%20/tid/search`);
+      // optional padding on canonical input is accepted
+      ok(
+        `/api/scout/transcripts/${dir}${"=".repeat((4 - (dir.length % 4)) % 4)}/tid/search`
+      );
+    });
+
     test("rejects DELETE and the log-delete route", () => {
       rejects(`/api/log-delete/${enc("file:///w/logs/run.eval")}`, "DELETE");
       rejects(`/api/log-delete/${enc("file:///w/logs/run.eval")}`);
@@ -225,6 +265,27 @@ suite("Proxy Scope Test Suite", () => {
       rejects(`/api/v2/transcripts/${b64url("file:///etc")}/tid/info`);
       rejects(`/api/v2/transcripts/${b64url("s3://other/logs")}/tid/info`);
       rejects("/api/v2/transcripts/");
+    });
+
+    test("checks every occurrence of results_dir", () => {
+      rejects(
+        `/api/scans?results_dir=${enc("file:///w/scans")}&results_dir=${enc(
+          "file:///"
+        )}`
+      );
+      rejects("/api/scans?results_dir=");
+    });
+
+    test("rejects non-canonical base64url segments", () => {
+      const dir = b64url("file:///w/scans");
+      rejects(`/api/v2/scans/${dir}!`, "POST");
+      rejects(`/api/v2/scans/${dir}/${b64url("scan_id=x")}%2B`);
+      rejects(`/api/v2/transcripts/${b64url("s3://bucket/logs")}~/tid/info`);
+      // canonical with padding still fine
+      ok(
+        `/api/v2/scans/${dir}${"=".repeat((4 - (dir.length % 4)) % 4)}`,
+        "POST"
+      );
     });
 
     test("leaves validations to the server's project containment", () => {

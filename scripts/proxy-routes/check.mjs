@@ -263,7 +263,8 @@ function writeStepSummary(rows, failures) {
     "| server | method | route | verdict |",
     "| --- | --- | --- | --- |",
     ...rows.map(
-      (r) => `| ${r.map((c) => String(c).replace(/\|/g, "\\|")).join(" | ")} |`
+      (r) =>
+        `| ${r.map((c) => String(c).replace(/\\/g, "\\\\").replace(/\|/g, "\\|")).join(" | ")} |`
     ),
     "",
   ].join("\n");

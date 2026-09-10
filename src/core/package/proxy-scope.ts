@@ -67,8 +67,21 @@ function checker(request: HttpProxyRpcRequest, inScope: InScope) {
   };
 }
 
-function decodeBase64Url(value: string): string {
-  return Buffer.from(value, "base64url").toString("utf-8");
+/**
+ * Decode a base64url segment, refusing non-canonical input. Node's decoder is
+ * lenient (it drops invalid characters and accepts the standard alphabet) and
+ * the Python server's `urlsafe_b64decode` is lenient in its own way, so only a
+ * value that round-trips exactly is accepted — that removes any room for the
+ * two decoders to disagree about which location was requested. Padding is
+ * optional (the viewers emit none).
+ */
+function decodeBase64Url(value: string, request: HttpProxyRpcRequest): string {
+  const decoded = Buffer.from(value, "base64url").toString("utf-8");
+  const canonical = Buffer.from(decoded, "utf-8").toString("base64url");
+  if (canonical !== value.replace(/=+$/, "")) {
+    throw proxyError(request);
+  }
+  return decoded;
 }
 
 /** Whether a decoded path/URI would replace (rather than extend) a base dir when joined. */
@@ -133,15 +146,15 @@ export function assertLogProxyInScope(
     return;
   }
 
-  // Endpoints whose location is a query parameter. A missing location means the
+  // Endpoints whose location is a query parameter. An ABSENT location means the
   // server lists/uses its own configured default (not an attacker-chosen path),
-  // which the viewer requests during config load — allow it; only enforce scope
-  // when a location is actually supplied.
+  // which the viewer requests during config load — allow it. Every supplied
+  // value is checked, including empty ones (the server treats "" as a real
+  // location, not the default) and repeats (FastAPI resolves a repeated scalar
+  // parameter to the LAST value, so validating only the first would be a
+  // bypass).
   if (pathname === "/api/logs" || pathname === "/api/log-files") {
-    const logDir = params.get("log_dir");
-    if (logDir) {
-      check(logDir);
-    }
+    params.getAll("log_dir").forEach(check);
     return;
   }
   if (
@@ -149,18 +162,12 @@ export function assertLogProxyInScope(
     pathname === "/api/pending-sample-data" ||
     pathname === "/api/pending-sample-data-urls"
   ) {
-    const logParam = params.get("log");
-    if (logParam) {
-      check(logParam);
-    }
+    params.getAll("log").forEach(check);
     return;
   }
   if (pathname === "/api/log-message") {
     // POST form: the log file is the `log_file` query parameter.
-    const logFile = params.get("log_file");
-    if (logFile) {
-      check(logFile);
-    }
+    params.getAll("log_file").forEach(check);
     return;
   }
   if (pathname === "/api/log-headers") {
@@ -169,16 +176,20 @@ export function assertLogProxyInScope(
     return;
   }
   // eval-set / flow resolve a directory from log_dir (+ an optional `dir`
-  // subdirectory joined onto it); confine the effective directory.
+  // subdirectory joined onto it); confine every effective directory the
+  // server could resolve from the supplied values.
   if (pathname === "/api/eval-set" || pathname === "/api/flow") {
-    const base = params.get("log_dir") ?? "";
-    const sub = params.get("dir") ?? "";
-    if (base && sub) {
-      check(joinLocation(base, sub));
-    } else if (base) {
-      check(base);
-    } else if (sub) {
-      check(sub);
+    const bases = params.getAll("log_dir");
+    const subs = params.getAll("dir");
+    if (bases.length > 0 && subs.length > 0) {
+      for (const base of bases) {
+        for (const sub of subs) {
+          check(joinLocation(base, sub));
+        }
+      }
+    } else {
+      bases.forEach(check);
+      subs.forEach(check);
     }
     return;
   }
@@ -196,7 +207,7 @@ export function assertLogProxyInScope(
     if (!dirSegment) {
       throw proxyError(request);
     }
-    return check(decodeBase64Url(dirSegment));
+    return check(decodeBase64Url(dirSegment, request));
   }
 
   throw proxyError(request);
@@ -273,10 +284,7 @@ export function assertScanProxyInScope(
   // Legacy scan listing: with no results_dir it lists the server default; with
   // one it must be in scope.
   if (pathname === "/api/scans") {
-    const resultsDir = params.get("results_dir");
-    if (resultsDir) {
-      check(resultsDir);
-    }
+    params.getAll("results_dir").forEach(check);
     return;
   }
 
@@ -294,7 +302,10 @@ export function assertScanProxyInScope(
     if (!dirSegment) {
       throw proxyError(request);
     }
-    return checker(request, inTranscriptsScope)(decodeBase64Url(dirSegment));
+    return checker(
+      request,
+      inTranscriptsScope
+    )(decodeBase64Url(dirSegment, request));
   }
 
   // /api/v2/scans/<base64url dir>[/<base64url scan>[/<scanner>/...]] (plus the
@@ -306,11 +317,11 @@ export function assertScanProxyInScope(
     if (!dirSegment) {
       throw proxyError(request);
     }
-    const dir = decodeBase64Url(dirSegment);
+    const dir = decodeBase64Url(dirSegment, request);
     check(dir);
     const scanSegment = segments[5];
     if (scanSegment && scanSegment !== "distinct") {
-      check(joinLocation(dir, decodeBase64Url(scanSegment)));
+      check(joinLocation(dir, decodeBase64Url(scanSegment, request)));
     }
     return;
   }
