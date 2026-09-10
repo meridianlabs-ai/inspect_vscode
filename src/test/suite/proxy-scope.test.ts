@@ -3,18 +3,22 @@
  */
 import * as assert from "assert";
 
+import { Uri } from "vscode";
+
 import {
   assertLogProxyInScope,
   assertScanProxyInScope,
 } from "../../core/package/proxy-scope";
+import { logPathInScope } from "../../providers/logview/logview-panel";
+import { scanLocationInScope } from "../../providers/scanview/scanview-panel";
 
 const enc = encodeURIComponent;
 const b64url = (v: string) => Buffer.from(v, "utf-8").toString("base64url");
 
-// A scope that admits only locations under file:///w/logs (or the dir itself).
-const IN = "file:///w/logs";
-const inScope = (loc: string) =>
-  loc === IN || loc.startsWith("file:///w/logs/");
+// Use the panels' real scope predicates (which normalize ".." traversal) so the
+// tests exercise the same checks the proxy is wired to in production.
+const logDir = Uri.parse("file:///w/logs");
+const inScope = (loc: string) => logPathInScope("dir", logDir, loc);
 
 const req = (path: string) => ({ method: "GET" as const, path });
 
@@ -93,8 +97,8 @@ suite("Proxy Scope Test Suite", () => {
   });
 
   suite("assertScanProxyInScope", () => {
-    const scanInScope = (loc: string) =>
-      loc === "file:///w/scans" || loc.startsWith("file:///w/scans/");
+    const scanDir = Uri.parse("file:///w/scans");
+    const scanInScope = (loc: string) => scanLocationInScope([scanDir], loc);
     const ok = (path: string) =>
       assert.doesNotThrow(() => assertScanProxyInScope(req(path), scanInScope));
     const rejects = (path: string) =>

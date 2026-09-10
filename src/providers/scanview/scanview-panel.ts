@@ -26,7 +26,7 @@ import { ScoutViewServer } from "../scout/scout-view-server";
 import { RouteMessage, sanitizeRouteMessage } from "./scanview-message";
 
 /** Whether a webview-supplied scan location is within one of the allowed roots. */
-function scanLocationInScope(scope: Uri[], location: string): boolean {
+export function scanLocationInScope(scope: Uri[], location: string): boolean {
   let target: Uri;
   try {
     target = resolveToUri(location);
