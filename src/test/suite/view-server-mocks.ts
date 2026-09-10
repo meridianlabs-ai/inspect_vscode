@@ -2,6 +2,8 @@
  * Shared mock utilities for testing view servers
  */
 
+import { EventEmitter } from "events";
+
 import { Disposable, OutputChannel } from "vscode";
 
 /**
@@ -288,17 +290,18 @@ export function createFetchMock(): FetchMockManager {
 /**
  * Mock ChildProcess for testing server lifecycle
  */
-export class MockChildProcess {
+export class MockChildProcess extends EventEmitter {
   pid: number | undefined = Math.floor(Math.random() * 10000);
   exitCode: number | null = null;
   killed: boolean = false;
+  signalCode: NodeJS.Signals | null = null;
 
   private killCallbacks: Array<() => void> = [];
   private errorCallbacks: Array<(error: Error) => void> = [];
 
   kill(signal?: string): boolean {
     this.killed = true;
-    this.exitCode = signal === "SIGKILL" ? 137 : 0;
+    this.simulateSignal((signal || "SIGTERM") as NodeJS.Signals);
     this.killCallbacks.forEach((cb) => cb());
     return true;
   }
@@ -313,10 +316,18 @@ export class MockChildProcess {
 
   triggerError(error: Error) {
     this.errorCallbacks.forEach((cb) => cb(error));
+    this.emit("error", error);
   }
 
   simulateExit(code: number) {
     this.exitCode = code;
+    this.emit("exit", code, null);
+    this.emit("close", code, null);
+  }
+  simulateSignal(signal: NodeJS.Signals) {
+    this.signalCode = signal;
+    this.emit("exit", null, signal);
+    this.emit("close", null, signal);
   }
 }
 

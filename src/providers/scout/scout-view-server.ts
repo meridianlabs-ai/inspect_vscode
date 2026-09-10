@@ -2,7 +2,7 @@ import { ExtensionContext, Uri } from "vscode";
 
 import { PackageManager } from "../../core/package/manager";
 import { PackageViewServer } from "../../core/package/view-server";
-import { AbsolutePath, toAbsolutePath } from "../../core/path";
+import { AbsolutePath } from "../../core/path";
 import { basename, dirname } from "../../core/uri";
 import { scoutBinPath } from "../../scout/props";
 
@@ -32,7 +32,8 @@ export class ScoutViewServer extends PackageViewServer {
       "scout",
       scoutBinPath,
       ["--display", "rich"],
-      "http"
+      "http",
+      "inspect_scout"
     );
 
     this.legacy = {
@@ -123,11 +124,7 @@ export class ScoutViewServer extends PackageViewServer {
       undefined,
       (status: number) => (status === 404 ? "null" : undefined)
     );
-    if (result.data === "null") {
-      return null;
-    }
-    const { path } = JSON.parse(result.data) as { path: string };
-    return toAbsolutePath(path);
+    return this.resourcePath(result.data);
   }
 
   async getScans(scans_dir: Uri): Promise<string> {
