@@ -536,7 +536,7 @@ suite("PackageViewServer lifecycle", () => {
       assert.ok(html.includes("view.js"));
       assert.ok(
         host.webview.options.localResourceRoots?.some(
-          (uri) => uri.fsPath === candidate
+          (uri) => uri.toString() === Uri.file(candidate).toString()
         )
       );
       await panel.getHtml(state);
