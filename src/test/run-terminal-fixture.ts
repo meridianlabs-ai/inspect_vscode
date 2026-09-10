@@ -8,6 +8,7 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
+import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -156,12 +157,35 @@ export async function verifyRunTerminal() {
     );
   } finally {
     Object.defineProperty(window, "createTerminal", original);
-    for (const terminal of terminals) {
-      terminal.dispose();
-    }
+    await Promise.all(
+      terminals.map(
+        (terminal) =>
+          new Promise<void>((resolve) => {
+            const listener = window.onDidCloseTerminal((closed) => {
+              if (closed === terminal) {
+                clearTimeout(timeout);
+                listener.dispose();
+                resolve();
+              }
+            });
+            const timeout = setTimeout(() => {
+              listener.dispose();
+              resolve();
+            }, 5000);
+            terminal.dispose();
+          })
+      )
+    );
     for (const cleanup of cleanups) {
       cleanup.dispose();
     }
-    rmSync(root, { recursive: true, force: true });
+    // Windows holds the terminal cwd until its process has actually exited.
+    // Async retries allow VS Code to process the close/exit notifications.
+    await rm(root, {
+      recursive: true,
+      force: true,
+      maxRetries: 10,
+      retryDelay: 100,
+    });
   }
 }
