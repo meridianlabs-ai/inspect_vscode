@@ -3,11 +3,12 @@
  */
 import * as assert from "assert";
 
-import { Terminal, WorkspaceConfiguration } from "vscode";
+import { Terminal, window } from "vscode";
 
 import {
   buildRunCommand,
   ExecProfile,
+  runCommand,
   terminalShellKind,
 } from "../../core/package/exec-manager";
 import { AbsolutePath } from "../../core/path";
@@ -531,158 +532,147 @@ suite("Terminal shell detection", () => {
       creationOptions: shellPath ? { shellPath } : {},
       state: { isInteractedWith: false, shell },
     }) as Pick<Terminal, "creationOptions" | "state">;
-  const config = (values: Record<string, unknown> = {}) =>
-    ({
-      get: (key: string) => values[key],
-    }) as Pick<WorkspaceConfiguration, "get">;
 
-  for (const [platform, key] of [
-    ["darwin", "osx"],
-    ["linux", "linux"],
-    ["win32", "windows"],
-  ] as const) {
-    test(`does not guess a default on ${platform}`, () => {
-      assert.strictEqual(
-        terminalShellKind(terminal(), config(), platform),
-        undefined
-      );
-    });
-    test(`identifies fish by configured path on ${platform}`, () => {
-      const cfg = config({
-        [`defaultProfile.${key}`]: "My shell",
-        [`profiles.${key}`]: { "My shell": { path: "/bin/fish" } },
-      });
-      assert.strictEqual(terminalShellKind(terminal(), cfg, platform), "fish");
-      assert.strictEqual(
-        terminalShellKind(terminal("/bin/nu"), cfg, platform),
-        undefined
-      );
-      assert.strictEqual(
-        terminalShellKind(terminal(undefined, "nu"), cfg, platform),
-        undefined
-      );
-    });
-  }
+  test("refuses reuse without reported identity, regardless of creation path", () => {
+    // VS Code 1.93 exposes no state.shell. Defaults may have changed from fish
+    // to bash, or the user may have entered a nested shell since creation.
+    assert.strictEqual(terminalShellKind(terminal()), undefined);
+    assert.strictEqual(terminalShellKind(terminal("/bin/fish")), undefined);
+    assert.strictEqual(terminalShellKind(terminal("/bin/bash")), undefined);
+  });
 
-  test("uses VS Code's detected default executable only without a configured profile", () => {
+  test("uses the captured resolved executable only for a new terminal", () => {
+    assert.strictEqual(terminalShellKind(terminal(), "/bin/fish"), "fish");
+    assert.strictEqual(terminalShellKind(terminal(), "/bin/bash"), "posix");
+    assert.strictEqual(terminalShellKind(terminal(), "/bin/nu"), undefined);
+    assert.strictEqual(terminalShellKind(terminal(), ""), undefined);
     assert.strictEqual(
-      terminalShellKind(terminal(), config(), "darwin", "/bin/fish"),
+      terminalShellKind(terminal("/bin/nu"), "/bin/bash"),
+      undefined
+    );
+  });
+
+  test("uses reported shell before creation or launch settings", () => {
+    assert.strictEqual(
+      terminalShellKind(terminal("/bin/bash", "fish"), "/bin/bash"),
       "fish"
     );
     assert.strictEqual(
-      terminalShellKind(terminal(), config(), "linux", "/bin/bash"),
+      terminalShellKind(terminal("/bin/fish", "bash"), "/bin/fish"),
       "posix"
     );
     assert.strictEqual(
-      terminalShellKind(terminal(), config(), "linux", "/bin/nu"),
+      terminalShellKind(terminal("/bin/bash", "nu"), "/bin/bash"),
       undefined
     );
+  });
+
+  test("recognizes the reported Git Bash identifier", () => {
     assert.strictEqual(
       terminalShellKind(
-        terminal(),
-        config({ "defaultProfile.linux": "unknown" }),
-        "linux",
-        "/bin/bash"
+        terminal("C:\\Program Files\\Git\\bin\\bash.exe", "gitbash")
       ),
-      undefined
-    );
-    assert.strictEqual(
-      terminalShellKind(terminal("/bin/nu"), config(), "linux", "/bin/bash"),
-      undefined
-    );
-  });
-
-  test("uses the reported shell before its creation executable", () => {
-    assert.strictEqual(
-      terminalShellKind(terminal("/bin/bash", "fish"), config()),
-      "fish"
-    );
-    assert.strictEqual(
-      terminalShellKind(terminal("/bin/fish", "bash"), config()),
       "posix"
     );
     assert.strictEqual(
-      terminalShellKind(terminal("/bin/bash", "nu"), config()),
-      undefined
-    );
-    assert.strictEqual(
-      terminalShellKind(terminal("/bin/fish"), config()),
-      "fish"
+      terminalShellKind(terminal(undefined, "gitbash")),
+      "posix"
     );
   });
 
-  for (const path of [
-    "/bin/nu",
-    ["/bin/bash", "/bin/fish"],
-    ["/bin/fish", "/bin/nu"],
-    [],
-  ]) {
-    test(`does not infer syntax from a misleading profile name: ${JSON.stringify(path)}`, () => {
-      const cfg = config({
-        "defaultProfile.linux": "fish",
-        "profiles.linux": { fish: { path } },
-      });
-      assert.strictEqual(
-        terminalShellKind(terminal(), cfg, "linux"),
-        undefined
-      );
-    });
-  }
-
-  test("accepts path alternatives only with the same recognized grammar", () => {
-    const cfg = config({
-      "defaultProfile.linux": "custom",
-      "profiles.linux": { custom: { path: ["/usr/bin/fish", "/bin/fish"] } },
-    });
-    assert.strictEqual(terminalShellKind(terminal(), cfg, "linux"), "fish");
-  });
-
-  test("does not infer syntax from profile labels without executable evidence", () => {
-    for (const name of [
-      "fish",
-      "bash",
-      "WSL",
-      "PowerShell",
-      "Command Prompt",
+  test("unknown reported grammars cannot fall back to Windows or POSIX quoting", () => {
+    for (const shell of [
+      "wsl",
+      "nu",
+      "csh",
+      "python",
+      "node",
+      "xonsh",
+      "custom",
     ]) {
       assert.strictEqual(
         terminalShellKind(
-          terminal(),
-          config({ "defaultProfile.linux": name }),
-          "linux"
+          terminal(undefined, shell),
+          "C:\\Windows\\System32\\cmd.exe"
         ),
+        undefined
+      );
+      assert.strictEqual(
+        terminalShellKind(terminal(undefined, shell), "/bin/bash"),
         undefined
       );
     }
   });
+});
 
-  test("recognizes built-in profile sources but does not override explicit paths", () => {
-    for (const [source, expected] of [
-      ["PowerShell", "powershell"],
-      ["Git Bash", "posix"],
-      ["fish", undefined],
-    ] as const) {
-      const values = {
-        "defaultProfile.windows": "custom",
-        "profiles.windows": { custom: { source } },
-      };
-      assert.strictEqual(
-        terminalShellKind(terminal(), config(values), "win32"),
-        expected
-      );
-    }
-    assert.strictEqual(
-      terminalShellKind(
-        terminal(),
-        config({
-          "defaultProfile.windows": "custom",
-          "profiles.windows": {
-            custom: { path: "unknown.exe", source: "PowerShell" },
+suite("Run command shell refusal", () => {
+  test("never emits commands to reused terminals without a known reported grammar", async () => {
+    const terminalsDescriptor = Object.getOwnPropertyDescriptor(
+      window,
+      "terminals"
+    )!;
+    const errorDescriptor = Object.getOwnPropertyDescriptor(
+      window,
+      "showErrorMessage"
+    )!;
+    const emitted: string[] = [];
+    const errors: string[] = [];
+    const profile: ExecProfile = {
+      packageName: "inspect-ai",
+      packageDisplayName: "Inspect",
+      packageVersion: null,
+      target: "Eval",
+      terminal: "Inspect Eval",
+      command: "inspect",
+      subcommand: "eval",
+      binPath: null,
+      execArgs: () => [],
+    };
+    try {
+      Object.defineProperty(window, "showErrorMessage", {
+        configurable: true,
+        value: (message: string) => {
+          errors.push(message);
+          return Promise.resolve(undefined);
+        },
+      });
+      for (const shell of [undefined, "nu", "wsl"]) {
+        const terminal = {
+          name: "Inspect Eval",
+          creationOptions: { shellPath: "/bin/bash" },
+          state: { isInteractedWith: true, shell },
+          show: () => {},
+          shellIntegration: {
+            executeCommand: (line: string) => {
+              emitted.push(line);
+            },
           },
-        }),
-        "win32"
-      ),
-      undefined
-    );
+          sendText: (line: string) => {
+            emitted.push(line);
+          },
+        };
+        Object.defineProperty(window, "terminals", {
+          configurable: true,
+          value: [terminal],
+        });
+        await runCommand(
+          profile,
+          [
+            "eval",
+            "t\\';echo INJECTED;#'.py@demo",
+            "-T",
+            "a=\\",
+            "-T",
+            "b=;echo INJECTED;#",
+          ],
+          "/workspace"
+        );
+      }
+      assert.deepStrictEqual(emitted, []);
+      assert.strictEqual(errors.length, 3);
+    } finally {
+      Object.defineProperty(window, "terminals", terminalsDescriptor);
+      Object.defineProperty(window, "showErrorMessage", errorDescriptor);
+    }
   });
 });

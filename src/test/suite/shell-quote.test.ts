@@ -6,9 +6,7 @@ import { join } from "path";
 
 import {
   quoteArg,
-  quoteArgUnknownShell,
   quoteCommandLine,
-  quoteCommandLineUnknownShell,
   ShellKind,
   shellKindFromPath,
 } from "../../core/shell-quote";
@@ -54,10 +52,17 @@ suite("Shell Quote Test Suite", () => {
   // used here would write a harmless marker inside a disposable test directory.
   for (const [shell, kind] of [
     ["sh", "posix"],
+    ["bash", "posix"],
     ["fish", "fish"],
   ] as const satisfies ReadonlyArray<readonly [string, ShellKind]>) {
     suite(`real ${shell} argument round trips`, () => {
       suiteSetup(function () {
+        // These fixtures contain Unix-only filenames and require a Unix shell
+        // argv transport. Git Bash launched through Windows spawnSync also
+        // undergoes Windows command-line escaping before Bash parses the text.
+        if (process.platform === "win32") {
+          this.skip();
+        }
         const probe = spawnSync(
           shell,
           shell === "fish" ? ["--no-config", "--version"] : ["--version"],
@@ -91,6 +96,8 @@ suite("Shell Quote Test Suite", () => {
             "\\",
             "a\\\\b",
             "trailing\\",
+            "a=\\",
+            "b=;printf injected>marker;#",
             "line\nbreak",
             "tab\there",
             "both'\"quotes",
@@ -260,62 +267,6 @@ suite("Shell Quote Test Suite", () => {
       assert.strictEqual(shellKindFromPath("C:\\shells\\fish.exe"), "fish");
       assert.strictEqual(shellKindFromPath("cmd.exe"), "cmd");
       assert.strictEqual(shellKindFromPath("pwsh"), "powershell");
-    });
-  });
-
-  suite("unknown-shell quoting", () => {
-    test("double-quotes so `&` is inert in both cmd.exe and PowerShell", () => {
-      // The exploited case: a task file named `x & calc & y.py`. Double quotes
-      // render `&` literal in both shells, so nothing executes.
-      assert.strictEqual(
-        quoteArgUnknownShell("x & calc & y.py"),
-        '"x & calc & y.py"'
-      );
-    });
-
-    test("refuses tokens neither shell can quote safely", () => {
-      // $/backtick (PowerShell expansion), %/! (cmd expansion), embedded quote.
-      assert.strictEqual(quoteArgUnknownShell("a$b"), null);
-      assert.strictEqual(quoteArgUnknownShell("a`b"), null);
-      assert.strictEqual(quoteArgUnknownShell("%PATH%"), null);
-      assert.strictEqual(quoteArgUnknownShell('a"b'), null);
-    });
-
-    test("leaves safe tokens bare so the command stays executable", () => {
-      // Safe tokens (incl. the leading command) must stay bare — a quoted
-      // leading token is a string literal, not a command, in PowerShell.
-      assert.strictEqual(
-        quoteCommandLineUnknownShell(["python", "eval", "ok.py"]),
-        "python eval ok.py"
-      );
-    });
-
-    test("leaves safe tokens bare and double-quotes unsafe ones", () => {
-      assert.strictEqual(
-        quoteCommandLineUnknownShell(["inspect", "eval", "x & y.py"]),
-        'inspect eval "x & y.py"'
-      );
-    });
-
-    test("command line is null if any token can't be quoted safely", () => {
-      assert.strictEqual(
-        quoteCommandLineUnknownShell(["python", "$(evil)"]),
-        null
-      );
-    });
-
-    test("refuses when the leading command isn't safe bare", () => {
-      // A quoted first token isn't executed by PowerShell (needs `&`), so a
-      // command that would need quoting (e.g. an interpreter path with a space)
-      // is refused rather than emitted as a broken line.
-      assert.strictEqual(
-        quoteCommandLineUnknownShell([
-          "/opt/py env/bin/python",
-          "eval",
-          "x.py",
-        ]),
-        null
-      );
     });
   });
 });

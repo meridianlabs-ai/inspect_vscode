@@ -33,59 +33,6 @@ export function shellKindFromPath(
   return undefined;
 }
 
-// Characters that neither cmd.exe nor PowerShell leaves inert inside a
-// double-quoted string: `$` and backtick (PowerShell expansion), `%` and `!`
-// (cmd variable / delayed expansion), the double quote itself, and newlines.
-// Everything else — including `&`, `|`, `<`, `>`, `(`, `)`, `^`, `'` — is
-// literal inside double quotes in BOTH shells.
-const kUnknownShellUnsafe = /[$`"%!\r\n]/;
-
-/**
- * Quote a single argument for a Windows terminal whose shell we could not
- * identify. Double quotes neutralize the command separators in both cmd.exe and
- * PowerShell, closing the quoting mismatch. Returns `null` if the value contains
- * a character that is not inert under double quoting in both shells, so the
- * caller can refuse to run rather than risk injection.
- */
-export function quoteArgUnknownShell(value: string): string | null {
-  // Leave tokens that are safe unquoted in the strictest shell (PowerShell) bare
-  // — this is what keeps the leading command (e.g. `inspect`) unquoted, so
-  // PowerShell actually executes it rather than parsing `"inspect"` as a string
-  // literal. A bare safe token is inert in cmd.exe and POSIX shells too.
-  if (isSafeUnquoted(value, "powershell")) {
-    return value;
-  }
-  if (kUnknownShellUnsafe.test(value)) {
-    return null;
-  }
-  return `"${value}"`;
-}
-
-/**
- * Quote each part for an unidentified shell, or return `null` if any part cannot
- * be safely quoted (see {@link quoteArgUnknownShell}).
- */
-export function quoteCommandLineUnknownShell(parts: string[]): string | null {
-  const quoted: string[] = [];
-  for (let i = 0; i < parts.length; i++) {
-    const part = parts[i] ?? "";
-    // The leading command token can't be double-quoted for an unknown shell:
-    // PowerShell parses a quoted first token as a string literal, not a command
-    // (invoking it would need the `&` operator). If it isn't safe bare — e.g. a
-    // discovered interpreter path containing a space — refuse rather than emit a
-    // line that errors in the terminal.
-    if (i === 0 && !isSafeUnquoted(part, "powershell")) {
-      return null;
-    }
-    const q = quoteArgUnknownShell(part);
-    if (q === null) {
-      return null;
-    }
-    quoted.push(q);
-  }
-  return quoted.join(" ");
-}
-
 // Characters that are safe to pass unquoted in any of our supported shells.
 // Anything outside this set — spaces, quotes, semicolons, $, backticks, etc.
 // — requires quoting. An empty string also requires quoting so it isn't lost.

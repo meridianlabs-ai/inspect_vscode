@@ -47,9 +47,11 @@ jobs:
       # one via xvfb; the Windows runner already has a display.
       - name: Run tests (Linux)
         if: runner.os == 'Linux'
+        env:
+          REQUIRE_FISH_TESTS: "1"
         run: |
           sudo apt-get update
-          sudo apt-get install -y xvfb
+          sudo apt-get install -y xvfb fish
           xvfb-run -a pnpm test
 
       - name: Run tests (Windows)
