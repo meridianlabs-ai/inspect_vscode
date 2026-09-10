@@ -8,6 +8,8 @@ on:
 
 jobs:
   verify-package:
+    # Preserve the stable job names required by the repository ruleset.
+    name: ${{ matrix.vscode == 'stable' && format('verify-package ({0})', matrix.os) || format('minimum-host ({0})', matrix.os) }}
     strategy:
       fail-fast: false
       matrix:
