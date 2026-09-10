@@ -18,6 +18,8 @@ import {
 } from "../../core/package/manager";
 import { AbsolutePath, activeWorkspacePath } from "../../core/path";
 
+import { workspaceTaskNames } from "./workspace-task-names";
+
 // Activates the provider which tracks the currently active task (document and task name)
 export function activateWorkspaceTaskProvider(
   inspectManager: PackageManager,
@@ -115,10 +117,6 @@ interface TaskDescriptor {
   name: string;
 }
 
-// Regexes to identify tasks
-const kTaskRegex = /@task/;
-const kTaskNameRegex =
-  /^[ \t]*@task(?:\([^)]*\))?[ \t]*\r?\n[ \t]*def\s+([A-Za-z_]\w*)\s*\(/gm;
 const kExcludeGlob =
   "**/{.venv,venv,__pycache__,.git,node_modules,env,envs,conda-env,.tox,.pytest_cache,.mypy_cache,.idea,.vscode,build,dist,.eggs,*.egg-info,.ipynb_checkpoints}/**";
 
@@ -178,12 +176,8 @@ async function workspaceTasks(
 
       const fileTasks: TaskDescriptor[] = [];
       const taskFile = relative(workspacePath.path, file.fsPath);
-      if (kTaskRegex.test(fileContent)) {
-        for (const match of fileContent.matchAll(kTaskNameRegex)) {
-          if (match[1]) {
-            fileTasks.push({ file: taskFile, name: match[1] });
-          }
-        }
+      for (const name of workspaceTaskNames(fileContent)) {
+        fileTasks.push({ file: taskFile, name });
       }
 
       // Update cache in memory

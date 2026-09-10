@@ -5,6 +5,7 @@ import {
   Command,
   ExtensionContext,
   languages,
+  Range,
   TextDocument,
   Uri,
 } from "vscode";
@@ -55,17 +56,13 @@ export class ScoutCodeLensProvider implements CodeLensProvider {
     alias?: string;
   } {
     const text = document.getText();
-    // Handle multiline imports by collapsing whitespace within parentheses
-    const normalizedText = text.replace(
-      normalizeTextPattern,
-      (_m, inner: string) => `(${inner.replace(/\s+/g, " ")})`
-    );
-
-    const fromImportMatch = normalizedText.match(fromImportPattern);
+    // The import patterns already accept newlines; no document-wide
+    // parenthesis normalization is needed (unclosed groups can be quadratic).
+    const fromImportMatch = text.match(fromImportPattern);
     if (fromImportMatch) {
       return { hasImport: true, alias: fromImportMatch[2] };
     }
-    if (hasImportPattern.test(normalizedText)) {
+    if (hasImportPattern.test(text)) {
       return { hasImport: true };
     }
     return { hasImport: false };
@@ -90,8 +87,24 @@ export class ScoutCodeLensProvider implements CodeLensProvider {
 
     // Go through line by line and show a lens
     // for any task decorated functions
+    const pendingDecorators: Range[] = [];
     for (let i = 0; i < document.lineCount; i++) {
+      if (token.isCancellationRequested) {
+        return [];
+      }
       const line = document.lineAt(i);
+      const functionMatch = line.text.match(kFuncPattern);
+      if (functionMatch?.[1]) {
+        const name = functionMatch[1];
+        if (isValidTaskName(name)) {
+          for (const range of pendingDecorators) {
+            for (const command of scanCommands(document.uri, name)) {
+              lenses.push(new CodeLens(range, command));
+            }
+          }
+        }
+        pendingDecorators.length = 0;
+      }
       const decoratorMatch = line.text.match(kDecoratorPattern);
 
       if (decoratorMatch) {
@@ -105,25 +118,9 @@ export class ScoutCodeLensProvider implements CodeLensProvider {
           continue;
         }
 
-        // Get the function name from the next line
-        let j = i + 1;
-        while (j < document.lineCount) {
-          const funcLine = document.lineAt(j);
-          const match = funcLine.text.match(kFuncPattern);
-          if (match && match[1]) {
-            // Only offer a Run lens for identifier-named scanners; a loosely
-            // parsed name carrying flags/metacharacters must not reach the
-            // run command line.
-            const name = match[1].trim();
-            if (isValidTaskName(name)) {
-              scanCommands(document.uri, name).forEach((cmd) => {
-                lenses.push(new CodeLens(line.range, cmd));
-              });
-            }
-            break;
-          }
-          j++;
-        }
+        // Resolve all preceding decorators at the next function in one pass,
+        // rather than searching the remaining document from each decorator.
+        pendingDecorators.push(line.range);
       }
     }
     return lenses;
@@ -132,8 +129,8 @@ export class ScoutCodeLensProvider implements CodeLensProvider {
 
 // Linear-time rewrite (see the matching comment in codelens-provider.ts):
 // prior import names are `\w+` elements separated by `\s*,\s*` with no two
-// whitespace quantifiers adjacent, and normalizeTextPattern scans each
-// parenthesized group once. Group 1 stays (scanner|scanjob), group 2 the alias.
+// whitespace quantifiers adjacent. Group 1 stays (scanner|scanjob), group 2
+// the alias. Multiline imports match directly.
 const fromImportPattern =
   /from\s+inspect_scout\s+import\s+(?:\(\s*)?(?:\w+\s*,\s*)*(scanner|scanjob)\b(?:\s+as\s+(\w+))?/;
 const hasImportPattern = /import\s+inspect_scout\b/;
@@ -142,4 +139,3 @@ const hasImportPattern = /import\s+inspect_scout\b/;
 // the matching comment/finding in codelens-provider.ts).
 const kFuncPattern = /^\s*def\s+([A-Za-z_]\w*)\s*\(/;
 const kDecoratorPattern = /^\s*@(inspect_scout\.)?(scanner|scanjob)\b|@(\w+)\b/;
-const normalizeTextPattern = /\(([^)]*)\)/g;

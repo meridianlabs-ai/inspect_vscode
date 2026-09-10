@@ -12,6 +12,8 @@ import {
 
 import { ScoutCodeLensProvider } from "../../providers/codelens/scout-codelens-provider";
 
+import { assertBoundedCodeLensScan } from "./codelens-performance";
+
 class MockTextLine implements TextLine {
   constructor(
     private lineText: string,
@@ -346,5 +348,80 @@ def my_job():
       2,
       "Should return lenses for inspect_scout.scanjob"
     );
+  });
+  test("unclosed parentheses complete within a bounded time", async function () {
+    this.timeout(10_000);
+    await assertBoundedCodeLensScan(
+      require.resolve("../../providers/codelens/scout-codelens-provider"),
+      "ScoutCodeLensProvider"
+    );
+  });
+
+  test("decorator scans read each line only once as input grows", () => {
+    for (const count of [10_000, 100_000]) {
+      const document = createDocument(
+        "import inspect_scout\n" + "@scanner\n".repeat(count)
+      );
+      const originalLineAt = document.lineAt.bind(document);
+      let reads = 0;
+      document.lineAt = (line: number | Position) => {
+        assert.ok(++reads <= document.lineCount, "repeated line scan");
+        return originalLineAt(typeof line === "number" ? line : line.line);
+      };
+      assert.deepStrictEqual(
+        provider.provideCodeLenses(document, cancellationToken),
+        []
+      );
+      assert.strictEqual(reads, document.lineCount);
+    }
+  });
+
+  test("preserves multiline decorators, stacked ranges, and command order", () => {
+    const document = createDocument(
+      [
+        "from inspect_scout import (",
+        "    scanner as alias,",
+        ")",
+        "@alias(",
+        "    name='example',",
+        ")",
+        "@alias",
+        "def example():",
+        "    pass",
+      ].join("\r\n")
+    );
+    const lenses = provider.provideCodeLenses(document, cancellationToken);
+    assert.deepStrictEqual(
+      lenses.map((lens) => lens.range.start.line),
+      [3, 3, 6, 6]
+    );
+    assert.deepStrictEqual(
+      lenses.map((lens) => lens.command?.arguments?.[1] as unknown),
+      ["example", "example", "example", "example"]
+    );
+    assert.deepStrictEqual(
+      lenses.map((lens) => lens.command?.command),
+      [
+        "inspect.debugScoutScan",
+        "inspect.runScoutScan",
+        "inspect.debugScoutScan",
+        "inspect.runScoutScan",
+      ]
+    );
+  });
+
+  test("stops reading lines when cancellation is observed during the scan", () => {
+    const document = createDocument(
+      "import inspect_scout\n" + "@scanner\n".repeat(1_000)
+    );
+    let checks = 0;
+    const token: CancellationToken = {
+      get isCancellationRequested() {
+        return ++checks > 10;
+      },
+      onCancellationRequested: () => ({ dispose: () => {} }),
+    };
+    assert.deepStrictEqual(provider.provideCodeLenses(document, token), []);
+    assert.strictEqual(checks, 11);
   });
 });
