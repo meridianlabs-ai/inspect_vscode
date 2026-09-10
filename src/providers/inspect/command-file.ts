@@ -1,0 +1,70 @@
+import {
+  closeSync,
+  constants,
+  fstatSync,
+  lstatSync,
+  openSync,
+  readSync,
+  unlinkSync,
+} from "node:fs";
+
+const kMaxBytes = 64 * 1024;
+
+/** Read a bounded regular file without following its final symlink. */
+export function readCommandFile(file: string): unknown {
+  const before = lstatSync(file);
+  if (!before.isFile() || before.nlink !== 1 || before.size > kMaxBytes) {
+    throw new Error(
+      "Command request must be a regular file of at most 64 KiB."
+    );
+  }
+  const fd = openSync(
+    file,
+    constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK
+  );
+  try {
+    const opened = fstatSync(fd);
+    if (
+      !opened.isFile() ||
+      opened.nlink !== 1 ||
+      opened.dev !== before.dev ||
+      opened.ino !== before.ino
+    ) {
+      throw new Error("Command file changed while opening.");
+    }
+    const buffer = Buffer.alloc(kMaxBytes + 1);
+    let length = 0;
+    while (length < buffer.length) {
+      const read = readSync(fd, buffer, length, buffer.length - length, null);
+      if (read === 0) break;
+      length += read;
+    }
+    const after = fstatSync(fd);
+    if (
+      length > kMaxBytes ||
+      after.size !== length ||
+      opened.size !== after.size ||
+      opened.mtimeMs !== after.mtimeMs
+    ) {
+      throw new Error("Command file is too large or still being written.");
+    }
+    const value: unknown = JSON.parse(
+      buffer.subarray(0, length).toString("utf8")
+    );
+    const current = lstatSync(file);
+    if (
+      !current.isFile() ||
+      current.dev !== after.dev ||
+      current.ino !== after.ino ||
+      current.size !== after.size ||
+      current.mtimeMs !== after.mtimeMs
+    ) {
+      throw new Error("Command file changed before consumption.");
+    }
+    // Consume only this request. Other pending files must not be discarded.
+    unlinkSync(file);
+    return value;
+  } finally {
+    closeSync(fd);
+  }
+}

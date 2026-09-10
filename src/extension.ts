@@ -21,7 +21,7 @@ import { InspectViewServer } from "./providers/inspect/inspect-view-server";
 import { activateLogNotify } from "./providers/lognotify";
 import { activateLogview } from "./providers/logview/logview";
 import { logviewTerminalLinkProvider } from "./providers/logview/logview-link-provider";
-import { activateOpenLog } from "./providers/openlog";
+import { activateOpenLog, openCommandLog } from "./providers/openlog";
 import { activateOpenScan } from "./providers/openscan";
 import { activateProtocolHandler } from "./providers/protocol-handler";
 import { activateScanview } from "./providers/scanview/scanview";
@@ -105,8 +105,6 @@ export async function activate(context: ExtensionContext) {
     context
   );
 
-  // Activate commands interface
-  activateInspectCommands(stateManager, context);
   end("Setup Eval Command");
 
   // Activate a watcher which inspects the active document and determines
@@ -151,6 +149,9 @@ export async function activate(context: ExtensionContext) {
 
   // initilisze open log
   activateOpenLog(context, logviewWebviewManager);
+  activateInspectCommands(stateManager, context, async (uri) => {
+    await openCommandLog(uri, logviewWebviewManager);
+  });
   end("Setup Log Viewer");
 
   // Activate the Activity Bar

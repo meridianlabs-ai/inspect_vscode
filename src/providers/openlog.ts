@@ -47,3 +47,18 @@ export function activateOpenLog(
     )
   );
 }
+
+/** Open a validated, user-authorized IPC log without consulting editor associations. */
+export async function openCommandLog(
+  uri: Uri,
+  viewManager: InspectViewManager
+) {
+  if (hasMinimumInspectVersion(kInspectEvalLogFormatVersion)) {
+    await commands.executeCommand("vscode.openWith", uri, kInspectLogViewType, {
+      preview: true,
+    });
+    await commands.executeCommand("inspect.logListingReveal", uri);
+  } else {
+    await viewManager.showLogFile(uri, "activate");
+  }
+}

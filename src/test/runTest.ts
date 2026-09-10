@@ -1,8 +1,12 @@
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import * as path from "path";
 
 import { runTests } from "@vscode/test-electron";
 
 async function main() {
+  // Keep the macOS IPC socket path below its length limit in deep worktrees.
+  const userDataDir = mkdtempSync(path.join(tmpdir(), "inspect-test-"));
   try {
     // The folder containing the Extension Manifest package.json
     // Passed to `--extensionDevelopmentPath`
@@ -22,13 +26,19 @@ async function main() {
       extensionDevelopmentPath,
       extensionTestsPath,
       // Configure for CI environments (GitHub Actions)
-      launchArgs: ["--no-sandbox", "--disable-gpu"],
+      launchArgs: [
+        "--no-sandbox",
+        "--disable-gpu",
+        `--user-data-dir=${userDataDir}`,
+      ],
       // Use headless mode when running on CI without a display
       extensionTestsEnv: { DISPLAY: process.env.DISPLAY || ":99.0" },
     });
   } catch (err) {
     console.error("Failed to run tests", err);
-    process.exit(1);
+    process.exitCode = 1;
+  } finally {
+    rmSync(userDataDir, { recursive: true, force: true });
   }
 }
 
