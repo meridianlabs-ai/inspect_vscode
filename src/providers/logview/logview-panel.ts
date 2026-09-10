@@ -25,7 +25,7 @@ import { log } from "../../core/log";
 import { assertLogProxyInScope } from "../../core/package/proxy-scope";
 import { HttpProxyRpcRequest } from "../../core/package/view-server";
 import { AbsolutePath } from "../../core/path";
-import { getRelativeUri, resolveToUri } from "../../core/uri";
+import { getRelativeUri, resolveServerLocation } from "../../core/uri";
 import {
   getWebviewPanelHtml,
   handleWebviewPanelOpenMessages,
@@ -52,7 +52,7 @@ export function logPathInScope(
   const panelUriStr = panelUri.toString();
   let targetUri: Uri;
   try {
-    targetUri = resolveToUri(target);
+    targetUri = resolveServerLocation(target);
   } catch {
     return false;
   }
@@ -175,14 +175,10 @@ export class LogviewPanel extends Disposable {
             logPathInScope(type, uri, target)
           );
         } catch (error) {
-          log.appendLine(
-            `[proxy-scope] BLOCKED ${request.method} ${request.path}`
-          );
+          log.warn(`[proxy-scope] blocked ${request.method} ${request.path}`);
           throw error;
         }
-        log.appendLine(
-          `[proxy-scope] allowed ${request.method} ${request.path}`
-        );
+        log.trace(`[proxy-scope] allowed ${request.method} ${request.path}`);
         return server_.proxyRpcRequest(request);
       },
     });

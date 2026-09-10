@@ -13,7 +13,7 @@ import { log } from "../../core/log";
 import { assertScanProxyInScope } from "../../core/package/proxy-scope";
 import { HttpProxyRpcRequest } from "../../core/package/view-server";
 import { AbsolutePath } from "../../core/path";
-import { getRelativeUri, resolveToUri } from "../../core/uri";
+import { getRelativeUri, resolveServerLocation } from "../../core/uri";
 import {
   getWebviewPanelHtml,
   handleWebviewPanelOpenMessages,
@@ -29,7 +29,7 @@ import { RouteMessage, sanitizeRouteMessage } from "./scanview-message";
 export function scanLocationInScope(scope: Uri[], location: string): boolean {
   let target: Uri;
   try {
-    target = resolveToUri(location);
+    target = resolveServerLocation(location);
   } catch {
     return false;
   }
@@ -94,20 +94,25 @@ export class ScanviewPanel extends Disposable {
         ),
       [kMethodHttpRequest]: async (params: unknown[]) => {
         // Confine the generic proxy to the panel scope like the named methods.
+        // Transcripts are read from the project's configured transcripts
+        // location (not the scan results dir), so those routes get a scope
+        // that also admits it.
         const request = params[0] as HttpProxyRpcRequest;
         try {
-          assertScanProxyInScope(request, (location) =>
-            scanLocationInScope(scopeResolver(), location)
+          assertScanProxyInScope(
+            request,
+            (location) => scanLocationInScope(scopeResolver(), location),
+            (location) =>
+              scanLocationInScope(
+                [...scopeResolver(), ...server_.transcriptsScope()],
+                location
+              )
           );
         } catch (error) {
-          log.appendLine(
-            `[proxy-scope] BLOCKED ${request.method} ${request.path}`
-          );
+          log.warn(`[proxy-scope] blocked ${request.method} ${request.path}`);
           throw error;
         }
-        log.appendLine(
-          `[proxy-scope] allowed ${request.method} ${request.path}`
-        );
+        log.trace(`[proxy-scope] allowed ${request.method} ${request.path}`);
         return server_.proxyRpcRequest(request);
       },
     });

@@ -12,34 +12,106 @@ import type { HttpProxyRpcRequest } from "./view-server";
  * here: the requested view-server route is parsed, any file/dir/URL location it
  * carries is extracted and checked against the panel scope, and unrecognized
  * routes are rejected by default. See CWE-863.
+ *
+ * Locations are extracted the way the server will interpret them: a
+ * `/{name:path}` catch-all receives the whole percent-decoded remainder of the
+ * path (not just its first segment), and a v2 `<dir>/<scan>` pair is joined the
+ * way `UPath(dir) / scan` joins it (an absolute `scan` replaces `dir`).
  */
 
 type InScope = (location: string) => boolean;
 
-interface ParsedPath {
+interface ParsedRequest {
   pathname: string;
   params: URLSearchParams;
   /** Path split on "/", each segment percent-decoded (index 0 is ""). */
   segments: string[];
+  /**
+   * The percent-decoded remainder of the path after `prefix` — what a
+   * `{name:path}` catch-all route receives on the server. `prefix` must end
+   * with "/" (e.g. "/api/log-bytes/").
+   */
+  remainder: (prefix: string) => string;
 }
 
-function parsePath(path: string): ParsedPath {
-  // The view server only serves absolute "/api/..." paths; normalize so a
-  // missing leading slash still parses rather than being treated as relative.
-  const url = new URL(
-    "http://127.0.0.1" + (path.startsWith("/") ? path : "/" + path)
-  );
-  const segments = url.pathname
-    .split("/")
-    .map((segment, index) =>
-      index === 0 ? segment : decodeURIComponent(segment)
+function parseRequest(request: HttpProxyRpcRequest): ParsedRequest {
+  try {
+    const path = request.path;
+    // The view server only serves absolute "/api/..." paths; normalize so a
+    // missing leading slash still parses rather than being treated as relative.
+    const url = new URL(
+      "http://127.0.0.1" + (path.startsWith("/") ? path : "/" + path)
     );
-  return { pathname: url.pathname, params: url.searchParams, segments };
+    const segments = url.pathname
+      .split("/")
+      .map((segment, index) =>
+        index === 0 ? segment : decodeURIComponent(segment)
+      );
+    return {
+      pathname: url.pathname,
+      params: url.searchParams,
+      segments,
+      remainder: (prefix) =>
+        segments.slice(prefix.split("/").length - 1).join("/"),
+    };
+  } catch {
+    throw proxyError(request);
+  }
+}
+
+function checker(request: HttpProxyRpcRequest, inScope: InScope) {
+  return (location: string | null | undefined): void => {
+    if (typeof location !== "string" || !inScope(location)) {
+      throw proxyError(request);
+    }
+  };
 }
 
 function decodeBase64Url(value: string): string {
   return Buffer.from(value, "base64url").toString("utf-8");
 }
+
+/** Whether a decoded path/URI would replace (rather than extend) a base dir when joined. */
+function isAbsoluteLocation(location: string): boolean {
+  return (
+    location.startsWith("/") ||
+    location.startsWith("\\") ||
+    /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(location)
+  );
+}
+
+function joinLocation(dir: string, child: string): string {
+  return isAbsoluteLocation(child)
+    ? child
+    : dir.replace(/\/+$/, "") + "/" + child.replace(/^\/+/, "");
+}
+
+// ---------------------------------------------------------------------------
+// Inspect log view
+// ---------------------------------------------------------------------------
+
+// Endpoints that carry no file/dir location.
+const kLogNoLocation = new Set([
+  "/api/log-dir",
+  "/api/user-info",
+  "/api/app-config",
+  "/api/events", // last_eval_time only
+  "/api/dist",
+  "/api/scout/searches", // type + count only
+]);
+
+// Endpoints of the form /api/<name>/{log:path}. `log-delete` is deliberately
+// absent: neither the named RPC surface nor the viewer deletes logs, so the
+// proxy must not either.
+const kLogSegmentRoutes = [
+  "/api/logs/",
+  "/api/log-info/",
+  "/api/log-size/",
+  "/api/log-bytes/",
+  "/api/log-download/",
+  "/api/log-edit/",
+  "/api/log-message/",
+];
 
 /**
  * Throw unless the proxied Inspect **log** view request stays within the panel
@@ -49,29 +121,15 @@ export function assertLogProxyInScope(
   request: HttpProxyRpcRequest,
   inScope: InScope
 ): void {
-  let parsed: ParsedPath;
-  try {
-    parsed = parsePath(request.path);
-  } catch {
-    throw proxyError(request.path);
+  // No log-view route needs DELETE, so refuse it outright.
+  if (request.method === "DELETE") {
+    throw proxyError(request);
   }
-  const { pathname, params, segments } = parsed;
-  const check = (location: string | null | undefined) => {
-    if (typeof location !== "string" || !inScope(location)) {
-      throw proxyError(request.path);
-    }
-  };
 
-  // Endpoints that carry no file/dir location.
-  const kNoLocation = new Set([
-    "/api/log-dir",
-    "/api/user-info",
-    "/api/app-config",
-    "/api/events", // last_eval_time only
-    "/api/dist",
-    "/api/scout/searches", // type + count only
-  ]);
-  if (kNoLocation.has(pathname)) {
+  const { pathname, params, segments, remainder } = parseRequest(request);
+  const check = checker(request, inScope);
+
+  if (kLogNoLocation.has(pathname)) {
     return;
   }
 
@@ -116,7 +174,7 @@ export function assertLogProxyInScope(
     const base = params.get("log_dir") ?? "";
     const sub = params.get("dir") ?? "";
     if (base && sub) {
-      check(base.replace(/\/+$/, "") + "/" + sub.replace(/^\/+/, ""));
+      check(joinLocation(base, sub));
     } else if (base) {
       check(base);
     } else if (sub) {
@@ -125,72 +183,90 @@ export function assertLogProxyInScope(
     return;
   }
 
-  // Endpoints of the form /api/<name>/<encoded file>.
-  const kSegmentRoutes = [
-    "/api/logs/",
-    "/api/log-info/",
-    "/api/log-size/",
-    "/api/log-delete/",
-    "/api/log-bytes/",
-    "/api/log-download/",
-    "/api/log-edit/",
-    "/api/log-message/",
-  ];
-  if (kSegmentRoutes.some((route) => pathname.startsWith(route))) {
-    return check(segments[3]);
+  const segmentRoute = kLogSegmentRoutes.find((route) =>
+    pathname.startsWith(route)
+  );
+  if (segmentRoute) {
+    return check(remainder(segmentRoute));
   }
 
   // /api/scout/transcripts/<base64url dir>/<id>/...
   if (pathname.startsWith("/api/scout/transcripts/")) {
     const dirSegment = segments[4];
     if (!dirSegment) {
-      throw proxyError(request.path);
+      throw proxyError(request);
     }
     return check(decodeBase64Url(dirSegment));
   }
 
-  throw proxyError(request.path);
+  throw proxyError(request);
 }
+
+// ---------------------------------------------------------------------------
+// Scout scan view
+// ---------------------------------------------------------------------------
+
+// No-location config/listing/compute endpoints.
+//
+// NOTE: `/startscan` (POST) and `/project/config` (PUT) are mutating endpoints
+// whose request BODY carries free-form locations (transcripts, scans/results,
+// scanner source files) that the scout server does not confine to the project.
+// They are allowed because the Scout View's "start scan" and "edit project"
+// features are built on them; this leaves those two operations reachable from
+// injected webview script. Scoping them would require parsing the body.
+const kScanNoLocation = new Set([
+  "/api/v2/dist",
+  "/api/v2/app-config",
+  "/api/v2/project/config",
+  "/api/v2/topics",
+  "/api/v2/topics/stream",
+  "/api/v2/scanners",
+  "/api/v2/code",
+  "/api/v2/searches",
+  "/api/v2/scans/active",
+  "/api/v2/startscan",
+  "/api/v2/validations",
+]);
+
+// Legacy /api/<name>/{location:path}. `scan-delete` is deliberately absent:
+// the viewer never deletes scans through the proxy.
+const kLegacyScanSegmentRoutes = [
+  "/api/scan/",
+  "/api/scanner_df/",
+  "/api/scanner_df_input/",
+];
 
 /**
  * Throw unless the proxied **scan** view request stays within the panel scope.
+ *
  * `inScope` is the panel's `scanLocationInScope` bound to its scan scope.
+ * `inTranscriptsScope` governs the transcripts routes: the viewer reads
+ * transcripts from the project's configured transcripts location (which is
+ * usually NOT under the scan results dir), so callers pass a predicate bound
+ * to that location. It defaults to `inScope`.
  */
 export function assertScanProxyInScope(
   request: HttpProxyRpcRequest,
-  inScope: InScope
+  inScope: InScope,
+  inTranscriptsScope: InScope = inScope
 ): void {
-  let parsed: ParsedPath;
-  try {
-    parsed = parsePath(request.path);
-  } catch {
-    throw proxyError(request.path);
-  }
-  const { pathname, params, segments } = parsed;
-  const check = (location: string | null | undefined) => {
-    if (typeof location !== "string" || !inScope(location)) {
-      throw proxyError(request.path);
-    }
-  };
+  const { pathname, params, segments, remainder } = parseRequest(request);
+  const check = checker(request, inScope);
 
-  // No-location config/listing/compute endpoints. The mutating ones
-  // (/startscan, /validations create) are constrained by the scout server's own
-  // project containment and carry no directory in the URL, so there is nothing
-  // to scope here.
-  const kNoLocation = new Set([
-    "/api/v2/dist",
-    "/api/v2/app-config",
-    "/api/v2/project/config",
-    "/api/v2/topics",
-    "/api/v2/topics/stream",
-    "/api/v2/scanners",
-    "/api/v2/code",
-    "/api/v2/searches",
-    "/api/v2/scans/active",
-    "/api/v2/startscan",
-    "/api/v2/validations",
-  ]);
-  if (kNoLocation.has(pathname)) {
+  // Validation sets/cases are files in the project dir, confined server-side
+  // (`_validate_path_within_project`), and the viewer creates, renames and
+  // deletes them. They are not scan results, so the scan scope does not apply.
+  if (pathname.startsWith("/api/v2/validations/")) {
+    return;
+  }
+
+  // Nothing else needs DELETE: the viewer never deletes scans through the
+  // proxy (the extension's own tree commands call the server directly).
+  if (request.method === "DELETE") {
+    throw proxyError(request);
+  }
+
+  if (kScanNoLocation.has(pathname)) {
     return;
   }
 
@@ -204,37 +280,46 @@ export function assertScanProxyInScope(
     return;
   }
 
-  // Legacy /api/<name>/<encoded location> (plain URI/path segment).
-  const kLegacySegmentRoutes = [
-    "/api/scan/",
-    "/api/scanner_df/",
-    "/api/scanner_df_input/",
-    "/api/scan-delete/",
-  ];
-  if (kLegacySegmentRoutes.some((route) => pathname.startsWith(route))) {
-    return check(segments[3]);
+  const legacyRoute = kLegacyScanSegmentRoutes.find((route) =>
+    pathname.startsWith(route)
+  );
+  if (legacyRoute) {
+    return check(remainder(legacyRoute));
   }
 
-  // v2 directory-scoped routes: /api/v2/{scans,transcripts,validations}/<dir>/…
-  // where <dir> (segments[4]) is base64url-encoded (decode_base64url server-side).
-  const kV2DirRoutes = [
-    "/api/v2/scans/",
-    "/api/v2/transcripts/",
-    "/api/v2/validations/",
-  ];
-  if (kV2DirRoutes.some((route) => pathname.startsWith(route))) {
+  // /api/v2/transcripts/<base64url dir>/<id>/...  — <id> is a transcript id
+  // (a database key), not a path.
+  if (pathname.startsWith("/api/v2/transcripts/")) {
     const dirSegment = segments[4];
     if (!dirSegment) {
-      throw proxyError(request.path);
+      throw proxyError(request);
     }
-    return check(decodeBase64Url(dirSegment));
+    return checker(request, inTranscriptsScope)(decodeBase64Url(dirSegment));
   }
 
-  throw proxyError(request.path);
+  // /api/v2/scans/<base64url dir>[/<base64url scan>[/<scanner>/...]] (plus the
+  // literal /api/v2/scans/<dir>/distinct). The server resolves the scan as
+  // `UPath(dir) / scan`, so an absolute or traversing <scan> escapes <dir>;
+  // check the effective joined location, not just <dir>.
+  if (pathname.startsWith("/api/v2/scans/")) {
+    const dirSegment = segments[4];
+    if (!dirSegment) {
+      throw proxyError(request);
+    }
+    const dir = decodeBase64Url(dirSegment);
+    check(dir);
+    const scanSegment = segments[5];
+    if (scanSegment && scanSegment !== "distinct") {
+      check(joinLocation(dir, decodeBase64Url(scanSegment)));
+    }
+    return;
+  }
+
+  throw proxyError(request);
 }
 
-function proxyError(path: string): Error {
+function proxyError(request: HttpProxyRpcRequest): Error {
   return new Error(
-    `Refusing proxied request to "${path}": outside the scope of this view.`
+    `Refusing proxied request ${request.method} "${request.path}": outside the scope of this view.`
   );
 }

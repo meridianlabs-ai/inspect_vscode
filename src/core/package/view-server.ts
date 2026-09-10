@@ -145,8 +145,9 @@ export class PackageViewServer implements Disposable {
 
   /**
    * JSON-RPC handler that proxies a webview HTTP request to the backend view
-   * server. Used by both the Inspect and Scout webviews so new viewer
-   * endpoints need no extension changes.
+   * server. Used by both the Inspect and Scout webviews. Callers must confine
+   * the request to the panel scope first (see `proxy-scope.ts`); a new viewer
+   * endpoint therefore needs a matching entry in that route table.
    */
   public async proxyRpcRequest(
     request: HttpProxyRpcRequest

@@ -47,6 +47,17 @@ suite("logview-panel Test Suite", () => {
       );
     });
 
+    test("dir panel decodes bare paths once, as the server does", () => {
+      const dir = Uri.file("/w/logs");
+      // The server unquotes "%2F" → "/" before resolving, so this is a traversal
+      assert.strictEqual(
+        logPathInScope("dir", dir, "/w/logs/..%2F..%2Fetc%2Fpasswd"),
+        false
+      );
+      assert.strictEqual(logPathInScope("dir", dir, "/w/logs/%E0%A4%A"), false);
+      assert.strictEqual(logPathInScope("dir", dir, "/w/logs/run.eval"), true);
+    });
+
     test("dir panel confines S3 scope to the same bucket/prefix", () => {
       const dir = Uri.parse("s3://team-a/logs");
       assert.strictEqual(
