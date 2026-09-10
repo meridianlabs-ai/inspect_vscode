@@ -5,7 +5,11 @@ import { OutputWatcher } from "../core/package/output-watcher";
 import { basename } from "../core/uri";
 
 import { InspectViewManager } from "./logview/logview-view";
-import { confirmRemoteOpen, validateLogUri } from "./protocol-handler";
+import {
+  confirmRemoteOpen,
+  validateLogUri,
+  workspaceTrustedRoots,
+} from "./protocol-handler";
 import { InspectSettingsManager } from "./settings/inspect-settings";
 
 /**
@@ -58,7 +62,9 @@ export function activateLogNotify(
         // process, so validate it as an Inspect log and — for remote locations
         // whose host the user did not choose — confirm the host before the view
         // server fetches it with the user's ambient credentials.
-        const validationError = validateLogUri(e.log);
+        const validationError = validateLogUri(e.log, {
+          trustedRoots: workspaceTrustedRoots(),
+        });
         if (validationError) {
           await showError(validationError);
           return;

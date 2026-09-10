@@ -16,7 +16,11 @@ import { showError } from "../../components/error";
 import { OutputWatcher } from "../../core/package/output-watcher";
 import { workspacePath } from "../../core/path";
 import { isUncPath, isUri, parseTerminalLinkUri } from "../../core/uri";
-import { confirmRemoteOpen, validateLogUri } from "../protocol-handler";
+import {
+  confirmRemoteOpen,
+  validateLogUri,
+  workspaceTrustedRoots,
+} from "../protocol-handler";
 
 const kLogFilePattern = /^.*Log: (\S*?\.json|\S*?\.eval)\s*/g;
 const kEvalJsonPattern = /(?:^|\s)(\S*?\.json|\S*?\.eval)\s*/g;
@@ -127,7 +131,9 @@ export const logviewTerminalLinkProvider = (
         // the signal-file source). Apply the same validation and host-naming
         // confirmation the protocol handler / notification paths use before the
         // view server fetches a location the user didn't choose. See CWE-918.
-        const validationError = validateLogUri(logUri);
+        const validationError = validateLogUri(logUri, {
+          trustedRoots: workspaceTrustedRoots(),
+        });
         if (validationError) {
           await showError(validationError);
           return;

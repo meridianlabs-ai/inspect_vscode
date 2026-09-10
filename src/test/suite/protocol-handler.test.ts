@@ -96,6 +96,52 @@ suite("Protocol Handler Test Suite", () => {
       assert.ok(err && err.includes("host"));
     });
 
+    test("accepts a hosted file URI inside a trusted root (UNC workspace)", () => {
+      // A Windows workspace folder that is itself a UNC share: VS Code has
+      // already connected to that host (gated by security.allowedUNCHosts), so
+      // a log inside the folder reopens no credential-leak vector.
+      const root = Uri.parse("file://server/share/proj");
+      assert.strictEqual(
+        validateLogUri(Uri.parse("file://server/share/proj/logs/run.eval"), {
+          trustedRoots: [root],
+        }),
+        null
+      );
+    });
+
+    test("rejects a hosted file URI outside every trusted root", () => {
+      const root = Uri.parse("file://server/share/proj");
+      // Same host, different share/folder.
+      let err = validateLogUri(
+        Uri.parse("file://server/share/other/run.eval"),
+        {
+          trustedRoots: [root],
+        }
+      );
+      assert.ok(err && err.includes("host"));
+      // Same path shape, different host.
+      err = validateLogUri(
+        Uri.parse("file://attacker.example/share/proj/logs/run.eval"),
+        { trustedRoots: [root] }
+      );
+      assert.ok(err && err.includes("host"));
+      // No roots at all: unchanged behaviour.
+      err = validateLogUri(
+        Uri.parse("file://server/share/proj/logs/run.eval"),
+        { trustedRoots: [] }
+      );
+      assert.ok(err && err.includes("host"));
+    });
+
+    test("rejects a hosted file URI that traverses out of a trusted root", () => {
+      const root = Uri.parse("file://server/share/proj");
+      const err = validateLogUri(
+        Uri.parse("file://server/share/proj/logs/../../other/run.eval"),
+        { trustedRoots: [root] }
+      );
+      assert.ok(err && err.includes("host"));
+    });
+
     test("rejects a remote authority carrying userinfo (host spoof)", () => {
       const err = validateLogUri(
         Uri.parse("https://logs.victim-corp.com@evil.example/run.eval")

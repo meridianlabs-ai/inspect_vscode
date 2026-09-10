@@ -7,10 +7,11 @@ import {
   Uri,
   UriHandler,
   window,
+  workspace,
 } from "vscode";
 
 import { showError } from "../components/error";
-import { isUncPath } from "../core/uri";
+import { getRelativeUri, isUncPath } from "../core/uri";
 
 // Schemes we are willing to open a log from. Anyone can invoke this URI
 // handler, so we restrict it to local files and the remote backends Inspect
@@ -40,9 +41,14 @@ export function activateProtocolHandler(context: ExtensionContext) {
  * so we only forward URIs that look like an Inspect log on a backend we
  * support, rather than passing arbitrary URIs to the view server. Returns an
  * error message describing why the URI was rejected, or `null` if it is
- * acceptable. Pure (no file-system access) so it can be unit tested.
+ * acceptable. Pure (no file-system access) so it can be unit tested; callers
+ * pass the open workspace folders as `trustedRoots` (see
+ * {@link workspaceTrustedRoots}).
  */
-export function validateLogUri(uri: Uri): string | null {
+export function validateLogUri(
+  uri: Uri,
+  opts?: { trustedRoots?: readonly Uri[] }
+): string | null {
   if (!kAllowedLogSchemes.includes(uri.scheme)) {
     return `Unable to open log: unsupported location "${uri.scheme}:".`;
   }
@@ -51,8 +57,20 @@ export function validateLogUri(uri: Uri): string | null {
   // handshake on Windows that leaks the user's credentials. Reject it before any
   // filesystem touch, matching parseTerminalLinkUri / isAcceptableSignalUri.
   // See CWE-522.
+  //
+  // The one exception is a log inside a `trustedRoots` folder (the open
+  // workspace folders): a UNC-hosted workspace is a host VS Code has already
+  // connected to (gated by `security.allowedUNCHosts`), so opening a log within
+  // it reopens no vector. Containment is checked with getRelativeUri, which
+  // requires the same authority and resolves `..`, so a link to another share
+  // or host on the same server is still refused.
   if (uri.scheme === "file" && (uri.authority || isUncPath(uri.fsPath))) {
-    return `Unable to open log: file URLs with a host are not supported.`;
+    const inTrustedRoot = (opts?.trustedRoots ?? []).some(
+      (root) => root.scheme === "file" && getRelativeUri(root, uri) !== null
+    );
+    if (!inTrustedRoot) {
+      return `Unable to open log: file URLs with a host are not supported.`;
+    }
   }
   // For remote schemes, require a clean host[:port] authority so the fetch
   // target is unambiguous and the confirmation dialog can't be spoofed.
@@ -85,6 +103,14 @@ export function validateLogUri(uri: Uri): string | null {
     }
   }
   return null;
+}
+
+/**
+ * The open workspace folders, as the `trustedRoots` for {@link validateLogUri}:
+ * a hosted (UNC) `file` log is only accepted from inside one of them.
+ */
+export function workspaceTrustedRoots(): Uri[] {
+  return (workspace.workspaceFolders ?? []).map((folder) => folder.uri);
 }
 
 /**
@@ -138,7 +164,9 @@ export class InspectProtocolHandler implements UriHandler {
           // This handler can be invoked by any web page (anyone can navigate to
           // vscode://ukaisi.inspect-ai/open?log=<uri>), so validate the target
           // before forwarding it to the log viewer.
-          const validationError = validateLogUri(logUri);
+          const validationError = validateLogUri(logUri, {
+            trustedRoots: workspaceTrustedRoots(),
+          });
           if (validationError) {
             await showError(validationError);
             return;
