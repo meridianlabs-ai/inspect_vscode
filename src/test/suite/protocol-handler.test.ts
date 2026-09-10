@@ -2,9 +2,62 @@ import * as assert from "assert";
 
 import { Uri } from "vscode";
 
-import { validateLogUri } from "../../providers/protocol-handler";
+import {
+  isTrustedLogLocation,
+  validateLogUri,
+} from "../../providers/protocol-handler";
 
 suite("Protocol Handler Test Suite", () => {
+  suite("isTrustedLogLocation", () => {
+    test("accepts a remote log inside a configured remote log dir", () => {
+      const roots = [Uri.parse("s3://bucket/logs")];
+      assert.strictEqual(
+        isTrustedLogLocation(Uri.parse("s3://bucket/logs/run.eval"), roots),
+        true
+      );
+      // Nested, and with a trailing slash on the root.
+      assert.strictEqual(
+        isTrustedLogLocation(Uri.parse("s3://bucket/logs/2026/run.eval"), [
+          Uri.parse("s3://bucket/logs/"),
+        ]),
+        true
+      );
+    });
+
+    test("rejects a remote log outside every configured root", () => {
+      const roots = [Uri.parse("s3://bucket/logs")];
+      // Different bucket, same path shape.
+      assert.strictEqual(
+        isTrustedLogLocation(Uri.parse("s3://evil/logs/run.eval"), roots),
+        false
+      );
+      // Shared string prefix but a sibling directory.
+      assert.strictEqual(
+        isTrustedLogLocation(
+          Uri.parse("s3://bucket/logs-evil/run.eval"),
+          roots
+        ),
+        false
+      );
+      // Traversal back out of the root.
+      assert.strictEqual(
+        isTrustedLogLocation(Uri.parse("s3://bucket/logs/../run.eval"), roots),
+        false
+      );
+      // A local root never trusts a remote log, and no roots trusts nothing.
+      assert.strictEqual(
+        isTrustedLogLocation(Uri.parse("s3://bucket/logs/run.eval"), [
+          Uri.file("/w/logs"),
+        ]),
+        false
+      );
+      assert.strictEqual(
+        isTrustedLogLocation(Uri.parse("s3://bucket/logs/run.eval"), []),
+        false
+      );
+    });
+  });
+
   suite("validateLogUri", () => {
     test("accepts a local .eval file", () => {
       assert.strictEqual(

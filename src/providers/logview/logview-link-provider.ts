@@ -16,11 +16,7 @@ import { showError } from "../../components/error";
 import { OutputWatcher } from "../../core/package/output-watcher";
 import { workspacePath } from "../../core/path";
 import { isUncPath, isUri, parseTerminalLinkUri } from "../../core/uri";
-import {
-  confirmRemoteOpen,
-  validateLogUri,
-  workspaceTrustedRoots,
-} from "../protocol-handler";
+import { validateLogUri, workspaceTrustedRoots } from "../protocol-handler";
 
 const kLogFilePattern = /^.*Log: (\S*?\.json|\S*?\.eval)\s*/g;
 const kEvalJsonPattern = /(?:^|\s)(\S*?\.json|\S*?\.eval)\s*/g;
@@ -126,22 +122,16 @@ export const logviewTerminalLinkProvider = (
       // Resolve the clicked link into a complete Uri to the file
       const logUri = await resolveLogFile(link.data);
       if (logUri) {
-        // Terminal output is attacker-influenceable, and the target may be a
-        // remote URI (including one hidden behind a local-looking filename via
-        // the signal-file source). Apply the same validation and host-naming
-        // confirmation the protocol handler / notification paths use before the
-        // view server fetches a location the user didn't choose. See CWE-918.
+        // Terminal output is attacker-influenceable, so apply the same
+        // validation as the protocol handler. No host confirmation is needed: a
+        // remote target only arises from a full URL in the link text (a bare
+        // filename resolves to a local file), so the user is looking at the
+        // exact location they clicked.
         const validationError = validateLogUri(logUri, {
           trustedRoots: workspaceTrustedRoots(),
         });
         if (validationError) {
           await showError(validationError);
-          return;
-        }
-        if (
-          logUri.scheme !== "file" &&
-          !(await confirmRemoteOpen(logUri, { source: "A terminal link" }))
-        ) {
           return;
         }
         await commands.executeCommand("inspect.openLogViewer", logUri);

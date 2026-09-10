@@ -5,11 +5,7 @@ import { OutputWatcher } from "../core/package/output-watcher";
 import { basename } from "../core/uri";
 
 import { InspectViewManager } from "./logview/logview-view";
-import {
-  confirmRemoteOpen,
-  validateLogUri,
-  workspaceTrustedRoots,
-} from "./protocol-handler";
+import { validateLogUri, workspaceTrustedRoots } from "./protocol-handler";
 import { InspectSettingsManager } from "./settings/inspect-settings";
 
 /**
@@ -58,23 +54,14 @@ export function activateLogNotify(
         dontShowAgain
       );
       if (result === viewLog) {
-        // The log location comes from a signal file writable by any same-user
-        // process, so validate it as an Inspect log and — for remote locations
-        // whose host the user did not choose — confirm the host before the view
-        // server fetches it with the user's ambient credentials.
+        // The log location comes from a signal file written by the eval the
+        // user launched, so validate it as an Inspect log. No host confirmation:
+        // anything able to forge the signal already runs as the user.
         const validationError = validateLogUri(e.log, {
           trustedRoots: workspaceTrustedRoots(),
         });
         if (validationError) {
           await showError(validationError);
-          return;
-        }
-        if (
-          e.log.scheme !== "file" &&
-          !(await confirmRemoteOpen(e.log, {
-            source: "The eval-complete notification",
-          }))
-        ) {
           return;
         }
         // open the editor

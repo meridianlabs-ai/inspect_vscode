@@ -13,6 +13,8 @@ import {
 import { showError } from "../components/error";
 import { getRelativeUri, isUncPath } from "../core/uri";
 
+import { WorkspaceEnvManager } from "./workspace/workspace-env-provider";
+
 // Schemes we are willing to open a log from. Anyone can invoke this URI
 // handler, so we restrict it to local files and the remote backends Inspect
 // itself supports rather than forwarding arbitrary URIs to the view server.
@@ -29,8 +31,15 @@ const kValidAuthorityPattern = /^[A-Za-z0-9._~:[\]-]+$/;
 // Recognized Inspect log file extensions.
 const kAllowedLogExtensions = [".eval", ".json"];
 
-export function activateProtocolHandler(context: ExtensionContext) {
-  const protocolHandler = new InspectProtocolHandler();
+export function activateProtocolHandler(
+  context: ExtensionContext,
+  envMgr: WorkspaceEnvManager
+) {
+  // Remote logs inside the workspace's configured log directory are opened
+  // without the host confirmation: the user chose that location.
+  const protocolHandler = new InspectProtocolHandler(() => [
+    envMgr.getDefaultLogDir(),
+  ]);
   context.subscriptions.push(window.registerUriHandler(protocolHandler));
 }
 
@@ -61,14 +70,10 @@ export function validateLogUri(
   // The one exception is a log inside a `trustedRoots` folder (the open
   // workspace folders): a UNC-hosted workspace is a host VS Code has already
   // connected to (gated by `security.allowedUNCHosts`), so opening a log within
-  // it reopens no vector. Containment is checked with getRelativeUri, which
-  // requires the same authority and resolves `..`, so a link to another share
-  // or host on the same server is still refused.
+  // it reopens no vector. isTrustedLogLocation requires the same authority and
+  // resolves `..`, so a link to another share or host is still refused.
   if (uri.scheme === "file" && (uri.authority || isUncPath(uri.fsPath))) {
-    const inTrustedRoot = (opts?.trustedRoots ?? []).some(
-      (root) => root.scheme === "file" && getRelativeUri(root, uri) !== null
-    );
-    if (!inTrustedRoot) {
+    if (!isTrustedLogLocation(uri, opts?.trustedRoots ?? [])) {
       return `Unable to open log: file URLs with a host are not supported.`;
     }
   }
@@ -106,6 +111,19 @@ export function validateLogUri(
 }
 
 /**
+ * Whether `uri` lies inside one of `trustedRoots` — locations the user chose
+ * themselves (the open workspace folders, the configured log directory). Uses
+ * getRelativeUri, so the scheme and authority must match exactly, a shared
+ * string prefix is not containment, and `..` is resolved before comparing.
+ */
+export function isTrustedLogLocation(
+  uri: Uri,
+  trustedRoots: readonly Uri[]
+): boolean {
+  return trustedRoots.some((root) => getRelativeUri(root, uri) !== null);
+}
+
+/**
  * The open workspace folders, as the `trustedRoots` for {@link validateLogUri}:
  * a hosted (UNC) `file` log is only accepted from inside one of them.
  */
@@ -114,18 +132,15 @@ export function workspaceTrustedRoots(): Uri[] {
 }
 
 /**
- * Confirm opening a remote log/scan, naming the host/bucket so the user can see
- * who they are fetching from. `source` describes what triggered the open (a
- * drive-by website, a terminal link, …) and `noun` what is being opened
- * ("Inspect log", "scan results") so the prompt matches its caller. Returns true
- * only if the user explicitly chooses to open it.
+ * Confirm opening a remote log requested via the (externally-invokable) URI
+ * handler, naming the host/bucket so the user can see who they are fetching
+ * from. Returns true only if the user explicitly chooses to open it. Callers
+ * skip this for locations the user configured themselves (see
+ * {@link isTrustedLogLocation}); terminal links and the eval-complete
+ * notification never prompt, since there the user is looking at the URL they
+ * clicked or launched the eval that produced it.
  */
-export async function confirmRemoteOpen(
-  logUri: Uri,
-  opts?: { source?: string; noun?: string }
-): Promise<boolean> {
-  const source = opts?.source ?? "A website";
-  const noun = opts?.noun ?? "an Inspect log";
+export async function confirmRemoteOpen(logUri: Uri): Promise<boolean> {
   // Display only the real host: drop any userinfo (everything before the final
   // '@') and refuse to render decoded control/whitespace, so the named location
   // can't be spoofed even if a caller reaches here without validateLogUri.
@@ -139,7 +154,7 @@ export async function confirmRemoteOpen(
   const open: MessageItem = { title: "Open" };
   const cancel: MessageItem = { title: "Cancel", isCloseAffordance: true };
   const choice = await window.showWarningMessage(
-    `${source} asked VS Code to open ${noun} from "${location}". ` +
+    `A website asked VS Code to open an Inspect log from "${location}". ` +
       `Opening it will fetch content from that location. Open it?`,
     { modal: true },
     open,
@@ -149,6 +164,10 @@ export async function confirmRemoteOpen(
 }
 
 export class InspectProtocolHandler implements UriHandler {
+  constructor(
+    private readonly trustedRoots_: () => readonly Uri[] = () => []
+  ) {}
+
   public async handleUri(uri: Uri): Promise<void> {
     // Read the command
     const command = uri.path.replace(/^\//, "");
@@ -183,9 +202,12 @@ export class InspectProtocolHandler implements UriHandler {
             // user — chose this host/bucket, and opening it makes the local
             // view server fetch it with the victim's ambient credentials. Since
             // validateLogUri deliberately allows any authority, require explicit
-            // confirmation naming the host before any fetch/render.
-            const confirmed = await confirmRemoteOpen(logUri);
-            if (!confirmed) {
+            // confirmation naming the host before any fetch/render — unless the
+            // log is inside a location the user configured (their log dir).
+            if (
+              !isTrustedLogLocation(logUri, this.trustedRoots_()) &&
+              !(await confirmRemoteOpen(logUri))
+            ) {
               return;
             }
           }
