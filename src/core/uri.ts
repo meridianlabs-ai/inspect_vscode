@@ -85,8 +85,13 @@ export function getRelativeUri(parentUri: Uri, childUri: Uri): string | null {
 
   // Resolve '.'/'..' on the URI path components (always '/'-separated and
   // decoded), so traversal cannot escape the parent under a shared prefix.
-  const parentPath = path.posix.normalize(parentUri.path);
-  const childPath = path.posix.normalize(childUri.path);
+  // Backslash is a path separator for downstream Windows consumers (fsPath, the
+  // Python view server) but not for path.posix, so a child like
+  // `.../logs/..\..\x` would otherwise pass the '/'-only segment check and then
+  // escape the directory on Windows. Fold '\' to '/' before normalizing so the
+  // containment check matches the downstream interpretation. See CWE-29.
+  const parentPath = path.posix.normalize(parentUri.path.replace(/\\/g, "/"));
+  const childPath = path.posix.normalize(childUri.path.replace(/\\/g, "/"));
 
   const parentBase = parentPath.endsWith("/")
     ? parentPath.slice(0, -1)
