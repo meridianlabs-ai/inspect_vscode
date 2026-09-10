@@ -3,11 +3,13 @@ import * as os from "os";
 import {
   debug,
   DebugConfiguration,
+  env,
   ExtensionContext,
   MessageItem,
   Terminal,
   window,
   workspace,
+  WorkspaceConfiguration,
 } from "vscode";
 
 import { sleep } from "../../core/wait";
@@ -264,25 +266,22 @@ const runCommand = async (
     kShellIntegrationTimeoutMs
   );
 
-  // Quote for the shell that actually runs in the terminal. The command line is
-  // sent verbatim, so quoting for a different shell than the one interpreting it
-  // is a command-injection vector — PowerShell single quotes are inert in
-  // cmd.exe, so an `&` in an attacker-controlled task path/name would execute.
-  // Identify the shell from the explicit creation path, then the actual shell
-  // reported after integration activates, then the configured default profile.
-  const creationOptions = terminal.creationOptions;
-  const creationShellPath =
-    "shellPath" in creationOptions ? creationOptions.shellPath : undefined;
-  const actualShell = (terminal.state as { shell?: string }).shell;
-  const shell: ShellKind | undefined =
-    shellKindFromPath(creationShellPath) ??
-    shellKindFromPath(actualShell) ??
-    configuredDefaultShellKind();
+  const shell = terminalShellKind(
+    terminal,
+    workspace.getConfiguration("terminal.integrated"),
+    os.platform(),
+    env.shell
+  );
+  if (!shell && os.platform() !== "win32") {
+    await window.showErrorMessage(
+      `Unable to ${profile.target === "Scan" ? "run scan" : "run task"}: this terminal's shell could not be identified. Select a supported shell profile (bash, zsh, sh, dash, ksh, fish, PowerShell, or cmd) and close the existing ${profile.terminal} terminal before retrying.`
+    );
+    return;
+  }
 
   // Build the command line (and optional `cd`). When the shell can't be
-  // identified, fall back to cross-shell-safe double quoting; if a token can't
-  // be safely quoted for an unknown shell, refuse to run rather than risk
-  // injection.
+  // identified on Windows, fall back to cmd/PowerShell double quoting. Refuse
+  // tokens that cannot be safely quoted rather than risk injection.
   let commandLine: string;
   let cdLine: string | undefined;
   if (shell) {
@@ -293,7 +292,7 @@ const runCommand = async (
     const cwdQuoted = reusedTerminal ? quoteArgUnknownShell(cwd) : "";
     if (line === null || cwdQuoted === null) {
       await window.showErrorMessage(
-        `Unable to ${profile.target === "Scan" ? "run scan" : "run task"}: the task path or arguments contain characters that can't be safely quoted for this terminal's shell. Select a known shell profile (PowerShell, cmd, or a POSIX shell) or rename the offending file/parameters.`
+        `Unable to ${profile.target === "Scan" ? "run scan" : "run task"}: the task path or arguments contain characters that can't be safely quoted for this terminal's shell. Select a known shell profile (PowerShell, cmd, fish, or a POSIX shell) and close this terminal before retrying.`
       );
       return;
     }
@@ -322,54 +321,62 @@ const runCommand = async (
 };
 
 /**
- * Best-effort identification of the shell VS Code's default terminal profile
- * launches, used when the terminal itself doesn't report its shell. Consults the
- * platform-appropriate defaultProfile so that, e.g., a pwsh default on macOS or
- * Linux isn't quoted as POSIX. Returns POSIX as the fallback on unix-like
- * platforms (their near-universal default) and `undefined` on Windows when the
- * profile can't be mapped, so the caller uses cross-shell-safe quoting instead
- * of guessing.
+ * Identify the terminal's shell without guessing a platform default. A reported
+ * shell takes precedence over launch settings, which may describe a wrapper or
+ * a shell the user has since left. An explicit but unrecognized executable must
+ * not fall through to a different shell's quoting rules.
  */
-const configuredDefaultShellKind = (): ShellKind | undefined => {
-  const platform = os.platform();
+export const terminalShellKind = (
+  terminal: Pick<Terminal, "creationOptions" | "state">,
+  cfg: Pick<WorkspaceConfiguration, "get"> = workspace.getConfiguration(
+    "terminal.integrated"
+  ),
+  platform: NodeJS.Platform = os.platform(),
+  defaultShellPath?: string
+): ShellKind | undefined => {
+  const actualShell = (terminal.state as { shell?: string }).shell;
+  if (actualShell) {
+    return shellKindFromPath(actualShell);
+  }
+  const options = terminal.creationOptions;
+  if ("shellPath" in options && options.shellPath) {
+    return shellKindFromPath(options.shellPath);
+  }
+
   const key =
     platform === "win32" ? "windows" : platform === "darwin" ? "osx" : "linux";
-  const unixFallback: ShellKind | undefined =
-    platform === "win32" ? undefined : "posix";
-
-  const cfg = workspace.getConfiguration("terminal.integrated");
-  const profileName = cfg.get<string>(`defaultProfile.${key}`) ?? undefined;
+  const profileName = cfg.get<string>(`defaultProfile.${key}`);
   if (!profileName) {
-    return unixFallback;
+    // VS Code exposes the detected default executable via env.shell. Identify
+    // that path rather than assuming that every Unix default is POSIX.
+    return shellKindFromPath(defaultShellPath);
   }
   const profiles =
     cfg.get<Record<string, { path?: string | string[]; source?: string }>>(
       `profiles.${key}`
     ) ?? {};
   const profile = profiles[profileName];
-  const pathVal = profile?.path;
-  const path = Array.isArray(pathVal) ? pathVal[0] : pathVal;
-  const byPath = shellKindFromPath(path) ?? shellKindFromPath(profile?.source);
-  if (byPath) {
-    return byPath;
+  if (profile?.path) {
+    // VS Code chooses the first existing executable from a path array. Only
+    // select quoting when every candidate has the same recognized grammar.
+    const paths = Array.isArray(profile.path) ? profile.path : [profile.path];
+    const kinds = paths.map(shellKindFromPath);
+    return kinds.length > 0 && kinds.every((kind) => kind === kinds[0])
+      ? kinds[0]
+      : undefined;
   }
-  const lower = profileName.toLowerCase();
-  if (lower.includes("command prompt") || lower === "cmd") {
-    return "cmd";
+  if (profile?.source) {
+    // VS Code's built-in detected profile sources (not arbitrary labels).
+    if (profile.source === "PowerShell") {
+      return "powershell";
+    }
+    if (profile.source === "Git Bash") {
+      return "posix";
+    }
+    return undefined;
   }
-  if (lower.includes("powershell") || lower.includes("pwsh")) {
-    return "powershell";
-  }
-  if (
-    lower.includes("git bash") ||
-    lower.includes("wsl") ||
-    lower.includes("bash") ||
-    lower.includes("zsh") ||
-    lower.includes("fish")
-  ) {
-    return "posix";
-  }
-  return unixFallback;
+  // Display names are user-defined and cannot establish an executable's syntax.
+  return undefined;
 };
 
 const runDebugger = async (

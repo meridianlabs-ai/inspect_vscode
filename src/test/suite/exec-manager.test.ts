@@ -3,7 +3,13 @@
  */
 import * as assert from "assert";
 
-import { buildRunCommand, ExecProfile } from "../../core/package/exec-manager";
+import { Terminal, WorkspaceConfiguration } from "vscode";
+
+import {
+  buildRunCommand,
+  ExecProfile,
+  terminalShellKind,
+} from "../../core/package/exec-manager";
 import { AbsolutePath } from "../../core/path";
 import { quoteCommandLine } from "../../core/shell-quote";
 import { DocumentState } from "../../providers/workspace/workspace-state-provider";
@@ -516,5 +522,167 @@ suite("ExecManager Test Suite", () => {
       assert.strictEqual(devVersion.isDeveloperBuild, true);
       assert.strictEqual(releaseVersion.isDeveloperBuild, false);
     });
+  });
+});
+
+suite("Terminal shell detection", () => {
+  const terminal = (shellPath?: string, shell?: string) =>
+    ({
+      creationOptions: shellPath ? { shellPath } : {},
+      state: { isInteractedWith: false, shell },
+    }) as Pick<Terminal, "creationOptions" | "state">;
+  const config = (values: Record<string, unknown> = {}) =>
+    ({
+      get: (key: string) => values[key],
+    }) as Pick<WorkspaceConfiguration, "get">;
+
+  for (const [platform, key] of [
+    ["darwin", "osx"],
+    ["linux", "linux"],
+    ["win32", "windows"],
+  ] as const) {
+    test(`does not guess a default on ${platform}`, () => {
+      assert.strictEqual(
+        terminalShellKind(terminal(), config(), platform),
+        undefined
+      );
+    });
+    test(`identifies fish by configured path on ${platform}`, () => {
+      const cfg = config({
+        [`defaultProfile.${key}`]: "My shell",
+        [`profiles.${key}`]: { "My shell": { path: "/bin/fish" } },
+      });
+      assert.strictEqual(terminalShellKind(terminal(), cfg, platform), "fish");
+      assert.strictEqual(
+        terminalShellKind(terminal("/bin/nu"), cfg, platform),
+        undefined
+      );
+      assert.strictEqual(
+        terminalShellKind(terminal(undefined, "nu"), cfg, platform),
+        undefined
+      );
+    });
+  }
+
+  test("uses VS Code's detected default executable only without a configured profile", () => {
+    assert.strictEqual(
+      terminalShellKind(terminal(), config(), "darwin", "/bin/fish"),
+      "fish"
+    );
+    assert.strictEqual(
+      terminalShellKind(terminal(), config(), "linux", "/bin/bash"),
+      "posix"
+    );
+    assert.strictEqual(
+      terminalShellKind(terminal(), config(), "linux", "/bin/nu"),
+      undefined
+    );
+    assert.strictEqual(
+      terminalShellKind(
+        terminal(),
+        config({ "defaultProfile.linux": "unknown" }),
+        "linux",
+        "/bin/bash"
+      ),
+      undefined
+    );
+    assert.strictEqual(
+      terminalShellKind(terminal("/bin/nu"), config(), "linux", "/bin/bash"),
+      undefined
+    );
+  });
+
+  test("uses the reported shell before its creation executable", () => {
+    assert.strictEqual(
+      terminalShellKind(terminal("/bin/bash", "fish"), config()),
+      "fish"
+    );
+    assert.strictEqual(
+      terminalShellKind(terminal("/bin/fish", "bash"), config()),
+      "posix"
+    );
+    assert.strictEqual(
+      terminalShellKind(terminal("/bin/bash", "nu"), config()),
+      undefined
+    );
+    assert.strictEqual(
+      terminalShellKind(terminal("/bin/fish"), config()),
+      "fish"
+    );
+  });
+
+  for (const path of [
+    "/bin/nu",
+    ["/bin/bash", "/bin/fish"],
+    ["/bin/fish", "/bin/nu"],
+    [],
+  ]) {
+    test(`does not infer syntax from a misleading profile name: ${JSON.stringify(path)}`, () => {
+      const cfg = config({
+        "defaultProfile.linux": "fish",
+        "profiles.linux": { fish: { path } },
+      });
+      assert.strictEqual(
+        terminalShellKind(terminal(), cfg, "linux"),
+        undefined
+      );
+    });
+  }
+
+  test("accepts path alternatives only with the same recognized grammar", () => {
+    const cfg = config({
+      "defaultProfile.linux": "custom",
+      "profiles.linux": { custom: { path: ["/usr/bin/fish", "/bin/fish"] } },
+    });
+    assert.strictEqual(terminalShellKind(terminal(), cfg, "linux"), "fish");
+  });
+
+  test("does not infer syntax from profile labels without executable evidence", () => {
+    for (const name of [
+      "fish",
+      "bash",
+      "WSL",
+      "PowerShell",
+      "Command Prompt",
+    ]) {
+      assert.strictEqual(
+        terminalShellKind(
+          terminal(),
+          config({ "defaultProfile.linux": name }),
+          "linux"
+        ),
+        undefined
+      );
+    }
+  });
+
+  test("recognizes built-in profile sources but does not override explicit paths", () => {
+    for (const [source, expected] of [
+      ["PowerShell", "powershell"],
+      ["Git Bash", "posix"],
+      ["fish", undefined],
+    ] as const) {
+      const values = {
+        "defaultProfile.windows": "custom",
+        "profiles.windows": { custom: { source } },
+      };
+      assert.strictEqual(
+        terminalShellKind(terminal(), config(values), "win32"),
+        expected
+      );
+    }
+    assert.strictEqual(
+      terminalShellKind(
+        terminal(),
+        config({
+          "defaultProfile.windows": "custom",
+          "profiles.windows": {
+            custom: { path: "unknown.exe", source: "PowerShell" },
+          },
+        }),
+        "win32"
+      ),
+      undefined
+    );
   });
 });

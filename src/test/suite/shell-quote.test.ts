@@ -1,10 +1,15 @@
 import * as assert from "assert";
+import { spawnSync } from "child_process";
+import { existsSync, mkdirSync, mkdtempSync, rmSync } from "fs";
+import { tmpdir } from "os";
+import { join } from "path";
 
 import {
   quoteArg,
   quoteArgUnknownShell,
   quoteCommandLine,
   quoteCommandLineUnknownShell,
+  ShellKind,
   shellKindFromPath,
 } from "../../core/shell-quote";
 
@@ -34,6 +39,123 @@ suite("Shell Quote Test Suite", () => {
       );
     });
   });
+
+  suite("quoteArg - fish", () => {
+    test("escapes backslashes and quotes, including trailing backslashes", () => {
+      assert.strictEqual(quoteArg("it's", "fish"), "'it\\'s'");
+      assert.strictEqual(quoteArg("a\\", "fish"), "'a\\\\'");
+      assert.strictEqual(quoteArg("\\'", "fish"), "'\\\\\\''");
+      assert.strictEqual(quoteArg("", "fish"), "''");
+      assert.strictEqual(quoteArg("task.py@demo", "fish"), "task.py@demo");
+    });
+  });
+
+  // Run the generated text through real parsers. The only injected operation
+  // used here would write a harmless marker inside a disposable test directory.
+  for (const [shell, kind] of [
+    ["sh", "posix"],
+    ["fish", "fish"],
+  ] as const satisfies ReadonlyArray<readonly [string, ShellKind]>) {
+    suite(`real ${shell} argument round trips`, () => {
+      suiteSetup(function () {
+        const probe = spawnSync(
+          shell,
+          shell === "fish" ? ["--no-config", "--version"] : ["--version"],
+          { encoding: "utf8" }
+        );
+        if (
+          probe.error &&
+          "code" in probe.error &&
+          probe.error.code === "ENOENT"
+        ) {
+          if (shell === "fish" && process.env.REQUIRE_FISH_TESTS) {
+            assert.fail("fish is required for this validation run");
+          }
+          this.skip();
+        }
+        assert.ifError(probe.error);
+      });
+
+      test("preserves targets and parameters without executing their contents", () => {
+        const cwd = mkdtempSync(join(tmpdir(), "inspect-shell-quote-"));
+        try {
+          const values = [
+            "",
+            "task.py@demo",
+            "my tasks/évaluation.py@demo",
+            "../other tasks/t.py@x",
+            "a,b",
+            "@task",
+            "--limit=10",
+            "it's",
+            "\\",
+            "a\\\\b",
+            "trailing\\",
+            "line\nbreak",
+            "tab\there",
+            "both'\"quotes",
+            "t\\';printf injected>marker;\\'.py@x",
+            "$(printf injected>marker)",
+            "(printf injected>marker)",
+            "`printf injected>marker`",
+            "$HOME",
+            "*?[abc]{a,b}",
+          ];
+          // Exercise all short combinations around the vulnerable quote boundary.
+          for (const a of ["\\", "'", ";", " "]) {
+            for (const b of ["\\", "'", ";", " "]) {
+              for (const c of ["\\", "'", ";", " "]) {
+                values.push(`t${a}${b}${c}.py@x`);
+              }
+            }
+          }
+          const line = quoteCommandLine(["printf", "%s\\0", ...values], kind);
+          const result = spawnSync(
+            shell,
+            [...(shell === "fish" ? ["--no-config"] : []), "-c", line],
+            {
+              cwd,
+              encoding: "utf8",
+              timeout: 5000,
+            }
+          );
+          assert.ifError(result.error);
+          assert.strictEqual(result.status, 0, result.stderr);
+          assert.deepStrictEqual(result.stdout.split("\0"), [...values, ""]);
+          assert.strictEqual(existsSync(join(cwd, "marker")), false);
+        } finally {
+          rmSync(cwd, { recursive: true, force: true });
+        }
+      });
+
+      test("preserves a reused terminal's working directory", () => {
+        const cwd = mkdtempSync(join(tmpdir(), "inspect-shell-cd-"));
+        const directory = "tasks\\';printf injected>marker;\\'";
+        mkdirSync(join(cwd, directory));
+        try {
+          const result = spawnSync(
+            shell,
+            [
+              ...(shell === "fish" ? ["--no-config"] : []),
+              "-c",
+              `cd ${quoteArg(directory, kind)}; pwd`,
+            ],
+            {
+              cwd,
+              encoding: "utf8",
+              timeout: 5000,
+            }
+          );
+          assert.ifError(result.error);
+          assert.strictEqual(result.status, 0, result.stderr);
+          assert.ok(result.stdout.trimEnd().endsWith(`/${directory}`));
+          assert.strictEqual(existsSync(join(cwd, "marker")), false);
+        } finally {
+          rmSync(cwd, { recursive: true, force: true });
+        }
+      });
+    });
+  }
 
   suite("quoteArg - powershell", () => {
     test("single-quotes a value with spaces", () => {
@@ -133,6 +255,9 @@ suite("Shell Quote Test Suite", () => {
 
     test("positively identifies known shells", () => {
       assert.strictEqual(shellKindFromPath("/bin/bash"), "posix");
+      assert.strictEqual(shellKindFromPath("/opt/homebrew/bin/fish"), "fish");
+      assert.strictEqual(shellKindFromPath("fish"), "fish");
+      assert.strictEqual(shellKindFromPath("C:\\shells\\fish.exe"), "fish");
       assert.strictEqual(shellKindFromPath("cmd.exe"), "cmd");
       assert.strictEqual(shellKindFromPath("pwsh"), "powershell");
     });

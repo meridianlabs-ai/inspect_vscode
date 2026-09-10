@@ -1,12 +1,12 @@
 // The kind of shell a command line will be sent to. We send run commands to a
 // VS Code integrated terminal via `terminal.sendText`, so the string must be
 // escaped according to the shell that terminal is actually running.
-export type ShellKind = "posix" | "powershell" | "cmd";
+export type ShellKind = "posix" | "fish" | "powershell" | "cmd";
 
 /**
  * Positively identify a {@link ShellKind} from a shell executable path, or
- * `undefined` when the path is empty or unrecognized. Unlike
- * {@link detectShellKind} this never guesses a platform default — the caller can
+ * `undefined` when the path is empty or unrecognized. This never guesses a
+ * platform default — the caller can
  * distinguish "known to be X" from "could not determine", which matters because
  * quoting for the wrong shell (PowerShell single quotes are inert in cmd.exe,
  * letting an embedded `&` execute) is a command-injection vector.
@@ -18,8 +18,11 @@ export function shellKindFromPath(
   if (!name) {
     return undefined;
   }
-  if (/(^|[\\/])(bash|zsh|sh|fish|dash|ksh)(\.exe)?$/.test(name)) {
+  if (/(^|[\\/])(bash|zsh|sh|dash|ksh)(\.exe)?$/.test(name)) {
     return "posix";
+  }
+  if (/(^|[\\/])fish(\.exe)?$/.test(name)) {
+    return "fish";
   }
   if (/(^|[\\/])(pwsh|powershell)(\.exe)?$/.test(name)) {
     return "powershell";
@@ -118,6 +121,10 @@ export function quoteArg(value: string, kind: ShellKind): string {
     return value;
   }
   switch (kind) {
+    case "fish":
+      // Fish interprets both backslash and quote escapes inside single quotes.
+      // Escape both together so a backslash cannot change the quote boundary.
+      return `'${value.replace(/[\\']/g, "\\$&")}'`;
     case "posix":
       // Single quotes suppress all interpretation in POSIX shells. The only
       // character that can't appear literally inside single quotes is the
