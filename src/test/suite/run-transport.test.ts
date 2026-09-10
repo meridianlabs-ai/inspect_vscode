@@ -97,6 +97,12 @@ suite("Run transport through real shells", () => {
       assert.ifError(probe.error);
       assert.ok(selected, "Python must be installed for transport tests");
       const root = mkdtempSync(join(tmpdir(), "inspect-transport-test-"));
+      const launchCwd = join(root, "launch");
+      mkdirSync(launchCwd);
+      writeFileSync(
+        join(launchCwd, "base64.py"),
+        "raise RuntimeError('unselected startup module imported')\n"
+      );
       const cwd = join(root, "cwd [demo] & %literal%!");
       mkdirSync(cwd);
       const venv = join(root, "venv with spaces & [brackets]");
@@ -168,7 +174,7 @@ suite("Run transport through real shells", () => {
         );
         const run = runShell(shell, transport.commandLine, {
           encoding: "utf8",
-          cwd: root,
+          cwd: launchCwd,
           env: {
             ...process.env,
             PYTHONPATH: root,
@@ -197,6 +203,7 @@ suite("Run transport through real shells", () => {
         );
         assert.strictEqual(actual.activation, "selected-environment");
         assert.strictEqual(existsSync(marker), false);
+        assert.strictEqual(existsSync(join(launchCwd, "INJECTED")), false);
         // Payloads are consumed once, preventing accidental replay of stale runs.
         const replay = runShell(shell, transport.commandLine);
         assert.notStrictEqual(replay.status, 0);

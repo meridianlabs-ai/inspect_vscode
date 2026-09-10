@@ -57,8 +57,10 @@ export function createRunTransport(
     const script = [
       "import base64,json,subprocess,sys",
       ...readPayload,
+      // Like a console script, do not put the shell's current directory on
+      // the child's import path. Keep explicit PYTHONPATH and environment setup.
       // chr(39) avoids nesting shell-visible double quotes or backslashes.
-      `c='import base64;exec(base64.b64decode('+chr(39)+'${encodedChild}'+chr(39)+'))'`,
+      `c='import sys;sys.path[:]=[p for p in sys.path if p];import base64;exec(base64.b64decode('+chr(39)+'${encodedChild}'+chr(39)+'))'`,
       "sys.exit(subprocess.call(d['python']+['-c',c]))",
     ].join(";");
     const bootstrap = platform === "win32" ? "python" : "python3";
