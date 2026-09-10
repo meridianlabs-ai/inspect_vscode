@@ -86,8 +86,10 @@ export class LogTreeDataProvider extends LogListingTreeDataProvider {
       return Promise.resolve(item);
     }
 
+    // Only log files have eval headers; asking the server for a directory's
+    // headers fails with "No recorder for location" (a 500 in the server log).
     const nodeUri = this.logListing_?.uriForNode(element);
-    if (nodeUri) {
+    if (nodeUri && element.type === "file") {
       const headers = await this.viewServer_.evalLogHeaders([
         nodeUri.toString(),
       ]);
