@@ -641,6 +641,7 @@
     "build:production": "webpack --mode production --devtool hidden-source-map",
     "dev": "webpack --watch",
     "compile-tests": "tsc -p . --outDir out",
+    "check:proxy-routes": "python3 scripts/proxy-routes/dump-openapi.py --out out/proxy-routes && pnpm compile-tests && node scripts/proxy-routes/check.mjs",
     "watch-tests": "tsc -p . -w --outDir out",
     "pretest": "pnpm run compile-tests && pnpm run build",
     "typecheck": "tsc --noEmit",
