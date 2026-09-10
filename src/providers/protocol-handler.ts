@@ -7,20 +7,39 @@ import {
   Uri,
   UriHandler,
   window,
+  workspace,
 } from "vscode";
 
 import { showError } from "../components/error";
+import { getRelativeUri, isUncPath } from "../core/uri";
+
+import { WorkspaceEnvManager } from "./workspace/workspace-env-provider";
 
 // Schemes we are willing to open a log from. Anyone can invoke this URI
 // handler, so we restrict it to local files and the remote backends Inspect
 // itself supports rather than forwarding arbitrary URIs to the view server.
 const kAllowedLogSchemes = ["file", "https", "http", "s3"];
 
+// A remote authority must look like a plain host[:port] (optionally an IPv6
+// literal in brackets). Uri.parse percent-decodes the authority, so this also
+// rejects userinfo (`spoof@host`) and any decoded whitespace/control/bidi
+// characters that could spoof the confirmation dialog. Underscores are allowed
+// (docker-compose service names, some internal DNS) — they carry no spoofing
+// power. See CWE-451.
+const kValidAuthorityPattern = /^[A-Za-z0-9._~:[\]-]+$/;
+
 // Recognized Inspect log file extensions.
 const kAllowedLogExtensions = [".eval", ".json"];
 
-export function activateProtocolHandler(context: ExtensionContext) {
-  const protocolHandler = new InspectProtocolHandler();
+export function activateProtocolHandler(
+  context: ExtensionContext,
+  envMgr: WorkspaceEnvManager
+) {
+  // Remote logs inside the workspace's configured log directory are opened
+  // without the host confirmation: the user chose that location.
+  const protocolHandler = new InspectProtocolHandler(() => [
+    envMgr.getDefaultLogDir(),
+  ]);
   context.subscriptions.push(window.registerUriHandler(protocolHandler));
 }
 
@@ -31,11 +50,41 @@ export function activateProtocolHandler(context: ExtensionContext) {
  * so we only forward URIs that look like an Inspect log on a backend we
  * support, rather than passing arbitrary URIs to the view server. Returns an
  * error message describing why the URI was rejected, or `null` if it is
- * acceptable. Pure (no file-system access) so it can be unit tested.
+ * acceptable. Pure (no file-system access) so it can be unit tested; callers
+ * pass the open workspace folders as `trustedRoots` (see
+ * {@link workspaceTrustedRoots}).
  */
-export function validateLogUri(uri: Uri): string | null {
+export function validateLogUri(
+  uri: Uri,
+  opts?: { trustedRoots?: readonly Uri[] }
+): string | null {
   if (!kAllowedLogSchemes.includes(uri.scheme)) {
     return `Unable to open log: unsupported location "${uri.scheme}:".`;
+  }
+  // A file URI with an authority (or a UNC-form path) designates a remote host;
+  // dereferencing it — even existsSync — triggers an implicit SMB/WebDAV NTLM
+  // handshake on Windows that leaks the user's credentials. Reject it before any
+  // filesystem touch, matching parseTerminalLinkUri / isAcceptableSignalUri.
+  // See CWE-522.
+  //
+  // The one exception is a log inside a `trustedRoots` folder (the open
+  // workspace folders): a UNC-hosted workspace is a host VS Code has already
+  // connected to (gated by `security.allowedUNCHosts`), so opening a log within
+  // it reopens no vector. isTrustedLogLocation requires the same authority and
+  // resolves `..`, so a link to another share or host is still refused.
+  if (uri.scheme === "file" && (uri.authority || isUncPath(uri.fsPath))) {
+    if (!isTrustedLogLocation(uri, opts?.trustedRoots ?? [])) {
+      return `Unable to open log: file URLs with a host are not supported.`;
+    }
+  }
+  // For remote schemes, require a clean host[:port] authority so the fetch
+  // target is unambiguous and the confirmation dialog can't be spoofed.
+  if (
+    uri.scheme !== "file" &&
+    uri.authority &&
+    !kValidAuthorityPattern.test(uri.authority)
+  ) {
+    return `Unable to open log: the log URL has an invalid host.`;
   }
   const lowerPath = uri.path.toLowerCase();
   if (!kAllowedLogExtensions.some((ext) => lowerPath.endsWith(ext))) {
@@ -62,13 +111,47 @@ export function validateLogUri(uri: Uri): string | null {
 }
 
 /**
+ * Whether `uri` lies inside one of `trustedRoots` — locations the user chose
+ * themselves (the open workspace folders, the configured log directory). Uses
+ * getRelativeUri, so the scheme and authority must match exactly, a shared
+ * string prefix is not containment, and `..` is resolved before comparing.
+ */
+export function isTrustedLogLocation(
+  uri: Uri,
+  trustedRoots: readonly Uri[]
+): boolean {
+  return trustedRoots.some((root) => getRelativeUri(root, uri) !== null);
+}
+
+/**
+ * The open workspace folders, as the `trustedRoots` for {@link validateLogUri}:
+ * a hosted (UNC) `file` log is only accepted from inside one of them.
+ */
+export function workspaceTrustedRoots(): Uri[] {
+  return (workspace.workspaceFolders ?? []).map((folder) => folder.uri);
+}
+
+/**
  * Confirm opening a remote log requested via the (externally-invokable) URI
  * handler, naming the host/bucket so the user can see who they are fetching
- * from. Returns true only if the user explicitly chooses to open it.
+ * from. Returns true only if the user explicitly chooses to open it. Callers
+ * skip this for locations the user configured themselves (see
+ * {@link isTrustedLogLocation}); terminal links and the eval-complete
+ * notification never prompt, since there the user is looking at the URL they
+ * clicked or launched the eval that produced it.
  */
 export async function confirmRemoteOpen(logUri: Uri): Promise<boolean> {
-  const location = logUri.authority || logUri.toString(true);
-  const open: MessageItem = { title: "Open Log" };
+  // Display only the real host: drop any userinfo (everything before the final
+  // '@') and refuse to render decoded control/whitespace, so the named location
+  // can't be spoofed even if a caller reaches here without validateLogUri.
+  const authorityHost = (logUri.authority || "").split("@").pop() ?? "";
+  const location =
+    authorityHost && kValidAuthorityPattern.test(authorityHost)
+      ? authorityHost
+      : logUri.authority
+        ? "an unrecognized host"
+        : logUri.toString(true);
+  const open: MessageItem = { title: "Open" };
   const cancel: MessageItem = { title: "Cancel", isCloseAffordance: true };
   const choice = await window.showWarningMessage(
     `A website asked VS Code to open an Inspect log from "${location}". ` +
@@ -81,6 +164,10 @@ export async function confirmRemoteOpen(logUri: Uri): Promise<boolean> {
 }
 
 export class InspectProtocolHandler implements UriHandler {
+  constructor(
+    private readonly trustedRoots_: () => readonly Uri[] = () => []
+  ) {}
+
   public async handleUri(uri: Uri): Promise<void> {
     // Read the command
     const command = uri.path.replace(/^\//, "");
@@ -96,7 +183,9 @@ export class InspectProtocolHandler implements UriHandler {
           // This handler can be invoked by any web page (anyone can navigate to
           // vscode://ukaisi.inspect-ai/open?log=<uri>), so validate the target
           // before forwarding it to the log viewer.
-          const validationError = validateLogUri(logUri);
+          const validationError = validateLogUri(logUri, {
+            trustedRoots: workspaceTrustedRoots(),
+          });
           if (validationError) {
             await showError(validationError);
             return;
@@ -113,9 +202,12 @@ export class InspectProtocolHandler implements UriHandler {
             // user — chose this host/bucket, and opening it makes the local
             // view server fetch it with the victim's ambient credentials. Since
             // validateLogUri deliberately allows any authority, require explicit
-            // confirmation naming the host before any fetch/render.
-            const confirmed = await confirmRemoteOpen(logUri);
-            if (!confirmed) {
+            // confirmation naming the host before any fetch/render — unless the
+            // log is inside a location the user configured (their log dir).
+            if (
+              !isTrustedLogLocation(logUri, this.trustedRoots_()) &&
+              !(await confirmRemoteOpen(logUri))
+            ) {
               return;
             }
           }

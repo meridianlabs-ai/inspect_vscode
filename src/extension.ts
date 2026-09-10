@@ -87,7 +87,7 @@ export async function activate(context: ExtensionContext) {
   end("Monitor Workspace Env");
 
   // Initialize the protocol handler
-  activateProtocolHandler(context);
+  activateProtocolHandler(context, workspaceEnvManager);
 
   // Inspect Manager watches for changes to inspect binary
   start("Monitor Inspect Binary");

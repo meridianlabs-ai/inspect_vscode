@@ -1,6 +1,5 @@
 import { ExtensionContext, Uri, ViewColumn } from "vscode";
 
-import { showError } from "../../components/error";
 import {
   InspectWebview,
   InspectWebviewManager,
@@ -17,7 +16,7 @@ import { selectLogDirectory } from "../activity-bar/log-listing/log-directory-se
 import { InspectViewServer } from "../inspect/inspect-view-server";
 import { WorkspaceEnvManager } from "../workspace/workspace-env-provider";
 
-import { logPathInScope, LogviewPanel } from "./logview-panel";
+import { LogviewPanel } from "./logview-panel";
 import { LogviewState } from "./logview-state";
 
 const kLogViewId = "inspect.logview";
@@ -173,9 +172,9 @@ export class InspectViewWebviewManager extends InspectWebviewManager<
         if (this.isVisible() && state.log_file) {
           this.updateViewState(state);
 
-          // Signal the viewer to either perform a background refresh
-          // or to check whether the view is focused and call us back to
-          // display a log file
+          // Tell the viewer the directory changed so it refreshes its log
+          // listing (only dir-scoped panels render one; file-scoped panels
+          // never receive this for other logs, see logFileInScope).
           await this.activeView_?.backgroundUpdate(
             state.log_file.path,
             state.log_dir.toString()
@@ -249,9 +248,6 @@ export class InspectViewWebviewManager extends InspectWebviewManager<
         });
       }
     }
-
-    // TODO: there is probably a better way to handle this
-    this.activeView_?.setManager(this);
   }
 
   private async updateVisibleView() {
@@ -341,13 +337,12 @@ class InspectViewWebview extends InspectWebview<LogviewState> {
     // The panel's authorization scope is fixed here at construction. A "file"
     // scope (legacy single-file open) confines the RPC surface to log_file; the
     // default "dir" scope confines it to descendants of log_dir. The webview
-    // cannot change this afterwards (see the displayLogFile handler below).
+    // cannot change this afterwards.
     this.scopeType_ = state.scopeType ?? "dir";
     this.scopeUri_ =
       this.scopeType_ === "file" && state.log_file
         ? state.log_file
         : state.log_dir;
-    this.trustedLogDir_ = state.log_dir;
 
     this.logviewPanel_ = new LogviewPanel(
       webviewPanel,
@@ -358,59 +353,11 @@ class InspectViewWebview extends InspectWebview<LogviewState> {
     );
     this._register(this.logviewPanel_);
 
-    this._register(
-      this._webviewPanel.webview.onDidReceiveMessage(
-        async (e: { type: string; url: string; [key: string]: unknown }) => {
-          switch (e.type) {
-            case "displayLogFile":
-              {
-                if (this._manager) {
-                  // Messages from the webview are untrusted. Ignore any
-                  // webview-supplied log_dir (it would let injected script widen
-                  // the panel's scope to an arbitrary directory) and require the
-                  // requested file to be within this panel's fixed scope.
-                  const requestedFile = Uri.parse(e.url);
-                  if (
-                    logPathInScope(
-                      this.scopeType_,
-                      this.scopeUri_,
-                      requestedFile.toString()
-                    )
-                  ) {
-                    await this._manager.displayLogFile(
-                      { log_file: requestedFile, log_dir: this.trustedLogDir_ },
-                      "open"
-                    );
-                  } else {
-                    await showError(
-                      "Refusing to display a log outside the current log directory."
-                    );
-                  }
-                } else {
-                  await showError(
-                    "Unable to display log file because of a missing manager. This is an unexpected error, please report it."
-                  );
-                }
-              }
-              break;
-          }
-        }
-      )
-    );
-
     void this.show(state);
   }
 
   private readonly scopeType_: "file" | "dir";
   private readonly scopeUri_: Uri;
-  private readonly trustedLogDir_: Uri;
-
-  public setManager(manager: InspectViewWebviewManager) {
-    if (this._manager !== manager) {
-      this._manager = manager;
-    }
-  }
-  _manager: InspectViewWebviewManager | undefined;
 
   public async update(state: LogviewState) {
     await this._webviewPanel.webview.postMessage({
@@ -419,6 +366,12 @@ class InspectViewWebview extends InspectWebview<LogviewState> {
     });
   }
 
+  // Notify the viewer that a log in its directory was created or changed.
+  // Current viewers only refresh their log listing on this message; the
+  // `url`/`log_dir` fields are kept for older bundled viewers that still
+  // read them. (Older viewers also used this to select the new log when
+  // unfocused and to call back via a `displayLogFile` message; both paths
+  // were broken and have been removed on both sides.)
   public async backgroundUpdate(file: string, log_dir: string) {
     await this._webviewPanel.webview.postMessage({
       type: "backgroundUpdate",
