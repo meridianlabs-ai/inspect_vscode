@@ -2,11 +2,7 @@ import { ExtensionContext, Uri } from "vscode";
 
 import { PackageManager } from "../../core/package/manager";
 import { PackageViewServer } from "../../core/package/view-server";
-import {
-  AbsolutePath,
-  activeWorkspacePath,
-  toAbsolutePath,
-} from "../../core/path";
+import { AbsolutePath, activeWorkspacePath } from "../../core/path";
 import { activeWorkspaceFolder } from "../../core/workspace";
 import {
   inspectEvalLog,
@@ -453,11 +449,7 @@ export class InspectViewServer extends PackageViewServer {
       undefined,
       (status: number) => (status === 404 ? "null" : undefined)
     );
-    if (result.data === "null") {
-      return null;
-    }
-    const { path } = JSON.parse(result.data) as { path: string };
-    return toAbsolutePath(path);
+    return this.resourcePath(result.data);
   }
 
   override async ensureRunning(): Promise<void> {
