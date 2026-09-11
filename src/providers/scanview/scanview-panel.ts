@@ -53,7 +53,12 @@ export function scanLocationInScopeAllowingEncoded(
   scope: Uri[],
   location: string
 ): boolean {
-  return locationInScope(scope, location, { decode: true });
+  // Current Scout uses the literal UPath location; some older routes and
+  // transcript consumers also unquote. Neither interpretation may escape.
+  return (
+    locationInScope(scope, location) &&
+    locationInScope(scope, location, { decode: true })
+  );
 }
 
 export class ScanviewPanel extends Disposable {
@@ -136,17 +141,14 @@ export class ScanviewPanel extends Disposable {
                   server_.modelEndpoints().includes(location),
                 scans: (location) =>
                   locationInScope(scopeResolver(), location, {
-                    decode: true,
                     base: server_.projectScope()[0],
                   }),
                 transcripts: (location) =>
                   locationInScope(transcriptsScope(), location, {
-                    decode: true,
                     base: server_.projectScope()[0],
                   }),
                 project: (location) =>
                   locationInScope(server_.projectScope(), location, {
-                    decode: true,
                     base: server_.projectScope()[0],
                   }),
               },

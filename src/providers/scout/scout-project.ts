@@ -62,6 +62,21 @@ const DEFAULT_CONFIG: ScoutProjectConfig = {
   transcripts: "./logs",
 };
 
+export function normalizeScoutProjectConfig(
+  parsed: Record<string, unknown>
+): ScoutProjectConfig {
+  return {
+    ...DEFAULT_CONFIG,
+    ...parsed,
+    // Apply the legacy alias before defaults, preserving explicit null values.
+    scans: ("scans" in parsed
+      ? parsed.scans
+      : "results" in parsed
+        ? parsed.results
+        : DEFAULT_CONFIG.scans) as string | null,
+  };
+}
+
 /**
  * Manages the scout project configuration by watching for scout.yml/yaml files
  * in the workspace root and emitting events when the configuration changes.
@@ -190,10 +205,7 @@ export class ScoutProjectManager implements Disposable {
         }
 
         // Merge with defaults to ensure required fields exist
-        const config: ScoutProjectConfig = {
-          ...DEFAULT_CONFIG,
-          ...parsed,
-        };
+        const config = normalizeScoutProjectConfig(parsed);
 
         log.info(`Loaded scout project config from ${filename}`);
 

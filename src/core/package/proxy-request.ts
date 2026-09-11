@@ -1,4 +1,6 @@
 /* eslint-disable no-control-regex -- Reject control characters at the RPC boundary. */
+import { validateHeaderValue } from "http";
+
 import type { HttpProxyRpcRequest } from "./view-server";
 
 /** Validate untrusted RPC data before starting or touching a shared server. */
@@ -12,7 +14,7 @@ export function parseProxyRequest(value: unknown): HttpProxyRpcRequest {
     !["GET", "HEAD", "POST", "PUT", "DELETE"].includes(method) ||
     typeof path !== "string" ||
     !path.startsWith("/api/") ||
-    /[\\\\#\s\u0000-\u001f\u007f]/u.test(path) ||
+    /[\\#\s\u0000-\u001f\u007f]/u.test(path) ||
     (body !== undefined &&
       (typeof body !== "string" || method === "GET" || method === "HEAD")) ||
     (headers !== undefined &&
@@ -26,12 +28,15 @@ export function parseProxyRequest(value: unknown): HttpProxyRpcRequest {
         typeof value !== "string" ||
         !/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/.test(name) ||
         /[\r\n\u0000]/u.test(value) ||
-        /^(authorization|host|connection|content-length|transfer-encoding|upgrade|expect|trailer)$/i.test(
+        /^(authorization|host|connection|keep-alive|content-length|transfer-encoding|upgrade|expect|trailer)$/i.test(
           name
         )
       ) {
         throw new Error("Invalid proxy headers");
       }
+      // Headers/Request accept some control bytes that the HTTP dispatcher
+      // rejects later. Reject those before they can reach the lifecycle catch.
+      validateHeaderValue(name, value);
     }
   }
   // Request construction checks byte-valued headers and Fetch's body rules

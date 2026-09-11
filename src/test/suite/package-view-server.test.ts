@@ -174,6 +174,12 @@ suite("PackageViewServer lifecycle", () => {
       { method: "GET", path: "api/log-dir" },
       { method: "GET", path: "/api/log-dir", body: "x" },
       { method: "GET X", path: "/api/log-dir" },
+      {
+        method: "GET",
+        path: "/api/dist",
+        headers: { "Keep-Alive": "timeout=5" },
+      },
+      { method: "GET", path: "/api/dist", headers: { test: "bad\u0001value" } },
       { method: "GET", path: "/api/log-dir", headers: { test: "x\ny" } },
       {
         method: "GET",

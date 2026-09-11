@@ -8,6 +8,7 @@ import { InspectViewServer } from "../../providers/inspect/inspect-view-server";
 import { LogviewPanel } from "../../providers/logview/logview-panel";
 import { captureProjectAuthority } from "../../providers/scanview/project-authority";
 import { ScanviewPanel } from "../../providers/scanview/scanview-panel";
+import { normalizeScoutProjectConfig } from "../../providers/scout/scout-project";
 import { ScoutViewServer } from "../../providers/scout/scout-view-server";
 
 function webview() {
@@ -41,6 +42,23 @@ const enc = encodeURIComponent;
 const b64 = (s: string) => Buffer.from(s).toString("base64url");
 
 suite("Webview boundary RPC integration", () => {
+  test("legacy results authority is captured before applying scans defaults", () => {
+    const config = normalizeScoutProjectConfig({ results: "/external/scans" });
+    const authority = captureProjectAuthority(config, (location) =>
+      Uri.file(location)
+    );
+    assert.ok(locationInScope(authority.scans, "/external/scans/run"));
+    assert.ok(!locationInScope(authority.scans, "/other/run"));
+    assert.strictEqual(normalizeScoutProjectConfig({}).scans, "./scans");
+    assert.strictEqual(
+      normalizeScoutProjectConfig({ scans: null }).scans,
+      null
+    );
+    assert.strictEqual(
+      normalizeScoutProjectConfig({ results: null }).scans,
+      null
+    );
+  });
   test("project edits cannot broaden captured authority, including filesystem and bucket roots", () => {
     const config = { transcripts: "s3://team/logs", scans: "file:///w/scans" };
     const authority = captureProjectAuthority(config, (location) =>
@@ -129,6 +147,15 @@ suite("Webview boundary RPC integration", () => {
           '{"unknown": "x"}',
           ...[
             { transcripts: "file:///" },
+            { scanners: { x: 42 } },
+            { validation: { x: 42 } },
+            { model_roles: { x: 42 } },
+            { scans: "/outside/%2e%2e/w/scans" },
+            {
+              scanners: [
+                { name: "scanner", file: "/outside/%2e%2e/w/scanner.py" },
+              ],
+            },
             { scans: "/outside" },
             { results: "/outside" },
             { scanners: [{ name: "scanner", file: "/outside/scanner.py" }] },
@@ -180,6 +207,31 @@ suite("Webview boundary RPC integration", () => {
         );
       }
       assert.strictEqual(calls, 2);
+      const nestedBody = JSON.stringify({
+        results: "./scans",
+        scanners: { scanner: { name: "scanner", file: "scanner.py" } },
+        validation: { scanner: { cases: [] } },
+        model_roles: {
+          grader: "provider/model",
+          critic: {
+            model: "provider/model",
+            base_url: "https://model.example/v1",
+          },
+        },
+      });
+      for (const [method, path] of [
+        ["POST", "/api/v2/startscan"],
+        ["PUT", "/api/v2/project/config"],
+      ]) {
+        assert.ok(
+          !(
+            await view.request("http_request", [
+              { method, path, body: nestedBody },
+            ])
+          ).error
+        );
+      }
+      assert.strictEqual(calls, 4);
     } finally {
       panel.dispose();
     }
@@ -299,6 +351,7 @@ suite("Webview boundary RPC integration", () => {
           "/w/scans/scan_id=other",
           "/w/scans/scan_id=own/..%2F..%2Foutside",
           "file:///w/scans/scan_id=own/x%23/../../outside",
+          "/outside/%2e%2e/w/scans/scan_id=own",
         ]) {
           assert.ok(
             (await view.request(method, [location, "scanner", "uuid"])).error
@@ -309,6 +362,11 @@ suite("Webview boundary RPC integration", () => {
       assert.ok((await view.request("get_scans", [])).error);
       const parent = b64("/w/scans");
       for (const request of [
+        {
+          method: "GET",
+          path: `/api/v2/scans/${b64("/outside/%2e%2e/w/scans/scan_id=own")}/${b64(".")}`,
+          headers: { Accept: "application/zip" },
+        },
         { method: "POST", path: `/api/v2/scans/${parent}` },
         {
           method: "GET",

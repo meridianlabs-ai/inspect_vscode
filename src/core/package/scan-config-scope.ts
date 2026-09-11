@@ -8,6 +8,40 @@ const validate = new Ajv({ strict: false }).compile({
   properties: {
     ...projectSchema.properties,
     results_buffer: { type: ["integer", "null"] },
+    // The editor schema deliberately leaves map values unconstrained; the
+    // HTTP boundary must use the actual ScanJobConfig value types instead.
+    scanners: {
+      anyOf: [
+        { type: "array", items: { $ref: "#/$defs/ScannerSpec" } },
+        {
+          type: "object",
+          additionalProperties: { $ref: "#/$defs/ScannerSpec" },
+        },
+        { type: "null" },
+      ],
+    },
+    validation: {
+      anyOf: [
+        {
+          type: "object",
+          additionalProperties: {
+            anyOf: [{ type: "string" }, { $ref: "#/$defs/ValidationSet" }],
+          },
+        },
+        { type: "null" },
+      ],
+    },
+    model_roles: {
+      anyOf: [
+        {
+          type: "object",
+          additionalProperties: {
+            anyOf: [{ type: "string" }, { $ref: "#/$defs/ModelConfig" }],
+          },
+        },
+        { type: "null" },
+      ],
+    },
   },
 });
 
