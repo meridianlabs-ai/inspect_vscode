@@ -1,5 +1,5 @@
 import * as assert from "node:assert";
-import { execFileSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import {
   existsSync,
   mkdirSync,
@@ -203,11 +203,15 @@ suite("Command dispatcher", function () {
 
   test("Windows short-directory aliases still deliver watcher requests", async function () {
     if (process.platform !== "win32") this.skip();
-    const shortTemp = execFileSync(
+    const shortPathResult = spawnSync(
       "cmd.exe",
       ["/d", "/c", 'for %I in ("%TEMP%") do @echo %~sI'],
-      { encoding: "utf8" }
-    ).trim();
+      // cmd parses its own quoting; Node's default argv escaping would insert
+      // literal backslashes around the quoted TEMP path in this FOR command.
+      { encoding: "utf8", windowsVerbatimArguments: true }
+    );
+    assert.strictEqual(shortPathResult.status, 0, shortPathResult.stderr);
+    const shortTemp = shortPathResult.stdout.trim();
     const alias = join(shortTemp, basename(dir));
     assert.strictEqual(realpathSync.native(alias), realpathSync.native(dir));
     dir = alias;
