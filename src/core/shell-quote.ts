@@ -86,12 +86,23 @@ export function quoteArg(value: string, kind: ShellKind): string {
       // smart quote would otherwise terminate the string — double those too.
       return `'${value.replace(/['\u2018\u2019\u201A\u201B]/g, (q) => q + q)}'`;
     case "cmd":
-      // Inside double quotes cmd.exe keeps `& | < > ( ) ^` literal, so a task
-      // at "tasks (1)/demo.py" arrives intact. A caret is *not* an escape
-      // character inside quotes and would be handed to the program, so it
-      // must not be added. Embedded double quotes are doubled, which the
-      // program's C runtime reads back as one quote.
-      return `"${value.replace(/"/g, '""')}"`;
+      // Two parsers read this text. cmd.exe only tracks the double quotes:
+      // inside them `& | < > ( ) ^` stay literal, so a task at
+      // "tasks (1)/demo.py" arrives intact, and a caret is *not* an escape
+      // character there (it would be handed to the program). The program's C
+      // runtime then splits the same text by its own rules: a backslash run
+      // is literal unless it precedes a quote, where 2n backslashes become n
+      // and an odd run also escapes the quote. So a run before an embedded
+      // quote or the closing quote is doubled — a directory parameter ending
+      // in a separator keeps it — and an embedded quote is written as "",
+      // which the runtime reads back as one literal quote while cmd.exe sees
+      // one quoted span end and another begin rather than a quote-toggling
+      // `\"` that would expose the rest of the value to the shell.
+      return `"${value.replace(
+        /(\\*)("|$)/g,
+        (_match, slashes: string, quote: string) =>
+          slashes + slashes + (quote ? '""' : "")
+      )}"`;
   }
 }
 
@@ -118,7 +129,12 @@ export function quoteCommandLine(parts: string[], kind: ShellKind): string {
 export function changeDirectoryCommand(cwd: string, kind: ShellKind): string {
   switch (kind) {
     case "cmd":
-      return `cd /d ${quoteArg(cwd, kind)}`;
+      // `cd` is a cmd.exe built-in, not a program: the shell strips the quotes
+      // itself and no C runtime parses the argument, so the directory is
+      // quoted plainly and a trailing separator is passed as typed rather
+      // than doubled as {@link quoteArg} does for program arguments. A `"`
+      // cannot occur in a Windows path.
+      return `cd /d "${cwd}"`;
     case "powershell":
       return `cd -LiteralPath ${quoteArg(cwd, kind)}`;
     default:

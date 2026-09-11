@@ -2,7 +2,8 @@
  * Tests for exec-manager.ts - ExecManager
  */
 import * as assert from "assert";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "fs";
+import { spawnSync } from "child_process";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 
@@ -387,65 +388,226 @@ suite("ExecManager Test Suite", () => {
       assert.deepStrictEqual(args, ["eval", "task.py@my_task"]);
     });
 
+    // Lay out an environment the way pip and Conda do and return the paths
+    // buildRunCommand must find. Windows layouts are built on every host (the
+    // platform is passed explicitly) so the lookup is checked here too.
+    const layoutEnvironment = (
+      root: string,
+      layout: "venv" | "conda",
+      platform: NodeJS.Platform,
+      scripts: string[]
+    ) => {
+      const windows = platform === "win32";
+      const scriptDir = join(root, windows ? "Scripts" : "bin");
+      mkdirSync(scriptDir, { recursive: true });
+      const exe = windows ? ".exe" : "";
+      let python: string;
+      if (layout === "conda") {
+        mkdirSync(join(root, "conda-meta"));
+        // Conda keeps python.exe at the environment root on Windows and its
+        // console scripts under Scripts; on POSIX both live in bin.
+        python = join(windows ? root : scriptDir, `python${exe}`);
+      } else {
+        writeFileSync(join(root, "pyvenv.cfg"), "");
+        python = join(scriptDir, `python${exe}`);
+      }
+      writeFileSync(python, "");
+      const installed: Record<string, string> = {};
+      for (const script of scripts) {
+        installed[script] = join(scriptDir, `${script}${exe}`);
+        writeFileSync(installed[script], "");
+      }
+      return { python: toAbsolutePath(python), installed };
+    };
+
+    const scout = () =>
+      profile({
+        packageName: "inspect-scout",
+        packageDisplayName: "Inspect Scout",
+        target: "Scan",
+        terminal: "Scout Scan",
+        command: "scout",
+        subcommand: "scan",
+      });
+
     test("uses an approved subdirectory environment's own console script", () => {
       const root = mkdtempSync(join(tmpdir(), "inspect-env-"));
       try {
-        const bin = join(
-          root,
-          process.platform === "win32" ? "Scripts" : "bin"
-        );
-        mkdirSync(bin);
-        const python = toAbsolutePath(
-          join(bin, process.platform === "win32" ? "python.exe" : "python")
-        );
-        writeFileSync(python.path, "");
-        const scout = join(
-          bin,
-          process.platform === "win32" ? "scout.exe" : "scout"
-        );
-        writeFileSync(scout, "");
-
+        const env = layoutEnvironment(root, "venv", process.platform, [
+          "scout",
+        ]);
         const { command, args } = buildRunCommand(
-          profile({ packageName: "inspect-scout", command: "scout" }),
+          scout(),
           ["scan", "scan.py"],
-          python
+          env.python
         );
-
-        assert.strictEqual(command, scout);
+        assert.strictEqual(command, env.installed.scout);
         assert.deepStrictEqual(args, ["scan", "scan.py"]);
       } finally {
         rmSync(root, { recursive: true, force: true });
       }
     });
 
-    test("falls back to `python -m <module>` when the environment has no console script", () => {
-      const python = toAbsolutePath(
-        process.platform === "win32"
-          ? "C:\\missing\\Scripts\\python.exe"
-          : "/missing/bin/python"
-      );
-      const { command, args } = buildRunCommand(
-        profile(),
-        ["eval", "task.py@my_task"],
-        python
-      );
+    test("finds the console scripts of a Windows Conda environment under Scripts", () => {
+      const root = mkdtempSync(join(tmpdir(), "inspect-conda-"));
+      try {
+        const env = layoutEnvironment(root, "conda", "win32", [
+          "inspect",
+          "scout",
+        ]);
+        assert.strictEqual(env.python.path, join(root, "python.exe"));
+        assert.deepStrictEqual(
+          buildRunCommand(scout(), ["scan", "scan.py"], env.python, "win32"),
+          {
+            command: join(root, "Scripts", "scout.exe"),
+            args: ["scan", "scan.py"],
+          }
+        );
+        assert.deepStrictEqual(
+          buildRunCommand(profile(), ["eval", "t.py"], env.python, "win32"),
+          {
+            command: join(root, "Scripts", "inspect.exe"),
+            args: ["eval", "t.py"],
+          }
+        );
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    });
 
-      assert.strictEqual(command, python.path);
-      // The importable module name, so Python reports the real problem.
-      assert.deepStrictEqual(args, [
-        "-m",
-        "inspect_ai",
-        "eval",
-        "task.py@my_task",
-      ]);
-      assert.deepStrictEqual(
-        buildRunCommand(
-          profile({ packageName: "inspect-scout", command: "scout" }),
-          ["scan"],
-          python
-        ).args,
-        ["-m", "inspect_scout", "scan"]
-      );
+    test("finds the console scripts of a Windows venv and a POSIX Conda environment", () => {
+      const root = mkdtempSync(join(tmpdir(), "inspect-layouts-"));
+      try {
+        const venv = layoutEnvironment(join(root, "venv"), "venv", "win32", [
+          "inspect",
+        ]);
+        assert.strictEqual(
+          buildRunCommand(profile(), ["eval"], venv.python, "win32").command,
+          join(root, "venv", "Scripts", "inspect.exe")
+        );
+        const conda = layoutEnvironment(join(root, "conda"), "conda", "linux", [
+          "scout",
+        ]);
+        assert.strictEqual(
+          buildRunCommand(scout(), ["scan"], conda.python, "linux").command,
+          join(root, "conda", "bin", "scout")
+        );
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    });
+
+    test("falls back to each package's executable module when the environment has no console script", () => {
+      const root = mkdtempSync(join(tmpdir(), "inspect-noscript-"));
+      try {
+        const conda = layoutEnvironment(root, "conda", "win32", []);
+        // `inspect_ai` has a package __main__; `inspect_scout` does not, its
+        // console-script entry point module is the runnable one.
+        assert.deepStrictEqual(
+          buildRunCommand(
+            profile(),
+            ["eval", "task.py@my_task"],
+            conda.python,
+            "win32"
+          ),
+          {
+            command: conda.python.path,
+            args: ["-m", "inspect_ai", "eval", "task.py@my_task"],
+          }
+        );
+        assert.deepStrictEqual(
+          buildRunCommand(scout(), ["scan", "scan.py"], conda.python, "win32"),
+          {
+            command: conda.python.path,
+            args: ["-m", "inspect_scout._cli.main", "scan", "scan.py"],
+          }
+        );
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    });
+
+    test("the module fallback runs through the environment's interpreter", function () {
+      // A real virtual environment whose site-packages holds stand-ins with
+      // the upstream packages' module shape: inspect_ai/__main__.py and
+      // inspect_scout/_cli/main.py (guarded by __name__ == "__main__"), with
+      // no inspect_scout/__main__.py. The fallback must start each one.
+      this.timeout(60000);
+      const root = mkdtempSync(join(tmpdir(), "inspect fallback (1) "));
+      try {
+        const venv = join(root, "venv");
+        const created = spawnSync(
+          process.platform === "win32" ? "python" : "python3",
+          ["-m", "venv", "--without-pip", venv],
+          { encoding: "utf8", timeout: 60000 }
+        );
+        if (
+          created.error &&
+          "code" in created.error &&
+          created.error.code === "ENOENT"
+        ) {
+          this.skip();
+        }
+        assert.strictEqual(created.status, 0, created.stderr);
+        const python = toAbsolutePath(
+          join(
+            venv,
+            process.platform === "win32" ? "Scripts" : "bin",
+            process.platform === "win32" ? "python.exe" : "python"
+          )
+        );
+        assert.ok(existsSync(python.path));
+        const sitePackages = spawnSync(
+          python.path,
+          ["-c", "import sysconfig; print(sysconfig.get_paths()['purelib'])"],
+          { encoding: "utf8" }
+        ).stdout.trim();
+        assert.ok(sitePackages);
+        const report = "import json, sys\nprint(json.dumps(sys.argv[1:]))\n";
+        mkdirSync(join(sitePackages, "inspect_ai"), { recursive: true });
+        writeFileSync(join(sitePackages, "inspect_ai", "__init__.py"), "");
+        writeFileSync(join(sitePackages, "inspect_ai", "__main__.py"), report);
+        mkdirSync(join(sitePackages, "inspect_scout", "_cli"), {
+          recursive: true,
+        });
+        writeFileSync(join(sitePackages, "inspect_scout", "__init__.py"), "");
+        writeFileSync(
+          join(sitePackages, "inspect_scout", "_cli", "__init__.py"),
+          ""
+        );
+        writeFileSync(
+          join(sitePackages, "inspect_scout", "_cli", "main.py"),
+          `def main():\n    ${report.replace(/\n/g, "\n    ").trimEnd()}\n\nif __name__ == "__main__":\n    main()\n`
+        );
+
+        const runArgs = [
+          "scan",
+          "tasks (1)/it's demo.py@demo",
+          "-T",
+          "prompt=a & b",
+        ];
+        for (const p of [profile(), scout()]) {
+          const { command, args } = buildRunCommand(p, runArgs, python);
+          assert.strictEqual(command, python.path);
+          const ran = spawnSync(command, args, {
+            encoding: "utf8",
+            timeout: 30000,
+          });
+          assert.ifError(ran.error);
+          assert.strictEqual(ran.status, 0, `${p.command}: ${ran.stderr}`);
+          assert.deepStrictEqual(JSON.parse(ran.stdout), runArgs, p.command);
+        }
+        // The package name itself is not runnable for Scout, which is why the
+        // fallback names its entry point module.
+        const wrong = spawnSync(python.path, ["-m", "inspect_scout", "scan"], {
+          encoding: "utf8",
+          timeout: 30000,
+        });
+        assert.notStrictEqual(wrong.status, 0);
+        assert.match(wrong.stderr, /No module named inspect_scout\.__main__/);
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
     });
 
     test("keeps a space-bearing target as a single argument", () => {

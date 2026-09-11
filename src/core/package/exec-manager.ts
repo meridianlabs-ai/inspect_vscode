@@ -185,9 +185,9 @@ export class ExecManager {
  * earlier on PATH):
  *
  * - a workspace subdirectory environment the user approved: the console
- *   script beside its interpreter (`.venv/bin/inspect`,
- *   `.venv\Scripts\inspect.exe`), or `python -m inspect_ai` when that script
- *   is missing so Python reports the missing package honestly;
+ *   script that environment installed (see {@link environmentConsoleScript}),
+ *   or that package's runnable module through the environment's interpreter
+ *   when the script is missing, so Python reports a missing package honestly;
  * - otherwise the selected interpreter's console script from
  *   {@link ExecProfile.binPath};
  * - otherwise the bare command, leaving resolution to the terminal.
@@ -203,21 +203,57 @@ export const buildRunCommand = (
   platform: NodeJS.Platform = os.platform()
 ): { command: string; args: string[] } => {
   if (python) {
-    const script = python
-      .dirname()
-      .child(platform === "win32" ? `${profile.command}.exe` : profile.command);
-    if (existsSync(script.path)) {
+    const script = environmentConsoleScript(python, profile.command, platform);
+    if (script) {
       return { command: script.path, args };
     }
     return {
       command: python.path,
-      args: ["-m", profile.packageName.replace(/-/g, "_"), ...args],
+      args: ["-m", kRunnableModule[profile.packageName], ...args],
     };
   }
   return {
     command: profile.binPath()?.path ?? profile.command,
     args,
   };
+};
+
+/**
+ * The module `python -m` can start for each package when its console script
+ * is absent. `inspect_ai` ships a package `__main__`. `inspect_scout` does
+ * not (`python -m inspect_scout` fails), so its console-script entry point
+ * module `inspect_scout/_cli/main.py`, which runs `main()` under
+ * `__name__ == "__main__"`, is named instead.
+ */
+const kRunnableModule: Record<ExecProfile["packageName"], string> = {
+  "inspect-ai": "inspect_ai",
+  "inspect-scout": "inspect_scout._cli.main",
+};
+
+/**
+ * The console script `command` installed by the environment that owns
+ * `python`, if it exists. pip places scripts in the interpreter's own
+ * directory (`.venv/bin/inspect`, `.venv\Scripts\inspect.exe`), but a Conda
+ * environment on Windows keeps `python.exe` at the environment root with its
+ * scripts under `Scripts`, so the script directory is derived from the
+ * environment root; the interpreter's directory is kept as a second candidate.
+ */
+const environmentConsoleScript = (
+  python: AbsolutePath,
+  command: string,
+  platform: NodeJS.Platform
+): AbsolutePath | undefined => {
+  const windows = platform === "win32";
+  const name = windows ? `${command}.exe` : command;
+  const pythonDir = python.dirname();
+  const root = /^(scripts|bin)$/i.test(pythonDir.filename())
+    ? pythonDir.dirname()
+    : pythonDir;
+  const candidates = [
+    root.child(windows ? "Scripts" : "bin").child(name),
+    pythonDir.child(name),
+  ];
+  return candidates.find((candidate) => existsSync(candidate.path));
 };
 
 /**

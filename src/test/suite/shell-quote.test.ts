@@ -5,6 +5,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  realpathSync,
   rmSync,
   writeFileSync,
 } from "fs";
@@ -190,6 +191,13 @@ suite("Shell Quote Test Suite", () => {
       name: string;
       kind: ShellKind;
       run: (line: string) => ReturnType<typeof spawnSync>;
+      // Windows PowerShell 5.1 rebuilds a native command line by wrapping
+      // whitespace-bearing arguments in double quotes without escaping, so a
+      // trailing backslash or an embedded quote in such an argument is
+      // corrupted by PowerShell itself before the program parses it. pwsh 7.3+
+      // (`$PSNativeCommandArgumentPassing` = Windows) and cmd.exe pass what
+      // our quoting produces; 5.1 is checked on the arguments it can carry.
+      legacyArgumentPassing?: boolean;
     }[] = [];
     let root = "";
     let program = "";
@@ -219,6 +227,7 @@ suite("Shell Quote Test Suite", () => {
         shells.push({
           name: "Windows PowerShell",
           kind: "powershell",
+          legacyArgumentPassing: true,
           run: (line) =>
             spawnSync(
               "powershell.exe",
@@ -287,11 +296,28 @@ suite("Shell Quote Test Suite", () => {
         "$HOME",
         "évaluation",
         "demo’s task.py@demo",
+        // A directory parameter keeps its trailing separator, and the
+        // argument after it stays a separate argument.
+        "directory=C:\\my data\\",
+        "next",
+        "C:\\my data\\\\",
+        "trailing\\",
+        "a\\\\b\\",
+        "C:\\my data\\sub",
+        'say "hi"',
+        'quote\\"slash',
       ];
       for (const shell of shells) {
+        const carried = shell.legacyArgumentPassing
+          ? values.filter(
+              (value) =>
+                !value.includes('"') &&
+                !(/\s/.test(value) && value.endsWith("\\"))
+            )
+          : values;
         const result = join(root, `${shell.name} result.json`);
         const line = quoteCommandLine(
-          [program, argvScript, result, ...values],
+          [program, argvScript, result, ...carried],
           shell.kind
         );
         const ran = shell.run(line);
@@ -303,10 +329,33 @@ suite("Shell Quote Test Suite", () => {
         );
         assert.deepStrictEqual(
           JSON.parse(readFileSync(result, "utf8")),
-          values,
+          carried,
           `${shell.name}: ${line}`
         );
       }
+    });
+
+    test("cmd's cd built-in receives a directory ending in a separator as typed", function () {
+      const cmd = shells.find((shell) => shell.kind === "cmd");
+      if (!cmd) {
+        this.skip();
+        return;
+      }
+      const directory = join(root, "work space (4)");
+      mkdirSync(directory);
+      const ran = cmd.run(
+        `${changeDirectoryCommand(`${directory}\\`, "cmd")} && cd`
+      );
+      assert.ifError(ran.error);
+      assert.strictEqual(
+        ran.status,
+        0,
+        `${String(ran.stdout)}${String(ran.stderr)}`
+      );
+      assert.strictEqual(
+        realpathSync.native(String(ran.stdout).trim()).toLowerCase(),
+        realpathSync.native(directory).toLowerCase()
+      );
     });
   });
 
@@ -373,6 +422,29 @@ suite("Shell Quote Test Suite", () => {
     test("escapes embedded double quotes", () => {
       assert.strictEqual(quoteArg('say "hi"', "cmd"), '"say ""hi"""');
     });
+
+    test("doubles a backslash run that would otherwise escape a quote", () => {
+      // The program's C runtime reads `\"` as a literal quote, so a directory
+      // parameter ending in a separator must not leave its backslash against
+      // the closing quote: "directory=C:\my data\" would arrive as
+      // `directory=C:\my data"` with the next argument appended to it.
+      assert.strictEqual(
+        quoteArg("directory=C:\\my data\\", "cmd"),
+        '"directory=C:\\my data\\\\"'
+      );
+      assert.strictEqual(
+        quoteArg("C:\\my data\\\\", "cmd"),
+        '"C:\\my data\\\\\\\\"'
+      );
+      // Before an embedded quote the run is doubled too; the quote itself is
+      // still written as "" so cmd.exe keeps the argument in one quoted span.
+      assert.strictEqual(quoteArg('a\\"b', "cmd"), '"a\\\\""b"');
+      // Backslashes not followed by a quote are literal and stay single.
+      assert.strictEqual(
+        quoteArg("C:\\my data\\sub", "cmd"),
+        '"C:\\my data\\sub"'
+      );
+    });
   });
 
   suite("quoteCommandLine", () => {
@@ -430,6 +502,14 @@ suite("Shell Quote Test Suite", () => {
       assert.strictEqual(
         changeDirectoryCommand("D:\\work space", "cmd"),
         'cd /d "D:\\work space"'
+      );
+      // `cd` is a cmd.exe built-in, not a program: no C runtime parses its
+      // argument, so a trailing separator is passed as typed rather than
+      // doubled the way a program argument's would be.
+      assert.strictEqual(changeDirectoryCommand("D:\\", "cmd"), 'cd /d "D:\\"');
+      assert.strictEqual(
+        changeDirectoryCommand("D:\\work space\\", "cmd"),
+        'cd /d "D:\\work space\\"'
       );
       assert.strictEqual(
         changeDirectoryCommand("D:\\work [1]", "powershell"),
