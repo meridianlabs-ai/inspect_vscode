@@ -1,6 +1,10 @@
+import { existsSync } from "node:fs";
+import * as os from "os";
+
 import {
   debug,
   DebugConfiguration,
+  env,
   ExtensionContext,
   MessageItem,
   Terminal,
@@ -20,10 +24,14 @@ import {
   activeWorkspacePath,
   workspaceRelativePath,
 } from "../path";
-import { findEnvPythonPath, pythonInterpreter } from "../python";
+import { findEnvPythonPath } from "../python";
+import {
+  changeDirectoryCommand,
+  quoteCommandLine,
+  ShellKind,
+  shellKindFromPath,
+} from "../shell-quote";
 import { activeWorkspaceFolder } from "../workspace";
-
-import { createRunTransport, resolveLaunchVector } from "./run-transport";
 
 export interface ExecProfile {
   packageName: "inspect-ai" | "inspect-scout";
@@ -33,7 +41,9 @@ export interface ExecProfile {
   terminal: "Inspect Eval" | "Scout Scan";
   command: "inspect" | "scout";
   subcommand: "eval" | "scan";
-  binPath: AbsolutePath | null;
+  // Resolved at Run time: the selected interpreter (and with it the console
+  // script location) can change after the extension has activated.
+  binPath: () => AbsolutePath | null;
   execArgs: (docState: DocumentState, debug: boolean) => string[];
 }
 
@@ -101,7 +111,7 @@ export class ExecManager {
 
       await runDebugger(
         this.profile_,
-        this.profile_.binPath?.path || this.profile_.command,
+        this.profile_.binPath()?.path || this.profile_.command,
         args,
         workspaceDir.path,
         env,
@@ -109,13 +119,11 @@ export class ExecManager {
       );
     } else {
       // Run the command
-      this.context_.subscriptions.push(
-        await runCommand(
-          this.profile_,
-          args,
-          workspaceDir.path,
-          pythonPath ? pythonPath : undefined
-        )
+      await runCommand(
+        this.profile_,
+        args,
+        workspaceDir.path,
+        pythonPath ? pythonPath : undefined
       );
     }
   }
@@ -168,6 +176,51 @@ export class ExecManager {
 }
 
 /**
+ * Builds the program and argument vector for a run command.
+ *
+ * The program is the console script of the environment that owns the package,
+ * named by absolute path so the terminal runs the selected environment's
+ * `inspect`/`scout` whether or not that environment is on the terminal's PATH
+ * (activation disabled, activation still running, or a different `inspect`
+ * earlier on PATH):
+ *
+ * - a workspace subdirectory environment the user approved: the console
+ *   script beside its interpreter (`.venv/bin/inspect`,
+ *   `.venv\Scripts\inspect.exe`), or `python -m inspect_ai` when that script
+ *   is missing so Python reports the missing package honestly;
+ * - otherwise the selected interpreter's console script from
+ *   {@link ExecProfile.binPath};
+ * - otherwise the bare command, leaving resolution to the terminal.
+ *
+ * Arguments are returned as plain, *unquoted* strings. Quoting is the caller's
+ * responsibility because it depends on the shell the command will be sent to
+ * (see {@link runCommand} and the `shell-quote` module).
+ */
+export const buildRunCommand = (
+  profile: ExecProfile,
+  args: string[],
+  python?: AbsolutePath,
+  platform: NodeJS.Platform = os.platform()
+): { command: string; args: string[] } => {
+  if (python) {
+    const script = python
+      .dirname()
+      .child(platform === "win32" ? `${profile.command}.exe` : profile.command);
+    if (existsSync(script.path)) {
+      return { command: script.path, args };
+    }
+    return {
+      command: python.path,
+      args: ["-m", profile.packageName.replace(/-/g, "_"), ...args],
+    };
+  }
+  return {
+    command: profile.binPath()?.path ?? profile.command,
+    args,
+  };
+};
+
+/**
  * Waits until shell integration becomes active on `terminal`, or until
  * `timeoutMs` elapses. Returns the integration object if it activated in time,
  * or `undefined` if it didn't (shell integration disabled or too slow).
@@ -197,86 +250,88 @@ const waitForShellIntegration = (
   });
 };
 
-const terminalSelections = new WeakMap<Terminal, string>();
-
 export const runCommand = async (
   profile: ExecProfile,
   args: string[],
   cwd: string,
   python?: AbsolutePath
 ) => {
-  // The terminal shell never searches for an executable: the launch vector is
-  // made absolute here (a bare default such as `python` is looked up on the
-  // extension host PATH, never in a workspace or terminal current directory)
-  // and the transport starts it through a fixed operating-system launcher.
-  const selected = resolveLaunchVector(
-    python ? [python.path] : (pythonInterpreter().execCommand ?? []),
-    cwd
-  );
-  // Retain output and activation on repeated runs. A changed interpreter needs
-  // a fresh activation; keep the old terminal's output available to the user.
-  const selection = JSON.stringify(selected);
+  // Reuse a named terminal so the user can see previous runs and so the
+  // Python extension's env-activation hooks have already run.
   const name = profile.terminal;
-  let terminal = window.terminals.find(
-    (t) => t.name === name && terminalSelections.get(t) === selection
-  );
+  let terminal = window.terminals.find((t) => t.name === name);
   const reusedTerminal = terminal !== undefined;
   if (!terminal) {
     terminal = window.createTerminal({ name, cwd });
-    terminalSelections.set(terminal, selection);
   }
   terminal.show(true);
 
-  const transport = createRunTransport(
-    selected,
-    profile.packageName,
-    profile.command,
-    args,
-    cwd
-  );
-  const closeListener = window.onDidCloseTerminal((closed) => {
-    if (closed === terminal) {
-      transport.dispose();
-      closeListener.dispose();
-    }
-  });
-  const cleanup = {
-    dispose: () => {
-      closeListener.dispose();
-      transport.dispose();
-    },
-  };
+  const { command, args: commandArgs } = buildRunCommand(profile, args, python);
 
   // Prefer shell integration (available in VS Code 1.93+): it fires after the
-  // shell's init sequence completes, so the Python environment activation
-  // (PATH, VIRTUAL_ENV, conda variables) is in place before the launcher is
-  // sent and is inherited by the selected interpreter. The launch itself does
-  // not depend on PATH. Task inputs never enter shell syntax; shell
-  // integration supplies command decorations only.
+  // shell's init sequence completes, so the Python environment activation is
+  // in place (and inherited by the task) before the command is sent. It also
+  // gives the terminal proper command decorations.
   //
   // On a reused terminal integration is usually already active; on a new
   // terminal we wait up to 10 s for it to activate. If it doesn't (shell
   // integration disabled, older VS Code build, or the shell doesn't support
   // it), we fall back to sendText with a fixed delay.
   const kShellIntegrationTimeoutMs = 10_000;
-  try {
-    const integration = await waitForShellIntegration(
-      terminal,
-      kShellIntegrationTimeoutMs
-    );
-    if (integration) {
-      integration.executeCommand(transport.commandLine);
-    } else {
-      if (!reusedTerminal) {
-        await sleep(2000);
-      }
-      terminal.sendText(transport.commandLine);
+  const integration = await waitForShellIntegration(
+    terminal,
+    kShellIntegrationTimeoutMs
+  );
+
+  // Quote for the shell running in the terminal, then emit a `cd` first on
+  // reused terminals (executeCommand doesn't change the working directory).
+  const shell = terminalShellKind(terminal);
+  const commandLine = quoteCommandLine([command, ...commandArgs], shell);
+  const cdLine = reusedTerminal
+    ? changeDirectoryCommand(cwd, shell)
+    : undefined;
+
+  if (integration) {
+    if (cdLine) {
+      integration.executeCommand(cdLine);
     }
-    return cleanup;
-  } catch (error) {
-    cleanup.dispose();
-    throw error;
+    integration.executeCommand(commandLine);
+  } else {
+    // Fallback: shell integration unavailable. Use sendText with a delay on
+    // new terminals to give the activation scripts time to finish.
+    if (!reusedTerminal) {
+      await sleep(2000);
+    }
+    if (cdLine) {
+      terminal.sendText(cdLine);
+    }
+    terminal.sendText(commandLine);
   }
+};
+
+/**
+ * Best-effort identification of the shell in `terminal`, in order of how much
+ * each signal knows about that particular terminal: the shell type VS Code
+ * reports once shell integration is active (newer hosts; absent on 1.93), the
+ * executable the terminal was created with, the default shell VS Code launches
+ * for terminals created without one (`env.shell` already reflects the
+ * `terminal.integrated.defaultProfile` setting), and finally the platform's
+ * own default: PowerShell on Windows, a POSIX shell elsewhere.
+ */
+export const terminalShellKind = (
+  terminal: Pick<Terminal, "creationOptions" | "state">,
+  defaultShell: string = env.shell,
+  platform: NodeJS.Platform = os.platform()
+): ShellKind => {
+  const reported = (terminal.state as { shell?: string }).shell;
+  const options = terminal.creationOptions;
+  const launched = "shellPath" in options ? options.shellPath : undefined;
+  return (
+    shellKindFromPath(reported) ??
+    shellKindFromPath(launched) ??
+    shellKindFromPath(defaultShell) ??
+    (platform === "win32" ? "powershell" : "posix")
+  );
 };
 
 const runDebugger = async (

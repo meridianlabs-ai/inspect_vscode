@@ -1,10 +1,18 @@
 import * as assert from "assert";
 import { spawnSync } from "child_process";
-import { existsSync, mkdirSync, mkdtempSync, rmSync } from "fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 
 import {
+  changeDirectoryCommand,
   quoteArg,
   quoteCommandLine,
   ShellKind,
@@ -145,7 +153,7 @@ suite("Shell Quote Test Suite", () => {
             [
               ...(shell === "fish" ? ["--no-config"] : []),
               "-c",
-              `cd ${quoteArg(directory, kind)}; pwd`,
+              `${changeDirectoryCommand(directory, kind)}; pwd`,
             ],
             {
               cwd,
@@ -163,6 +171,144 @@ suite("Shell Quote Test Suite", () => {
       });
     });
   }
+
+  // PowerShell and cmd receive a real program path that needs quoting (spaces
+  // and parentheses, as under `C:\Users\First Last`) plus arguments with the
+  // characters Windows allows in file names. The program is a genuine venv
+  // interpreter so the launch goes through each shell's own command lookup.
+  suite("real PowerShell and cmd argument round trips", () => {
+    const windows = process.platform === "win32";
+    const locate = (name: string): string | undefined => {
+      const found = spawnSync(windows ? "where.exe" : "which", [name], {
+        encoding: "utf8",
+      });
+      return found.status === 0
+        ? found.stdout.split(/\r?\n/)[0]?.trim()
+        : undefined;
+    };
+    const shells: {
+      name: string;
+      kind: ShellKind;
+      run: (line: string) => ReturnType<typeof spawnSync>;
+    }[] = [];
+    let root = "";
+    let program = "";
+    let argvScript = "";
+
+    suiteSetup(function () {
+      this.timeout(60000);
+      const pwsh = locate("pwsh");
+      if (pwsh) {
+        shells.push({
+          name: "pwsh",
+          kind: "powershell",
+          run: (line) =>
+            spawnSync(
+              pwsh,
+              ["-NoProfile", "-NonInteractive", "-Command", line],
+              {
+                encoding: "utf8",
+                timeout: 30000,
+              }
+            ),
+        });
+      } else if (process.env.REQUIRE_PWSH_TESTS) {
+        assert.fail("PowerShell is required for this validation run");
+      }
+      if (windows) {
+        shells.push({
+          name: "Windows PowerShell",
+          kind: "powershell",
+          run: (line) =>
+            spawnSync(
+              "powershell.exe",
+              ["-NoProfile", "-NonInteractive", "-Command", line],
+              { encoding: "utf8", timeout: 30000 }
+            ),
+        });
+        shells.push({
+          name: "cmd",
+          kind: "cmd",
+          run: (line) =>
+            spawnSync("cmd.exe", ["/d", "/s", "/c", `"${line}"`], {
+              encoding: "utf8",
+              timeout: 30000,
+              windowsVerbatimArguments: true,
+            }),
+        });
+      }
+      if (shells.length === 0) {
+        this.skip();
+      }
+      root = mkdtempSync(join(tmpdir(), "quote env (1) "));
+      const venv = join(root, "venv (2)");
+      const created = spawnSync(
+        windows ? "python" : "python3",
+        ["-m", "venv", "--without-pip", venv],
+        { encoding: "utf8", timeout: 60000 }
+      );
+      assert.strictEqual(created.status, 0, created.stderr);
+      program = windows
+        ? join(venv, "Scripts", "python.exe")
+        : join(venv, "bin", "python");
+      assert.ok(existsSync(program));
+      argvScript = join(root, "argv (3).py");
+      writeFileSync(
+        argvScript,
+        [
+          "import json, sys",
+          "with open(sys.argv[1], 'w', encoding='utf-8') as f:",
+          "    json.dump(sys.argv[2:], f)",
+          "",
+        ].join("\n")
+      );
+    });
+
+    suiteTeardown(() => {
+      if (root) {
+        rmSync(root, { recursive: true, force: true });
+      }
+    });
+
+    test("a quoted program path and Windows-legal arguments arrive literally", function () {
+      this.timeout(120000);
+      const values = [
+        "task.py@demo",
+        "my tasks/demo.py@demo",
+        "tasks (1)/demo.py@demo",
+        "it's",
+        "a&b",
+        "x^y|z<w>v",
+        "--limit=10",
+        "a,b",
+        "@task",
+        "-T",
+        "prompt=say hello; & goodbye",
+        "$HOME",
+        "évaluation",
+        "demo’s task.py@demo",
+      ];
+      for (const shell of shells) {
+        const result = join(root, `${shell.name} result.json`);
+        const line = quoteCommandLine(
+          [program, argvScript, result, ...values],
+          shell.kind
+        );
+        const ran = shell.run(line);
+        assert.ifError(ran.error);
+        assert.strictEqual(
+          ran.status,
+          0,
+          `${shell.name}: ${line}\n${String(ran.stdout)}${String(ran.stderr)}`
+        );
+        assert.deepStrictEqual(
+          JSON.parse(readFileSync(result, "utf8")),
+          values,
+          `${shell.name}: ${line}`
+        );
+      }
+    });
+  });
 
   suite("quoteArg - powershell", () => {
     test("single-quotes a value with spaces", () => {
@@ -192,11 +338,11 @@ suite("Shell Quote Test Suite", () => {
 
     test("doubles Unicode smart quotes so they cannot terminate the string", () => {
       // PowerShell treats U+2018–U+201B as single-quote characters, so an
-      // embedded smart quote must be doubled or it would end the quoted string
-      // and let the following text execute.
-      const payload = "demo" + "’" + ";calc;" + "’";
+      // embedded smart quote (common in macOS file names) must be doubled or it
+      // would end the quoted string and break the command.
+      const payload = "demo" + "’" + "s task" + "’";
       const quoted = quoteArg(payload, "powershell");
-      assert.strictEqual(quoted, "'demo’’;calc;’’'");
+      assert.strictEqual(quoted, "'demo’’s task’’'");
     });
 
     test("quotes a leading @ (splatting/array subexpression)", () => {
@@ -214,8 +360,14 @@ suite("Shell Quote Test Suite", () => {
       assert.strictEqual(quoteArg("my task", "cmd"), '"my task"');
     });
 
-    test("caret-escapes cmd metacharacters", () => {
-      assert.strictEqual(quoteArg("a&b|c", "cmd"), '"a^&b^|c"');
+    test("keeps cmd metacharacters literal inside the quotes", () => {
+      // A caret is not an escape inside double quotes; adding one would hand
+      // `tasks ^(1^)` to the program.
+      assert.strictEqual(quoteArg("a&b|c", "cmd"), '"a&b|c"');
+      assert.strictEqual(
+        quoteArg("tasks (1)/demo.py", "cmd"),
+        '"tasks (1)/demo.py"'
+      );
     });
 
     test("escapes embedded double quotes", () => {
@@ -248,6 +400,47 @@ suite("Shell Quote Test Suite", () => {
         "inspect eval task.py@my_task"
       );
     });
+
+    test("invokes a quoted program through PowerShell's call operator", () => {
+      assert.strictEqual(
+        quoteCommandLine(
+          [
+            "C:\\Users\\First Last\\.venv\\Scripts\\inspect.exe",
+            "eval",
+            "t.py",
+          ],
+          "powershell"
+        ),
+        "& 'C:\\Users\\First Last\\.venv\\Scripts\\inspect.exe' eval t.py"
+      );
+      // Other shells run a quoted first token directly.
+      assert.strictEqual(
+        quoteCommandLine(["/my env/bin/inspect", "eval", "t.py"], "posix"),
+        "'/my env/bin/inspect' eval t.py"
+      );
+      assert.strictEqual(
+        quoteCommandLine(["C:\\my env\\inspect.exe", "eval", "t.py"], "cmd"),
+        '"C:\\my env\\inspect.exe" eval t.py'
+      );
+    });
+  });
+
+  suite("changeDirectoryCommand", () => {
+    test("switches drives on cmd and stays literal on PowerShell", () => {
+      assert.strictEqual(
+        changeDirectoryCommand("D:\\work space", "cmd"),
+        'cd /d "D:\\work space"'
+      );
+      assert.strictEqual(
+        changeDirectoryCommand("D:\\work [1]", "powershell"),
+        "cd -LiteralPath 'D:\\work [1]'"
+      );
+      assert.strictEqual(
+        changeDirectoryCommand("/work space", "posix"),
+        "cd '/work space'"
+      );
+      assert.strictEqual(changeDirectoryCommand("/work", "fish"), "cd /work");
+    });
   });
 
   suite("shellKindFromPath", () => {
@@ -258,6 +451,7 @@ suite("Shell Quote Test Suite", () => {
         shellKindFromPath("C:\\some\\custom-shell.exe"),
         undefined
       );
+      assert.strictEqual(shellKindFromPath("nu"), undefined);
     });
 
     test("positively identifies known shells", () => {
@@ -267,6 +461,13 @@ suite("Shell Quote Test Suite", () => {
       assert.strictEqual(shellKindFromPath("C:\\shells\\fish.exe"), "fish");
       assert.strictEqual(shellKindFromPath("cmd.exe"), "cmd");
       assert.strictEqual(shellKindFromPath("pwsh"), "powershell");
+    });
+
+    test("accepts the shell types VS Code reports in terminal.state.shell", () => {
+      assert.strictEqual(shellKindFromPath("gitbash"), "posix");
+      assert.strictEqual(shellKindFromPath("zsh"), "posix");
+      assert.strictEqual(shellKindFromPath("pwsh"), "powershell");
+      assert.strictEqual(shellKindFromPath("cmd"), "cmd");
     });
   });
 });

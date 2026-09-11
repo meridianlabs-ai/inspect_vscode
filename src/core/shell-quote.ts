@@ -4,12 +4,10 @@
 export type ShellKind = "posix" | "fish" | "powershell" | "cmd";
 
 /**
- * Positively identify a {@link ShellKind} from a shell executable path, or
- * `undefined` when the path is empty or unrecognized. This never guesses a
- * platform default — the caller can
- * distinguish "known to be X" from "could not determine", which matters because
- * quoting for the wrong shell (PowerShell single quotes are inert in cmd.exe,
- * letting an embedded `&` execute) is a command-injection vector.
+ * Identify a {@link ShellKind} from a shell executable path or from one of the
+ * shell type identifiers VS Code reports through `terminal.state.shell`
+ * (`bash`, `gitbash`, `pwsh`, `cmd`, …). Returns `undefined` when the value is
+ * empty or unrecognized so the caller can fall through to its next signal.
  */
 export function shellKindFromPath(
   shellPath: string | undefined
@@ -18,7 +16,9 @@ export function shellKindFromPath(
   if (!name) {
     return undefined;
   }
-  if (/(^|[\\/])(bash|zsh|sh|dash|ksh)(\.exe)?$/.test(name)) {
+  if (
+    /(^|[\\/])(bash|gitbash|zsh|sh|dash|ksh|csh|tcsh|wsl)(\.exe)?$/.test(name)
+  ) {
     return "posix";
   }
   if (/(^|[\\/])fish(\.exe)?$/.test(name)) {
@@ -82,23 +82,46 @@ export function quoteArg(value: string, kind: ShellKind): string {
       // Single-quoted PowerShell strings are literal; an embedded single quote
       // is escaped by doubling it. PowerShell's tokenizer also treats the
       // Unicode single-quotation marks U+2018–U+201B as single-quote
-      // characters, so an embedded smart quote would otherwise terminate the
-      // string and let the following text execute — double those too.
+      // characters (they appear in file names typed on macOS), so an embedded
+      // smart quote would otherwise terminate the string — double those too.
       return `'${value.replace(/['\u2018\u2019\u201A\u201B]/g, (q) => q + q)}'`;
-    case "cmd": {
-      // cmd.exe has no robust quoting, but double quotes plus caret-escaping
-      // the command separators closes the common injection vectors. Embedded
-      // double quotes are doubled.
-      const escaped = value.replace(/"/g, '""').replace(/([&|<>()^])/g, "^$1");
-      return `"${escaped}"`;
-    }
+    case "cmd":
+      // Inside double quotes cmd.exe keeps `& | < > ( ) ^` literal, so a task
+      // at "tasks (1)/demo.py" arrives intact. A caret is *not* an escape
+      // character inside quotes and would be handed to the program, so it
+      // must not be added. Embedded double quotes are doubled, which the
+      // program's C runtime reads back as one quote.
+      return `"${value.replace(/"/g, '""')}"`;
   }
 }
 
 /**
  * Quotes each part for the given shell where necessary and joins them into a
- * command line string.
+ * command line string. PowerShell parses a quoted first token as a string
+ * expression rather than a command, so a program path that needs quoting (one
+ * with spaces, the common case under `C:\Users\First Last`) is invoked through
+ * the call operator: `& 'C:\...\inspect.exe' eval ...`.
  */
 export function quoteCommandLine(parts: string[], kind: ShellKind): string {
-  return parts.map((part) => quoteArg(part, kind)).join(" ");
+  const quoted = parts.map((part) => quoteArg(part, kind));
+  if (kind === "powershell" && quoted.length > 0 && quoted[0] !== parts[0]) {
+    quoted[0] = `& ${quoted[0]}`;
+  }
+  return quoted.join(" ");
+}
+
+/**
+ * The command that moves a reused terminal back to `cwd`. cmd.exe needs `/d`
+ * to follow a directory on another drive; PowerShell's `cd` (Set-Location)
+ * expands wildcards such as `[` unless the path is given literally.
+ */
+export function changeDirectoryCommand(cwd: string, kind: ShellKind): string {
+  switch (kind) {
+    case "cmd":
+      return `cd /d ${quoteArg(cwd, kind)}`;
+    case "powershell":
+      return `cd -LiteralPath ${quoteArg(cwd, kind)}`;
+    default:
+      return `cd ${quoteArg(cwd, kind)}`;
+  }
 }

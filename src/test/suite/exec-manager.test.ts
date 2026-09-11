@@ -2,9 +2,16 @@
  * Tests for exec-manager.ts - ExecManager
  */
 import * as assert from "assert";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "fs";
+import { tmpdir } from "os";
+import { join } from "path";
 
-import { ExecProfile } from "../../core/package/exec-manager";
-import { AbsolutePath } from "../../core/path";
+import {
+  buildRunCommand,
+  ExecProfile,
+  terminalShellKind,
+} from "../../core/package/exec-manager";
+import { AbsolutePath, toAbsolutePath } from "../../core/path";
 import { DocumentState } from "../../providers/workspace/workspace-state-provider";
 
 /**
@@ -51,7 +58,7 @@ suite("ExecManager Test Suite", () => {
         terminal: "Inspect Eval",
         command: "inspect",
         subcommand: "eval",
-        binPath: { path: "/usr/bin/inspect" } as ExecProfile["binPath"],
+        binPath: () => ({ path: "/usr/bin/inspect" }) as AbsolutePath,
         execArgs: () => [],
       };
 
@@ -74,7 +81,7 @@ suite("ExecManager Test Suite", () => {
         terminal: "Scout Scan",
         command: "scout",
         subcommand: "scan",
-        binPath: { path: "/usr/bin/scout" } as ExecProfile["binPath"],
+        binPath: () => ({ path: "/usr/bin/scout" }) as AbsolutePath,
         execArgs: () => [],
       };
 
@@ -95,12 +102,12 @@ suite("ExecManager Test Suite", () => {
         terminal: "Inspect Eval",
         command: "inspect",
         subcommand: "eval",
-        binPath: null,
+        binPath: () => null,
         execArgs: () => [],
       };
 
       assert.strictEqual(profile.packageVersion, null);
-      assert.strictEqual(profile.binPath, null);
+      assert.strictEqual(profile.binPath(), null);
     });
   });
 
@@ -329,36 +336,130 @@ suite("ExecManager Test Suite", () => {
     });
   });
 
-  suite("Python Environment Handling", () => {
-    test("should build command with python module syntax", () => {
-      const pythonPath = "/venv/bin/python";
-      const packageName = "inspect-ai";
-      const args = ["eval", "task.py@my_task"];
+  suite("buildRunCommand (real command construction)", () => {
+    const profile = (overrides: Partial<ExecProfile> = {}): ExecProfile => ({
+      packageName: "inspect-ai",
+      packageDisplayName: "Inspect",
+      packageVersion: createMockVersion(
+        "0.4.0"
+      ) as unknown as ExecProfile["packageVersion"],
+      target: "Eval",
+      terminal: "Inspect Eval",
+      command: "inspect",
+      subcommand: "eval",
+      binPath: () => null,
+      execArgs: () => [],
+      ...overrides,
+    });
 
-      const cmd: string[] = [];
-      cmd.push(pythonPath);
-      cmd.push("-m");
-      cmd.push(packageName);
-      cmd.push(...args);
+    test("runs the selected environment's console script by absolute path", () => {
+      const { command, args } = buildRunCommand(
+        profile({
+          binPath: () => ({ path: "/my env/bin/inspect" }) as AbsolutePath,
+        }),
+        ["eval", "task.py@my_task"]
+      );
 
-      assert.deepStrictEqual(cmd, [
-        "/venv/bin/python",
-        "-m",
-        "inspect-ai",
+      assert.strictEqual(command, "/my env/bin/inspect");
+      assert.deepStrictEqual(args, ["eval", "task.py@my_task"]);
+    });
+
+    test("resolves the console script at Run time, not activation time", () => {
+      let current: string | null = null;
+      const p = profile({
+        binPath: () => (current ? ({ path: current } as AbsolutePath) : null),
+      });
+      assert.strictEqual(buildRunCommand(p, ["eval"]).command, "inspect");
+      current = "/other env/bin/inspect";
+      assert.strictEqual(
+        buildRunCommand(p, ["eval"]).command,
+        "/other env/bin/inspect"
+      );
+    });
+
+    test("falls back to the bare command when no console script is known", () => {
+      const { command, args } = buildRunCommand(profile(), [
         "eval",
         "task.py@my_task",
       ]);
+
+      assert.strictEqual(command, "inspect");
+      assert.deepStrictEqual(args, ["eval", "task.py@my_task"]);
     });
 
-    test("should build command with direct binary", () => {
-      const command = "inspect";
-      const args = ["eval", "task.py@my_task"];
+    test("uses an approved subdirectory environment's own console script", () => {
+      const root = mkdtempSync(join(tmpdir(), "inspect-env-"));
+      try {
+        const bin = join(
+          root,
+          process.platform === "win32" ? "Scripts" : "bin"
+        );
+        mkdirSync(bin);
+        const python = toAbsolutePath(
+          join(bin, process.platform === "win32" ? "python.exe" : "python")
+        );
+        writeFileSync(python.path, "");
+        const scout = join(
+          bin,
+          process.platform === "win32" ? "scout.exe" : "scout"
+        );
+        writeFileSync(scout, "");
 
-      const cmd: string[] = [];
-      cmd.push(command);
-      cmd.push(...args);
+        const { command, args } = buildRunCommand(
+          profile({ packageName: "inspect-scout", command: "scout" }),
+          ["scan", "scan.py"],
+          python
+        );
 
-      assert.deepStrictEqual(cmd, ["inspect", "eval", "task.py@my_task"]);
+        assert.strictEqual(command, scout);
+        assert.deepStrictEqual(args, ["scan", "scan.py"]);
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    });
+
+    test("falls back to `python -m <module>` when the environment has no console script", () => {
+      const python = toAbsolutePath(
+        process.platform === "win32"
+          ? "C:\\missing\\Scripts\\python.exe"
+          : "/missing/bin/python"
+      );
+      const { command, args } = buildRunCommand(
+        profile(),
+        ["eval", "task.py@my_task"],
+        python
+      );
+
+      assert.strictEqual(command, python.path);
+      // The importable module name, so Python reports the real problem.
+      assert.deepStrictEqual(args, [
+        "-m",
+        "inspect_ai",
+        "eval",
+        "task.py@my_task",
+      ]);
+      assert.deepStrictEqual(
+        buildRunCommand(
+          profile({ packageName: "inspect-scout", command: "scout" }),
+          ["scan"],
+          python
+        ).args,
+        ["-m", "inspect_scout", "scan"]
+      );
+    });
+
+    test("keeps a space-bearing target as a single argument", () => {
+      const { args } = buildRunCommand(profile(), [
+        "eval",
+        "src/my tasks/task file.py@evaluate_model",
+      ]);
+
+      // The space-bearing target must remain ONE argument, not be split — it is
+      // the caller's job to quote it before sending it to a shell.
+      assert.deepStrictEqual(args, [
+        "eval",
+        "src/my tasks/task file.py@evaluate_model",
+      ]);
     });
   });
 
@@ -430,8 +531,65 @@ suite("ExecManager Test Suite", () => {
   });
 });
 
-suite("Run on hosts without shell identity", () => {
-  test("first and repeated Run emit only the fixed transport in both integration modes", async function () {
+suite("terminalShellKind", () => {
+  const terminal = (
+    shellPath?: string,
+    reported?: string
+  ): Parameters<typeof terminalShellKind>[0] => ({
+    creationOptions: shellPath ? { shellPath } : {},
+    state: { isInteractedWith: false, shell: reported } as unknown as {
+      isInteractedWith: boolean;
+    },
+  });
+
+  test("prefers the shell VS Code reports for the terminal", () => {
+    assert.strictEqual(
+      terminalShellKind(
+        terminal("C:\\Program Files\\PowerShell\\7\\pwsh.exe", "gitbash"),
+        "cmd.exe",
+        "win32"
+      ),
+      "posix"
+    );
+  });
+
+  test("then the executable the terminal was created with", () => {
+    assert.strictEqual(
+      terminalShellKind(
+        terminal("/opt/homebrew/bin/fish"),
+        "/bin/zsh",
+        "darwin"
+      ),
+      "fish"
+    );
+  });
+
+  test("then the default shell VS Code launches for new terminals", () => {
+    assert.strictEqual(
+      terminalShellKind(terminal(), "/bin/zsh", "darwin"),
+      "posix"
+    );
+    assert.strictEqual(
+      terminalShellKind(terminal(), "C:\\Windows\\System32\\cmd.exe", "win32"),
+      "cmd"
+    );
+  });
+
+  test("and finally the platform default", () => {
+    assert.strictEqual(
+      terminalShellKind(terminal(), "", "win32"),
+      "powershell"
+    );
+    assert.strictEqual(terminalShellKind(terminal(), "", "linux"), "posix");
+    assert.strictEqual(
+      terminalShellKind(terminal(undefined, "nu"), "", "darwin"),
+      "posix"
+    );
+  });
+});
+
+suite("Run emits a readable command for the terminal's shell", () => {
+  test("first and repeated Run, with and without shell integration", async function () {
     this.timeout(20000);
     const vscode = await import("vscode");
     const { runCommand } = await import("../../core/package/exec-manager");
@@ -444,28 +602,43 @@ suite("Run on hosts without shell identity", () => {
       Object.defineProperty(vscode.window, name, { configurable: true, value });
     };
     const emitted: string[] = [];
-    const disposables: { dispose: () => void }[] = [];
     const terminal = {
       name: "Inspect Eval",
       // Exactly the identity available on the supported VS Code 1.93 host.
       state: { isInteractedWith: false },
-      creationOptions: {
-        shellPath: "/bin/bash",
-        shellArgs: ["-c", "exec fish"],
-      },
+      creationOptions: { shellPath: "/bin/zsh" },
       shellIntegration: undefined as
         undefined | { executeCommand: (line: string) => void },
       show: () => {},
       sendText: (line: string) => emitted.push(line),
     };
-    const profile = {
-      packageName: "inspect-ai",
-      command: "inspect",
-      target: "Eval",
-      terminal: "Inspect Eval",
-    } as ExecProfile;
+    const cases = [
+      {
+        shellPath: "/bin/zsh",
+        binPath: "/selected env/bin/inspect",
+        cwd: "/work space",
+        command:
+          "'/selected env/bin/inspect' eval 'tasks (1)/it'\\''s demo.py@demo' --limit 5",
+        cd: "cd '/work space'",
+      },
+      {
+        shellPath: "C:\\Program Files\\PowerShell\\7\\pwsh.exe",
+        binPath: "C:\\Users\\First Last\\.venv\\Scripts\\inspect.exe",
+        cwd: "D:\\work space",
+        command:
+          "& 'C:\\Users\\First Last\\.venv\\Scripts\\inspect.exe' eval 'tasks (1)/it''s demo.py@demo' --limit 5",
+        cd: "cd -LiteralPath 'D:\\work space'",
+      },
+      {
+        shellPath: "C:\\Windows\\System32\\cmd.exe",
+        binPath: "C:\\Users\\First Last\\.venv\\Scripts\\inspect.exe",
+        cwd: "D:\\work space",
+        command:
+          '"C:\\Users\\First Last\\.venv\\Scripts\\inspect.exe" eval "tasks (1)/it\'s demo.py@demo" --limit 5',
+        cd: 'cd /d "D:\\work space"',
+      },
+    ];
     try {
-      replace("onDidCloseTerminal", () => ({ dispose: () => {} }));
       replace("createTerminal", () => terminal);
       replace("terminals", []);
       // Exercise the no-integration callback without waiting 10 seconds per test.
@@ -478,60 +651,43 @@ suite("Run on hosts without shell identity", () => {
           return { dispose: () => {} };
         }
       );
-      for (const integration of [true, false]) {
-        terminal.shellIntegration = integration
-          ? {
-              executeCommand: (line: string) => {
-                emitted.push(line);
-              },
-            }
-          : undefined;
-        for (const reused of [false, true]) {
+      for (const testCase of cases) {
+        terminal.creationOptions = { shellPath: testCase.shellPath };
+        const profile = {
+          packageName: "inspect-ai",
+          command: "inspect",
+          target: "Eval",
+          terminal: "Inspect Eval",
+          binPath: () => ({ path: testCase.binPath }) as AbsolutePath,
+        } as ExecProfile;
+        // Shell integration is the normal path; the sendText fallback (no
+        // integration, reused terminal) must emit exactly the same text.
+        for (const [integration, reused] of [
+          [true, false],
+          [true, true],
+          [false, true],
+        ]) {
+          terminal.shellIntegration = integration
+            ? { executeCommand: (line: string) => emitted.push(line) }
+            : undefined;
           Object.defineProperty(vscode.window, "terminals", {
             configurable: true,
             value: reused ? [terminal] : [],
           });
-          disposables.push(
-            await runCommand(
-              profile,
-              [
-                "eval",
-                "tasks”; New-Item INJECTED -ItemType File; “x/task.py@demo",
-                "demo’; New-Item INJECTED -ItemType File; #/task.py@demo",
-                "“”„‘’‚‛",
-              ],
-              "/cwd [literal]",
-              { path: "/selected dir/py$thon" } as AbsolutePath
-            )
+          emitted.length = 0;
+          await runCommand(
+            profile,
+            ["eval", "tasks (1)/it's demo.py@demo", "--limit", "5"],
+            testCase.cwd
+          );
+          assert.deepStrictEqual(
+            emitted,
+            reused ? [testCase.cd, testCase.command] : [testCase.command],
+            `${testCase.shellPath} integration=${integration} reused=${reused}`
           );
         }
       }
-      assert.strictEqual(emitted.length, 4);
-      for (const line of emitted) {
-        // A fixed operating-system launcher at an absolute path; the shell
-        // never searches cwd or PATH for python.
-        assert.match(
-          line,
-          process.platform === "win32"
-            ? /^[A-Za-z]:\/\S+\/powershell\.exe -NoLogo -NoProfile -NonInteractive -EncodedCommand "/
-            : /^\/bin\/sh -c '/
-        );
-        assert.doesNotMatch(line, /^python/);
-        assert.ok(!line.includes("INJECTED"));
-        assert.match(
-          line,
-          /^[\x20-\x7e]+$/,
-          "task Unicode quotes never enter shell source"
-        );
-        assert.ok(!line.includes("/cwd"));
-        assert.ok(!line.includes("selected dir"));
-        assert.ok(!line.includes("$thon"));
-        assert.ok(!line.startsWith("cd "));
-      }
     } finally {
-      for (const disposable of disposables) {
-        disposable.dispose();
-      }
       for (const [name, descriptor] of originals) {
         Object.defineProperty(vscode.window, name, descriptor);
       }

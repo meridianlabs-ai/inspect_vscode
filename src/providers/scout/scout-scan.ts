@@ -22,7 +22,7 @@ export function activateScoutScanManager(
     terminal: "Scout Scan",
     command: "scout",
     subcommand: "scan",
-    binPath: scoutBinPath(),
+    binPath: scoutBinPath,
     execArgs: (_docState: DocumentState, debug: boolean) => {
       const args: string[] = [];
 

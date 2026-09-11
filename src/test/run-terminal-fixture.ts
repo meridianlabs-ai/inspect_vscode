@@ -13,122 +13,100 @@ import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { delimiter, dirname, join, resolve } from "node:path";
 
-import { TerminalOptions, version, window } from "vscode";
+import { TerminalOptions, window } from "vscode";
 
 import { ExecProfile, runCommand } from "../core/package/exec-manager";
 import { AbsolutePath } from "../core/path";
 
-export async function verifyRunTerminal(
-  shell: "startup" | "powershell" = "startup"
-): Promise<boolean> {
+/**
+ * Run first and repeated Inspect and Scout tasks through a real integrated
+ * terminal created with the host's default shell profile, the way users do.
+ *
+ * The "selected environment" is a directory holding an interpreter-style
+ * console script beside `python`, as pip lays out `.venv/bin/inspect` or
+ * `.venv\Scripts\inspect.exe`. The terminal's PATH puts a decoy `inspect` /
+ * `scout` first and omits both the environment and the Python installation,
+ * so the task only runs if the command names the environment's script by
+ * absolute path. Paths and arguments carry spaces, parentheses and an
+ * apostrophe, the characters real installs and file names have.
+ */
+export async function verifyRunTerminal(): Promise<void> {
   const windows = process.platform === "win32";
-  // The terminal runs with no Python on PATH, so shells are started by
-  // absolute path.
-  const locate = (name: string): string | undefined => {
-    const found = spawnSync(windows ? "where.exe" : "which", [name], {
-      encoding: "utf8",
-    });
-    return found.status === 0
-      ? found.stdout.split(/\r?\n/)[0]?.trim()
-      : undefined;
-  };
-  const fish = locate("fish");
-  if (shell === "startup" && !windows && !fish) {
-    if (process.env.REQUIRE_FISH_TESTS) {
-      assert.fail("fish is required");
-    }
-    return false;
-  }
-  const pwsh = locate("pwsh");
-  if (shell === "powershell" && !pwsh) {
-    if (process.env.REQUIRE_PWSH_TESTS) {
-      assert.fail("PowerShell is required");
-    }
-    return false;
-  }
-  const selected = spawnSync(
+  const python = spawnSync(
     windows ? "python" : "python3",
     ["-c", "import sys;print(sys.executable)"],
     { encoding: "utf8" }
   ).stdout.trim();
-  assert.ok(selected);
-  const root = mkdtempSync(join(tmpdir(), "inspect-terminal-test-"));
-  const cwd = join(root, "cwd [demo] & %literal%!");
+  assert.ok(python, "a Python interpreter is required for this fixture");
+
+  const root = mkdtempSync(join(tmpdir(), "inspect run (test) "));
+  const cwd = join(root, "work space");
   mkdirSync(cwd);
-  // Bare `python`/`python3` decoys in the terminal's current directory and at
-  // the front of PATH record that they ran. The selected interpreter's own
-  // directory is removed from PATH: the launch must not need it there.
-  const marker = join(root, "UNSELECTED");
-  const decoyDir = join(root, "decoys");
-  mkdirSync(decoyDir);
-  for (const dir of [decoyDir, cwd]) {
-    for (const name of windows
-      ? ["python.cmd", "python3.cmd"]
-      : ["python", "python3"]) {
-      const decoy = join(dir, name);
-      writeFileSync(
-        decoy,
-        windows
-          ? `@echo unselected>"${marker}"\r\n@exit /b 23\r\n`
-          : `#!/bin/sh\nprintf unselected > "${marker}"\nexit 23\n`
-      );
-      if (!windows) {
-        chmodSync(decoy, 0o755);
-      }
-    }
-  }
-  const selectedDir = resolve(dirname(selected)).toLowerCase();
-  const terminalPath = [
-    decoyDir,
-    ...(process.env.PATH || "")
-      .split(delimiter)
-      .filter((entry) => entry && resolve(entry).toLowerCase() !== selectedDir),
-  ].join(delimiter);
-  const fixture = join(root, "inspect_ai");
-  mkdirSync(fixture);
-  writeFileSync(join(fixture, "__init__.py"), "");
-  const metadata = join(root, "inspect_ai-1.0.dist-info");
-  mkdirSync(metadata);
-  writeFileSync(join(metadata, "METADATA"), "Name: inspect-ai\nVersion: 1.0\n");
+  const envBin = join(root, "env", windows ? "Scripts" : "bin");
+  mkdirSync(envBin, { recursive: true });
+  const result = join(root, "result.json");
   writeFileSync(
-    join(metadata, "entry_points.txt"),
-    "[console_scripts]\ninspect = inspect_ai.__main__:main\n"
-  );
-  writeFileSync(
-    join(fixture, "__main__.py"),
+    join(envBin, "console_script.py"),
     [
-      "import json,os,sys",
-      "def main():",
-      " result=os.environ['TRANSPORT_RESULT']",
-      " with open(result+'.tmp', 'w', encoding='utf-8') as f:",
-      "  json.dump({'args':sys.argv[1:],'cwd':os.getcwd(),'python':sys.executable,'activation':os.environ['TRANSPORT_ACTIVATED']},f)",
-      " os.replace(result+'.tmp',result)",
-      " print('Inspect test output')",
+      "import json, os, sys",
+      "target = os.environ['RUN_RESULT']",
+      "with open(target + '.tmp', 'w', encoding='utf-8') as f:",
+      "    json.dump({'command': sys.argv[1], 'args': sys.argv[2:], 'cwd': os.getcwd(), 'activation': os.environ.get('RUN_ACTIVATED')}, f)",
+      "os.replace(target + '.tmp', target)",
+      "print('fixture output')",
+      "",
     ].join("\n")
   );
-  const scoutMetadata = join(root, "inspect_scout-1.0.dist-info");
-  mkdirSync(scoutMetadata);
-  writeFileSync(
-    join(scoutMetadata, "METADATA"),
-    "Name: inspect-scout\nVersion: 1.0\n"
-  );
-  // Scout has a console entry point but no package __main__ module.
-  writeFileSync(
-    join(scoutMetadata, "entry_points.txt"),
-    "[console_scripts]\nscout = inspect_ai.__main__:main\n"
-  );
-  const rcfile = join(root, "startup.bash");
-  writeFileSync(rcfile, `exec "${fish}" --no-config -i\n`);
-  const result = join(root, "result.json");
+  const marker = join(root, "DECOY_RAN");
+  const decoyDir = join(root, "decoys");
+  mkdirSync(decoyDir);
+  const scripts: Record<string, string> = {};
+  for (const command of ["inspect", "scout"]) {
+    if (windows) {
+      // Batch files stand in for pip's .exe launchers; keep them ASCII, cmd
+      // reads them in the OEM code page.
+      scripts[command] = join(envBin, `${command}.cmd`);
+      writeFileSync(
+        scripts[command],
+        `@"${python}" "%~dp0console_script.py" ${command} %*\r\n`
+      );
+      writeFileSync(
+        join(decoyDir, `${command}.cmd`),
+        `@echo decoy>"${marker}"\r\n@exit /b 23\r\n`
+      );
+    } else {
+      scripts[command] = join(envBin, command);
+      writeFileSync(
+        scripts[command],
+        `#!/bin/sh\nexec "${python}" "$(dirname "$0")/console_script.py" ${command} "$@"\n`
+      );
+      chmodSync(scripts[command], 0o755);
+      const decoy = join(decoyDir, command);
+      writeFileSync(decoy, `#!/bin/sh\nprintf decoy > "${marker}"\nexit 23\n`);
+      chmodSync(decoy, 0o755);
+    }
+  }
+  const pythonDir = resolve(dirname(python)).toLowerCase();
+  const terminalPath = [
+    decoyDir,
+    ...(process.env.PATH || "").split(delimiter).filter((entry) => {
+      const normalized = entry ? resolve(entry).toLowerCase() : "";
+      return (
+        normalized &&
+        !normalized.startsWith(pythonDir) &&
+        normalized !== resolve(envBin).toLowerCase()
+      );
+    }),
+  ].join(delimiter);
+
   const original = Object.getOwnPropertyDescriptor(window, "createTerminal")!;
   const create = window.createTerminal;
   const terminals: ReturnType<typeof create>[] = [];
-  const cleanups: { dispose: () => void }[] = [];
   let output = "";
-  const reading = new Set<(typeof terminals)[number]>();
+  const running = new Set<(typeof terminals)[number]>();
   const outputListener = window.onDidStartTerminalShellExecution((event) => {
     if (terminals.includes(event.terminal)) {
-      reading.add(event.terminal);
+      running.add(event.terminal);
       void (async () => {
         for await (const data of event.execution.read()) {
           output = (output + data).slice(-20000);
@@ -138,115 +116,92 @@ export async function verifyRunTerminal(
           output += String(error);
         })
         .finally(() => {
-          reading.delete(event.terminal);
+          running.delete(event.terminal);
         });
     }
   });
+  // The default profile is used, as in production; only the environment is
+  // adjusted, standing in for the Python extension's activation variables.
   Object.defineProperty(window, "createTerminal", {
     configurable: true,
     value: (options: TerminalOptions) => {
       const terminal = create({
         ...options,
-        ...(shell === "powershell"
-          ? { shellPath: pwsh, shellArgs: ["-NoLogo", "-NoProfile"] }
-          : windows
-            ? {}
-            : { shellPath: "/bin/bash", shellArgs: ["--rcfile", rcfile] }),
         env: {
-          PYTHONPATH: root,
-          TRANSPORT_RESULT: result,
-          TRANSPORT_ACTIVATED: "terminal-activation",
           PATH: terminalPath,
+          RUN_RESULT: result,
+          RUN_ACTIVATED: "terminal-activation",
         },
       });
-      if (version.startsWith("1.93.")) {
-        assert.strictEqual(
-          "shell" in terminal.state,
-          false,
-          "minimum host has no shell identity reporting"
-        );
-      }
       terminals.push(terminal);
       return terminal;
     },
   });
   try {
-    for (const profile of [
-      {
-        packageName: "inspect-ai",
-        command: "inspect",
-        terminal: "Inspect Eval",
-        target: "Eval",
-      },
-      {
-        packageName: "inspect-scout",
-        command: "scout",
-        terminal: "Scout Scan",
-        target: "Scan",
-      },
-    ] as ExecProfile[]) {
+    for (const command of ["inspect", "scout"] as const) {
+      const profile = {
+        packageName: command === "inspect" ? "inspect-ai" : "inspect-scout",
+        command,
+        terminal: command === "inspect" ? "Inspect Eval" : "Scout Scan",
+        target: command === "inspect" ? "Eval" : "Scan",
+        binPath: () => ({ path: scripts[command] }) as AbsolutePath,
+      } as ExecProfile;
       for (const label of ["first", "repeated"]) {
         rmSync(result, { force: true });
         const args = [
-          "eval",
-          label === "first"
-            ? "tasks”; New-Item INJECTED -ItemType File; “x/task.py@demo"
-            : "demo’; New-Item INJECTED -ItemType File; #/task.py@demo",
-          ...["“", "”", "„", "‘", "’", "‚", "‛"].map(
-            (quote) =>
-              `task${quote}; New-Item INJECTED -ItemType File; #.py@demo`
-          ),
-          "t\\';echo INJECTED>INJECTED;#'.py@demo",
-          label,
-          "%PATH%",
-          "!PATH!",
-          "a\\",
+          command === "inspect" ? "eval" : "scan",
+          `tasks (1)/it's ${label}.py@demo`,
+          "--limit",
+          "5",
+          "-T",
+          // The batch stand-in re-parses its arguments through cmd, so the
+          // Windows values stay within what a quoted batch argument keeps.
+          windows ? "prompt=hello (world) & co" : "prompt=say $HOME; & done",
         ];
-        cleanups.push(
-          await runCommand(profile, args, cwd, {
-            path: selected,
-          } as AbsolutePath)
-        );
-        const deadline = Date.now() + 10000;
+        await runCommand(profile, args, cwd);
+        const deadline = Date.now() + 15000;
         while (!existsSync(result) && Date.now() < deadline) {
           await new Promise((resolve) => setTimeout(resolve, 100));
         }
         assert.ok(
           existsSync(result),
-          `${profile.command} ${label}: terminal task should finish; output: ${output}`
+          `${command} ${label}: terminal task should finish; output: ${output}`
         );
         const actual = JSON.parse(readFileSync(result, "utf8")) as {
+          command: string;
           args: string[];
           cwd: string;
-          python: string;
-          activation: string;
+          activation: string | null;
         };
+        assert.strictEqual(
+          actual.command,
+          command,
+          "the environment's console script ran"
+        );
         assert.deepStrictEqual(actual.args, args);
         assert.strictEqual(
-          actual.cwd.replace(/^\/private/, ""),
-          cwd.replace(/^\/private/, "")
+          resolve(actual.cwd)
+            .replace(/^\/private/, "")
+            .toLowerCase(),
+          resolve(cwd)
+            .replace(/^\/private/, "")
+            .toLowerCase()
         );
-        assert.strictEqual(
-          actual.python.replace(/^\/private/, "").toLowerCase(),
-          selected.replace(/^\/private/, "").toLowerCase(),
-          "the selected interpreter ran, not a PATH or cwd python"
-        );
+        assert.strictEqual(actual.activation, "terminal-activation");
         assert.strictEqual(
           existsSync(marker),
           false,
-          "a bare python decoy must never execute"
+          "the PATH decoy must never run"
         );
-        assert.strictEqual(actual.activation, "terminal-activation");
-        assert.strictEqual(existsSync(join(cwd, "INJECTED")), false);
-        // A result file can appear before Python has exited. Normal repeated
-        // Run happens at the shell prompt, not while the prior task owns stdin.
+        // A result file can appear before the task has exited. Repeated Run
+        // happens at the shell prompt, not while the prior task owns stdin.
         const terminal = terminals[terminals.length - 1]!;
         const completedBy = Date.now() + 10000;
-        while (reading.has(terminal) && Date.now() < completedBy) {
+        while (running.has(terminal) && Date.now() < completedBy) {
           await new Promise((resolve) => setTimeout(resolve, 100));
         }
         assert.ok(
-          !reading.has(terminal),
+          !running.has(terminal),
           "previous terminal command should finish"
         );
       }
@@ -278,9 +233,6 @@ export async function verifyRunTerminal(
           })
       )
     );
-    for (const cleanup of cleanups) {
-      cleanup.dispose();
-    }
     // Windows holds the terminal cwd until its process has actually exited.
     // Async retries allow VS Code to process the close/exit notifications.
     await rm(root, {
@@ -290,5 +242,4 @@ export async function verifyRunTerminal(
       retryDelay: 100,
     });
   }
-  return true;
 }
