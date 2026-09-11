@@ -22,8 +22,9 @@ import {
   webviewPanelJsonRpcServer,
 } from "../../core/jsonrpc";
 import { log } from "../../core/log";
+import { locationInScope } from "../../core/package/location-scope";
+import { parseProxyRequest } from "../../core/package/proxy-request";
 import { assertLogProxyInScope } from "../../core/package/proxy-scope";
-import { HttpProxyRpcRequest } from "../../core/package/view-server";
 import { AbsolutePath } from "../../core/path";
 import { getRelativeUri, resolveToUri } from "../../core/uri";
 import {
@@ -78,14 +79,23 @@ export function logPathInScopeAllowingEncoded(
   panelUri: Uri,
   target: string
 ): boolean {
-  let decoded: string;
-  try {
-    decoded = decodeURIComponent(target);
-  } catch {
-    // malformed percent-encoding
+  if (
+    !locationInScope([panelUri], target, {
+      decode: true,
+      exact: type === "file",
+    })
+  )
     return false;
+  // Inspect normalize_uri re-parses file URIs after unquoting. Check that
+  // consumer interpretation as well as the whole path used by pending/search
+  // routes, which do not all call normalize_uri.
+  const decoded = decodeURIComponent(target);
+  if (decoded.startsWith("file://") && /[?#]/.test(decoded)) {
+    return locationInScope([panelUri], decoded.split(/[?#]/, 1)[0]!, {
+      exact: type === "file",
+    });
   }
-  return logPathInScope(type, panelUri, decoded);
+  return true;
 }
 
 // jsonForScript now lives in core/webview.ts (shared with the scan view). It
@@ -111,7 +121,10 @@ export class LogviewPanel extends Disposable {
     // touch descendants of its log directory. Requests outside that scope are
     // rejected before the path ever reaches the server.
     const requireScope = (target: unknown): string => {
-      if (typeof target !== "string" || !logPathInScope(type, uri, target)) {
+      if (
+        typeof target !== "string" ||
+        !logPathInScopeAllowingEncoded(type, uri, target)
+      ) {
         throw new Error(
           `Refusing to access "${String(
             target
@@ -223,7 +236,7 @@ export class LogviewPanel extends Disposable {
         // token, so confine it to the panel scope like the named methods. The
         // server percent-decodes the locations it receives (normalize_uri), so
         // use the encoding-tolerant check to scope the decoded form.
-        const request = params[0] as HttpProxyRpcRequest;
+        const request = parseProxyRequest(params[0]);
         try {
           assertLogProxyInScope(request, (target) =>
             logPathInScopeAllowingEncoded(type, uri, target)

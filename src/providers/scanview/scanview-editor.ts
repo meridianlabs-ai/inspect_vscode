@@ -103,7 +103,7 @@ class ScoutScanReadonlyEditor implements vscode.CustomReadonlyEditorProvider {
       webviewPanel as HostWebviewPanel,
       this.context_,
       this.server_,
-      () => [scanDir]
+      () => [Uri.joinPath(scanDir, scanJob)]
     );
 
     // set html

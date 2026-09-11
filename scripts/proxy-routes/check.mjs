@@ -112,10 +112,60 @@ const EXTRA_ROUTES = {
 
 // ---------------------------------------------------------------------------
 
+// Runtime method normalization must not change an authorization decision.
+for (const method of ["delete", "Delete", "dElEtE", "GET X"]) {
+  let rejected = false;
+  try {
+    assertScanProxyInScope(
+      {
+        method,
+        path: `/api/v2/scans/${b64url(SCANS_DIR)}/${b64url("scan_id=x")}`,
+      },
+      scanInScope
+    );
+  } catch {
+    rejected = true;
+  }
+  if (!rejected) fail(`Unexpected method accepted: ${method}`);
+}
+for (const [method, path] of [
+  ["POST", "/api/v2/startscan"],
+  ["PUT", "/api/v2/project/config"],
+  ["POST", "/api/v2/validations"],
+]) {
+  let rejected = false;
+  try {
+    assertScanProxyInScope(
+      { method, path, body: "{}" },
+      scanInScope,
+      transcriptsInScope,
+      { fullView: false }
+    );
+  } catch {
+    rejected = true;
+  }
+  if (!rejected)
+    fail(`Single-scan editor accepted project mutation: ${method} ${path}`);
+}
 const results = [];
 for (const [name, assertFn, inScope] of [
   ["inspect", assertLogProxyInScope, [logInScope]],
-  ["scout", assertScanProxyInScope, [scanInScope, transcriptsInScope]],
+  [
+    "scout",
+    assertScanProxyInScope,
+    [
+      scanInScope,
+      transcriptsInScope,
+      {
+        fullView: true,
+        configScope: {
+          scans: scanInScope,
+          transcripts: transcriptsInScope,
+          project: under("file:///proj"),
+        },
+      },
+    ],
+  ],
 ]) {
   const specFile = resolve(specsDir, `${name}.json`);
   if (!existsSync(specFile)) {
@@ -127,6 +177,16 @@ for (const [name, assertFn, inScope] of [
   const routes = [...routesFromOpenApi(spec), ...EXTRA_ROUTES[name]];
   for (const route of routes) {
     const request = { method: route.method, path: concretePath(route, name) };
+    if (
+      route.path === "/api/v2/startscan" ||
+      (route.path === "/api/v2/project/config" && route.method === "PUT")
+    ) {
+      request.body = JSON.stringify({
+        transcripts: TRANSCRIPTS_DIR,
+        scans: SCANS_DIR,
+        scanners: [{ name: "scanner", file: "file:///proj/scanner.py" }],
+      });
+    }
     let allowed = true;
     let error = "";
     try {

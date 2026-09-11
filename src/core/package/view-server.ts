@@ -18,6 +18,7 @@ import { runPython } from "../../core/python/exec";
 import { shQuote } from "../../core/string";
 
 import { PackageManager } from "./manager";
+import { parseProxyRequest } from "./proxy-request";
 
 // Custom request/response types for JSON-RPC proxy communication.
 // We can't use fetch's Request/Response/Headers because:
@@ -32,7 +33,7 @@ import { PackageManager } from "./manager";
 // - Multi-value headers (e.g. Set-Cookie) collapse to single string
 // - Large request bodies must fit in memory
 export interface HttpProxyRpcRequest {
-  method: "GET" | "POST" | "PUT" | "DELETE";
+  method: "GET" | "HEAD" | "POST" | "PUT" | "DELETE";
   path: string;
   headers?: Record<string, string>;
   body?: string;
@@ -92,7 +93,7 @@ export class PackageViewServer implements Disposable {
 
   protected async api_json(
     path: string,
-    method: "GET" | "POST" | "PUT" | "DELETE" = "GET",
+    method: "GET" | "HEAD" | "POST" | "PUT" | "DELETE" = "GET",
     headers?: Record<string, string>,
     handleError?: (status: number) => string | undefined
   ): Promise<{ data: string; headers: Headers }> {
@@ -105,7 +106,7 @@ export class PackageViewServer implements Disposable {
 
   protected async api_bytes(
     path: string,
-    method: "GET" | "POST" | "PUT" | "DELETE" = "GET"
+    method: "GET" | "HEAD" | "POST" | "PUT" | "DELETE" = "GET"
   ): Promise<{ data: Uint8Array; headers: Headers }> {
     const result = await this.api(path, method, {}, true);
     return {
@@ -120,7 +121,7 @@ export class PackageViewServer implements Disposable {
    */
   protected async serverFetch(
     path: string,
-    method: "GET" | "POST" | "PUT" | "DELETE",
+    method: "GET" | "HEAD" | "POST" | "PUT" | "DELETE",
     headers: Headers,
     body?: string
   ): Promise<{
@@ -168,7 +169,7 @@ export class PackageViewServer implements Disposable {
   public async proxyRpcRequest(
     request: HttpProxyRpcRequest
   ): Promise<HttpProxyRpcResponse> {
-    await this.ensureRunning();
+    request = parseProxyRequest(request);
 
     const { status, headers, data } = await this.serverFetch(
       request.path,
@@ -193,7 +194,7 @@ export class PackageViewServer implements Disposable {
 
   protected async api(
     path: string,
-    method: "GET" | "POST" | "PUT" | "DELETE" = "GET",
+    method: "GET" | "HEAD" | "POST" | "PUT" | "DELETE" = "GET",
     headers: Record<string, string> = {},
     binary: boolean = false,
     handleError?: (status: number) => string | undefined
@@ -240,6 +241,9 @@ export class PackageViewServer implements Disposable {
     options: RequestInit,
     consume: (response: Response) => Promise<T>
   ): Promise<T> {
+    // Invalid caller input is not a failed server connection. Construct locally
+    // before entering the lifecycle/transport path.
+    new Request(`http://${kServerHost}${path}`, options);
     await this.ensureRunning();
     const instance = this.server_;
     if (!instance || !this.isRunning(instance)) {

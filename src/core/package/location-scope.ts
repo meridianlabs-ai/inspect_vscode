@@ -1,0 +1,61 @@
+/* eslint-disable no-control-regex -- Reject control characters at the RPC boundary. */
+import path from "path";
+
+import { Uri } from "vscode";
+
+import { getRelativeUri } from "../uri";
+
+/** Parse a consumer's decoded location without decoding or dropping path data.
+ * Python's filesystem consumers keep literal ?, # and % in local/S3 paths.
+ * Uri.parse would both split delimiters and perform an additional decode.
+ */
+export function locationUri(location: string, base?: Uri): Uri {
+  if (!location || /[\u0000-\u001f\u007f]/u.test(location)) {
+    throw new Error("Invalid location");
+  }
+  const match = /^([a-zA-Z][a-zA-Z0-9+.-]+):\/\/([^/]*)(.*)$/s.exec(location);
+  if (match) {
+    const scheme = match[1]!;
+    const authority = match[2]!;
+    const pathname = match[3]!;
+    if (scheme === "file") {
+      // file://C:/path is also accepted by Inspect's normalize_uri.
+      if (/^[a-zA-Z]:$/.test(authority)) {
+        return Uri.from({ scheme, path: `/${authority}${pathname}` });
+      }
+      if (authority) throw new Error("Unsupported file authority");
+    }
+    return Uri.from({ scheme, authority, path: pathname || "/" });
+  }
+  if (/^[a-zA-Z]:[\\/]/.test(location)) {
+    return Uri.from({
+      scheme: "file",
+      path: "/" + location.replace(/\\/g, "/"),
+    });
+  }
+  if (location.startsWith("/")) return Uri.file(location);
+  if (!base || /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(location)) {
+    throw new Error("Relative location without an authorized base");
+  }
+  return base.with({
+    path: path.posix.join(base.path, location.replace(/\\/g, "/")),
+  });
+}
+
+export function locationInScope(
+  roots: readonly Uri[],
+  location: string,
+  options: { decode?: boolean; exact?: boolean; base?: Uri } = {}
+): boolean {
+  try {
+    const decoded = options.decode ? decodeURIComponent(location) : location;
+    const target = locationUri(decoded, options.base);
+    return roots.some(
+      (root) =>
+        root.toString() === target.toString() ||
+        (!options.exact && getRelativeUri(root, target) !== null)
+    );
+  } catch {
+    return false;
+  }
+}

@@ -10,6 +10,7 @@ import { ExtensionContext, Uri, window } from "vscode";
 
 import { PackageManager } from "../../core/package/manager";
 import { PackageViewServer } from "../../core/package/view-server";
+import type { HttpProxyRpcRequest } from "../../core/package/view-server";
 import * as paths from "../../core/path";
 import * as ports from "../../core/port";
 import * as processes from "../../core/process";
@@ -157,6 +158,41 @@ suite("PackageViewServer lifecycle", () => {
     await waitFor(() => children.length > index);
     outputs[index]!.stdout!("Running on http://127.0.0.1\n");
   }
+
+  test("malformed proxy input leaves the shared child and in-flight requests alive", async () => {
+    const starting = server.start();
+    await ready();
+    await starting;
+    let finish!: (response: Response) => void;
+    global.fetch = () =>
+      new Promise<Response>((resolve) => {
+        finish = resolve;
+      });
+    const otherPanel = server.json();
+    await waitFor(() => finish !== undefined);
+    for (const request of [
+      { method: "GET", path: "api/log-dir" },
+      { method: "GET", path: "/api/log-dir", body: "x" },
+      { method: "GET X", path: "/api/log-dir" },
+      { method: "GET", path: "/api/log-dir", headers: { test: "x\ny" } },
+      {
+        method: "GET",
+        path: "/api/log-dir",
+        headers: { "content-length": "100" },
+      },
+      { method: "POST", path: "/api/log-dir", body: {} },
+      null,
+    ]) {
+      await assert.rejects(
+        server.proxyRpcRequest(request as HttpProxyRpcRequest)
+      );
+      assert.strictEqual(children[0]!.killed, false);
+      assert.strictEqual(children.length, 1);
+    }
+    finish(new Response("other panel completed"));
+    assert.strictEqual((await otherPanel).data, "other panel completed");
+    assert.strictEqual(children[0]!.killed, false);
+  });
 
   test("concurrent startup waits for a split readiness banner and shares one child", async () => {
     const requests = [

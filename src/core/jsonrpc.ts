@@ -193,7 +193,8 @@ export function jsonRpcPostMessageServer(
       }
 
       // dispatch method
-      method(request.params || [])
+      Promise.resolve()
+        .then(() => method(request.params || []))
         .then((value) => {
           target.postMessage(jsonRpcResponse(request, value));
         })

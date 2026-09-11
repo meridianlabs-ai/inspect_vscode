@@ -1,5 +1,4 @@
-import type { HttpProxyRpcRequest } from "./view-server";
-
+import { parseProxyRequest } from "./proxy-request";
 /**
  * Scope confinement for the generic `http_request` proxy exposed to the log and
  * scan webviews.
@@ -19,6 +18,9 @@ import type { HttpProxyRpcRequest } from "./view-server";
  * way `UPath(dir) / scan` joins it (an absolute `scan` replaces `dir`).
  */
 
+import { assertScanConfigInScope, ScanConfigScope } from "./scan-config-scope";
+import type { HttpProxyRpcRequest } from "./view-server";
+
 type InScope = (location: string) => boolean;
 
 interface ParsedRequest {
@@ -36,12 +38,10 @@ interface ParsedRequest {
 
 function parseRequest(request: HttpProxyRpcRequest): ParsedRequest {
   try {
-    const path = request.path;
+    const path = parseProxyRequest(request).path;
     // The view server only serves absolute "/api/..." paths; normalize so a
     // missing leading slash still parses rather than being treated as relative.
-    const url = new URL(
-      "http://127.0.0.1" + (path.startsWith("/") ? path : "/" + path)
-    );
+    const url = new URL("http://127.0.0.1" + path);
     const segments = url.pathname
       .split("/")
       .map((segment, index) =>
@@ -142,6 +142,16 @@ export function assertLogProxyInScope(
   const { pathname, params, segments, remainder } = parseRequest(request);
   const check = checker(request, inScope);
 
+  const logMethod =
+    pathname === "/api/log-message" || pathname.startsWith("/api/log-edit/")
+      ? "POST"
+      : "GET";
+  const searchPost = /^\/api\/scout\/transcripts\/[^/]+\/[^/]+\/search$/.test(
+    pathname
+  );
+  if (request.method !== (searchPost ? "POST" : logMethod))
+    throw proxyError(request);
+
   if (kLogNoLocation.has(pathname)) {
     return;
   }
@@ -219,12 +229,6 @@ export function assertLogProxyInScope(
 
 // No-location config/listing/compute endpoints.
 //
-// NOTE: `/startscan` (POST) and `/project/config` (PUT) are mutating endpoints
-// whose request BODY carries free-form locations (transcripts, scans/results,
-// scanner source files) that the scout server does not confine to the project.
-// They are allowed because the Scout View's "start scan" and "edit project"
-// features are built on them; this leaves those two operations reachable from
-// injected webview script. Scoping them would require parsing the body.
 const kScanNoLocation = new Set([
   "/api/v2/dist",
   "/api/v2/app-config",
@@ -259,31 +263,38 @@ const kLegacyScanSegmentRoutes = [
 export function assertScanProxyInScope(
   request: HttpProxyRpcRequest,
   inScope: InScope,
-  inTranscriptsScope: InScope = inScope
+  inTranscriptsScope: InScope = inScope,
+  permissions: { fullView: boolean; configScope?: ScanConfigScope } = {
+    fullView: false,
+  }
 ): void {
   const { pathname, params, segments, remainder } = parseRequest(request);
   const check = checker(request, inScope);
 
-  // Validation sets/cases are files in the project dir, confined server-side
-  // (`_validate_path_within_project`), and the viewer creates, renames and
-  // deletes them. They are not scan results, so the scan scope does not apply.
-  if (pathname.startsWith("/api/v2/validations/")) {
+  const methods = scanRouteMethods(pathname);
+  if (!methods.includes(request.method)) throw proxyError(request);
+  const projectMutation =
+    pathname === "/api/v2/startscan" ||
+    (pathname === "/api/v2/project/config" && request.method === "PUT") ||
+    (pathname.startsWith("/api/v2/validations") && request.method !== "GET");
+  if (projectMutation && !permissions.fullView) throw proxyError(request);
+  if (
+    pathname === "/api/v2/startscan" ||
+    (pathname === "/api/v2/project/config" && request.method === "PUT")
+  ) {
+    if (!permissions.configScope) throw proxyError(request);
+    assertScanConfigInScope(request.body, permissions.configScope);
     return;
   }
-
-  // Nothing else needs DELETE: the viewer never deletes scans through the
-  // proxy (the extension's own tree commands call the server directly).
-  if (request.method === "DELETE") {
+  if (pathname.startsWith("/api/v2/validations/")) return;
+  if (!permissions.fullView && pathname === "/api/v2/scans/active")
     throw proxyError(request);
-  }
-
-  if (kScanNoLocation.has(pathname)) {
-    return;
-  }
+  if (kScanNoLocation.has(pathname)) return;
 
   // Legacy scan listing: with no results_dir it lists the server default; with
   // one it must be in scope.
   if (pathname === "/api/scans") {
+    if (!permissions.fullView) throw proxyError(request);
     params.getAll("results_dir").forEach(check);
     return;
   }
@@ -318,15 +329,50 @@ export function assertScanProxyInScope(
       throw proxyError(request);
     }
     const dir = decodeBase64Url(dirSegment, request);
-    check(dir);
     const scanSegment = segments[5];
     if (scanSegment && scanSegment !== "distinct") {
       check(joinLocation(dir, decodeBase64Url(scanSegment, request)));
+    } else {
+      if (!permissions.fullView) throw proxyError(request);
+      check(dir);
     }
     return;
   }
 
   throw proxyError(request);
+}
+
+function scanRouteMethods(pathname: string): string[] {
+  if (/^\/api\/v2\/transcripts\/[^/]+\/[^/]+\/info$/.test(pathname))
+    return ["GET", "HEAD"];
+  if (pathname === "/api/v2/project/config") return ["GET", "PUT"];
+  if (pathname === "/api/v2/startscan" || pathname === "/api/v2/code")
+    return ["POST"];
+  if (pathname === "/api/v2/validations") return ["GET", "POST"];
+  if (/^\/api\/v2\/validations\/[^/]+$/.test(pathname))
+    return ["GET", "DELETE"];
+  if (/^\/api\/v2\/validations\/[^/]+\/rename$/.test(pathname)) return ["PUT"];
+  if (/^\/api\/v2\/validations\/[^/]+\/[^/]+$/.test(pathname))
+    return ["GET", "POST", "DELETE"];
+  if (
+    kScanNoLocation.has(pathname) ||
+    pathname === "/api/scans" ||
+    kLegacyScanSegmentRoutes.some((route) => pathname.startsWith(route))
+  )
+    return ["GET"];
+  if (/^\/api\/v2\/(scans|transcripts)\/[^/]+(?:\/distinct)?$/.test(pathname))
+    return ["POST"];
+  if (/^\/api\/v2\/scans\/[^/]+\/[^/]+(?:\/[^/]+){0,2}$/.test(pathname))
+    return ["GET"];
+  if (/^\/api\/v2\/transcripts\/[^/]+\/[^/]+\/search$/.test(pathname))
+    return ["POST"];
+  if (
+    /^\/api\/v2\/transcripts\/[^/]+\/[^/]+\/(?:info|messages-events|searches\/[^/]+)$/.test(
+      pathname
+    )
+  )
+    return ["GET"];
+  return [];
 }
 
 function proxyError(request: HttpProxyRpcRequest): Error {

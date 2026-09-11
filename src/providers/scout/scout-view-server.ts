@@ -99,6 +99,10 @@ export class ScoutViewServer extends PackageViewServer {
   // from. Set at activation to the configured scan-results dir plus the open
   // workspace folders; the per-scan custom editor supplies its own tighter
   // scope directly to ScanviewPanel instead of using this.
+  public scopeReady: Promise<void> = Promise.resolve();
+  public projectScope: () => Uri[] = () => [];
+  public modelEndpoints: () => string[] = () => [];
+
   private scanResultsScope_: () => Uri[] = () => [];
   public setScanResultsScope(fn: () => Uri[]) {
     this.scanResultsScope_ = fn;

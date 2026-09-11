@@ -10,8 +10,9 @@ import {
   webviewPanelJsonRpcServer,
 } from "../../core/jsonrpc";
 import { log } from "../../core/log";
+import { locationInScope } from "../../core/package/location-scope";
+import { parseProxyRequest } from "../../core/package/proxy-request";
 import { assertScanProxyInScope } from "../../core/package/proxy-scope";
-import { HttpProxyRpcRequest } from "../../core/package/view-server";
 import { AbsolutePath } from "../../core/path";
 import { getRelativeUri, resolveToUri } from "../../core/uri";
 import {
@@ -52,14 +53,7 @@ export function scanLocationInScopeAllowingEncoded(
   scope: Uri[],
   location: string
 ): boolean {
-  let decoded: string;
-  try {
-    decoded = decodeURIComponent(location);
-  } catch {
-    // malformed percent-encoding
-    return false;
-  }
-  return scanLocationInScope(scope, decoded);
+  return locationInScope(scope, location, { decode: true });
 }
 
 export class ScanviewPanel extends Disposable {
@@ -75,6 +69,9 @@ export class ScanviewPanel extends Disposable {
     super();
 
     const scopeResolver = scope ?? (() => server_.scanResultsScope());
+    const fullView = scope === undefined;
+    const transcriptsScope = () =>
+      fullView ? [...scopeResolver(), ...server_.transcriptsScope()] : [];
 
     // The scan webview renders untrusted scan results and its RPC surface is
     // reachable from injected script, while the token-authorized scout server
@@ -85,7 +82,7 @@ export class ScanviewPanel extends Disposable {
     const requireScanScope = (location: unknown): string => {
       if (
         typeof location !== "string" ||
-        !scanLocationInScope(scopeResolver(), location)
+        !scanLocationInScopeAllowingEncoded(scopeResolver(), location)
       ) {
         throw new Error(
           `Refusing to access scan "${String(
@@ -98,7 +95,13 @@ export class ScanviewPanel extends Disposable {
 
     // serve eval log api to webview
     this._rpcDisconnect = webviewPanelJsonRpcServer(panel_, {
-      [kMethodGetScans]: async () => server_.legacy.getScans(),
+      [kMethodGetScans]: async () => {
+        if (!fullView)
+          throw new Error(
+            "Scan listings are unavailable in a single-scan editor"
+          );
+        return server_.legacy.getScans();
+      },
       [kMethodGetScan]: async (params: unknown[]) =>
         server_.legacy.getScan(requireScanScope(params[0])),
       [kMethodGetScannerDataframe]: async (params: unknown[]) =>
@@ -117,17 +120,37 @@ export class ScanviewPanel extends Disposable {
         // Transcripts are read from the project's configured transcripts
         // location (not the scan results dir), so those routes get a scope
         // that also admits it.
-        const request = params[0] as HttpProxyRpcRequest;
+        const request = parseProxyRequest(params[0]);
+        await server_.scopeReady;
         try {
           assertScanProxyInScope(
             request,
             (location) =>
               scanLocationInScopeAllowingEncoded(scopeResolver(), location),
             (location) =>
-              scanLocationInScopeAllowingEncoded(
-                [...scopeResolver(), ...server_.transcriptsScope()],
-                location
-              )
+              scanLocationInScopeAllowingEncoded(transcriptsScope(), location),
+            {
+              fullView,
+              configScope: {
+                modelEndpoint: (location) =>
+                  server_.modelEndpoints().includes(location),
+                scans: (location) =>
+                  locationInScope(scopeResolver(), location, {
+                    decode: true,
+                    base: server_.projectScope()[0],
+                  }),
+                transcripts: (location) =>
+                  locationInScope(transcriptsScope(), location, {
+                    decode: true,
+                    base: server_.projectScope()[0],
+                  }),
+                project: (location) =>
+                  locationInScope(server_.projectScope(), location, {
+                    decode: true,
+                    base: server_.projectScope()[0],
+                  }),
+              },
+            }
           );
         } catch (error) {
           log.warn(`[proxy-scope] blocked ${request.method} ${request.path}`);

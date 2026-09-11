@@ -74,7 +74,10 @@ suite("Proxy Scope Test Suite", () => {
           "file:///w/logs/b.eval"
         )}`
       );
-      ok(`/api/scout/transcripts/${b64url("file:///w/logs")}/tid/search`);
+      ok(
+        `/api/scout/transcripts/${b64url("file:///w/logs")}/tid/search`,
+        "POST"
+      );
       // bare (non-URI) paths resolve like file URIs
       ok(`/api/log-bytes/${enc("/w/logs/run.eval")}`);
     });
@@ -95,7 +98,10 @@ suite("Proxy Scope Test Suite", () => {
           "file:///etc/passwd"
         )}`
       );
-      rejects(`/api/scout/transcripts/${b64url("file:///other")}/tid/search`);
+      rejects(
+        `/api/scout/transcripts/${b64url("file:///other")}/tid/search`,
+        "POST"
+      );
     });
 
     test("checks the whole {log:path} remainder, not just its first segment", () => {
@@ -153,11 +159,12 @@ suite("Proxy Scope Test Suite", () => {
     test("rejects non-canonical base64url segments", () => {
       const dir = b64url("file:///w/logs");
       // a lenient decoder would drop the stray character and see the in-scope dir
-      rejects(`/api/scout/transcripts/${dir}!/tid/search`);
-      rejects(`/api/scout/transcripts/${dir}%20/tid/search`);
+      rejects(`/api/scout/transcripts/${dir}!/tid/search`, "POST");
+      rejects(`/api/scout/transcripts/${dir}%20/tid/search`, "POST");
       // optional padding on canonical input is accepted
       ok(
-        `/api/scout/transcripts/${dir}${"=".repeat((4 - (dir.length % 4)) % 4)}/tid/search`
+        `/api/scout/transcripts/${dir}${"=".repeat((4 - (dir.length % 4)) % 4)}/tid/search`,
+        "POST"
       );
     });
 
@@ -188,7 +195,8 @@ suite("Proxy Scope Test Suite", () => {
         assertScanProxyInScope(
           req(path, method),
           scanInScope,
-          transcriptsInScope
+          transcriptsInScope,
+          { fullView: true }
         )
       );
     const rejects = (path: string, method?: Method) =>
@@ -196,7 +204,8 @@ suite("Proxy Scope Test Suite", () => {
         assertScanProxyInScope(
           req(path, method),
           scanInScope,
-          transcriptsInScope
+          transcriptsInScope,
+          { fullView: true }
         )
       );
 
@@ -205,12 +214,12 @@ suite("Proxy Scope Test Suite", () => {
       ok("/api/scans");
       ok("/api/v2/app-config");
       ok("/api/v2/project/config");
-      ok("/api/v2/project/config", "PUT");
+      rejects("/api/v2/project/config", "PUT");
       ok("/api/v2/scanners");
       ok("/api/v2/searches");
       ok("/api/v2/scans/active");
       ok("/api/v2/topics/stream");
-      ok("/api/v2/startscan", "POST");
+      rejects("/api/v2/startscan", "POST");
       ok("/api/v2/validations");
     });
 

@@ -67,6 +67,8 @@ const DEFAULT_CONFIG: ScoutProjectConfig = {
  * in the workspace root and emitting events when the configuration changes.
  */
 export class ScoutProjectManager implements Disposable {
+  public readonly ready: Promise<void>;
+
   private config_: ScoutProjectConfig = { ...DEFAULT_CONFIG };
   private configFilePath_?: string;
   private watcher_: FileSystemWatcher;
@@ -113,7 +115,7 @@ export class ScoutProjectManager implements Disposable {
     this.context_.subscriptions.push(this.watcher_);
 
     // Load initial configuration
-    void this.refresh();
+    this.ready = this.refresh();
   }
 
   /**

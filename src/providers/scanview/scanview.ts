@@ -11,6 +11,7 @@ import {
 } from "../workspace/workspace-env-provider";
 
 import { scanviewCommands } from "./commands";
+import { captureProjectAuthority } from "./project-authority";
 import { activateScanviewEditor } from "./scanview-editor";
 import { ScoutViewManager, ScoutViewWebviewManager } from "./scanview-view";
 
@@ -24,27 +25,47 @@ export function activateScanview(
   // Confine the full Scout View's webview RPC methods to the configured scan
   // results directory plus the open workspace folders, so injected webview
   // script can't read arbitrary paths/URIs via the token-authorized server.
+  const configuredScanRoots: Uri[] = [];
   server.setScanResultsScope(() => {
-    const roots: Uri[] = [envMgr.getDefaultScanResultsDir()];
+    const roots: Uri[] = [
+      envMgr.getDefaultScanResultsDir(),
+      ...configuredScanRoots,
+    ];
     for (const folder of workspace.workspaceFolders ?? []) {
       roots.push(folder.uri);
     }
     return roots;
   });
 
-  // The scan webviews read transcripts from the project's configured
-  // transcripts location (scout.yaml, or the SCOUT_SCAN_TRANSCRIPTS override),
-  // which is usually not under the scan results dir — admit it for the
-  // transcripts routes only.
+  // Take project authority once, before serving webview requests. Later
+  // project/config writes may change defaults but cannot mint new roots, even
+  // if another panel is opened. Environment locations remain host settings.
+  const projectRoots = (workspace.workspaceFolders ?? []).map(
+    (folder) => folder.uri
+  );
+  server.projectScope = () => projectRoots;
+  const transcriptRoots: Uri[] = [];
+  const modelEndpoints: string[] = [];
+  server.modelEndpoints = () => {
+    const fromEnv = envMgr.getValues()[kScoutEnvValues.modelBaseUrl];
+    return typeof fromEnv === "string"
+      ? [...modelEndpoints, fromEnv]
+      : [...modelEndpoints];
+  };
+  server.scopeReady = scoutProjectManager.ready.then(() => {
+    const authority = captureProjectAuthority(
+      scoutProjectManager.getConfig(),
+      scoutLocationToUri
+    );
+    transcriptRoots.push(...authority.transcripts);
+    configuredScanRoots.push(...authority.scans);
+    modelEndpoints.push(...authority.modelEndpoints);
+  });
   server.setTranscriptsScope(() => {
-    const roots: Uri[] = [];
-    const configured = scoutProjectManager.getConfig().transcripts;
+    const roots = [...transcriptRoots];
     const fromEnv = envMgr.getValues()[kScoutEnvValues.scanTranscripts];
-    for (const location of [configured, fromEnv]) {
-      if (typeof location === "string" && location) {
-        roots.push(scoutLocationToUri(location));
-      }
-    }
+    if (typeof fromEnv === "string" && fromEnv)
+      roots.push(scoutLocationToUri(fromEnv));
     return roots;
   });
 
