@@ -149,7 +149,7 @@ for (const [method, path] of [
 }
 const results = [];
 for (const [name, assertFn, inScope] of [
-  ["inspect", assertLogProxyInScope, [logInScope]],
+  ["inspect", assertLogProxyInScope, [logInScope, logInScope]],
   [
     "scout",
     assertScanProxyInScope,

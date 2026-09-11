@@ -230,15 +230,22 @@ export class LogviewPanel extends Disposable {
       [kMethodHttpRequest]: async (params: unknown[]) => {
         // The generic proxy reaches every view-server endpoint with the auth
         // token, so confine it to the panel scope like the named methods. The
-        // server percent-decodes the locations it receives (normalize_uri), so
-        // use the encoding-tolerant check to scope the decoded form.
+        // content routes decode locations again; directory routes retain the
+        // literal value after HTTP decoding. Keep those interpretations apart.
         const request = bindLogProxyDefault(
           parseProxyRequest(params[0]),
-          type === "dir" ? uri.toString() : undefined
+          type === "dir"
+            ? uri.scheme === "file"
+              ? uri.fsPath
+              : `${uri.scheme}://${uri.authority}${uri.path}`
+            : undefined
         );
         try {
-          assertLogProxyInScope(request, (target) =>
-            logPathInScopeAllowingEncoded(type, uri, target)
+          assertLogProxyInScope(
+            request,
+            (target) => logPathInScopeAllowingEncoded(type, uri, target),
+            (target) =>
+              locationInScope([uri], target, { exact: type === "file" })
           );
         } catch (error) {
           log.warn(`[proxy-scope] blocked ${request.method} ${request.path}`);

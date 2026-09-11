@@ -45,7 +45,10 @@ export function locationUri(location: string, base?: Uri): Uri {
     throw new Error("Relative location without an authorized base");
   }
   return base.with({
-    path: path.posix.join(base.path, location.replace(/\\/g, "/")),
+    path:
+      base.scheme === "file"
+        ? path.posix.join(base.path, location.replace(/\\/g, "/"))
+        : `${base.path.replace(/\/$/, "")}/${location}`,
   });
 }
 
@@ -57,11 +60,18 @@ export function locationInScope(
   try {
     const decoded = options.decode ? decodeURIComponent(location) : location;
     const target = locationUri(decoded, options.base);
-    return roots.some(
-      (root) =>
-        root.toString() === target.toString() ||
-        (!options.exact && getRelativeUri(root, target) !== null)
-    );
+    return roots.some((root) => {
+      if (root.toString() === target.toString()) return true;
+      if (options.exact || getRelativeUri(root, target) === null) return false;
+      // Object stores preserve dot segments, repeated slashes and backslashes
+      // in keys. Require their literal prefix too, before accepting the shared
+      // helper's filesystem/URL-normalized interpretation. Neither reading may
+      // broaden authority when a scheme has multiple supported consumers.
+      return (
+        root.scheme === "file" ||
+        target.path.startsWith(`${root.path.replace(/\/$/, "")}/`)
+      );
+    });
   } catch {
     return false;
   }

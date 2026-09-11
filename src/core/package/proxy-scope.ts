@@ -151,10 +151,14 @@ const kLogSegmentRoutes = [
  */
 export function assertLogProxyInScope(
   request: HttpProxyRpcRequest,
-  inScope: InScope
+  inScope: InScope,
+  directoryInScope: InScope
 ): void {
   const { pathname, params, segments, remainder } = parseRequest(request);
   const check = checker(request, inScope);
+  // Unlike content routes, Inspect directory routes do not unquote the query
+  // value again after HTTP decoding. Authorize their literal filesystem input.
+  const checkDirectory = checker(request, directoryInScope);
 
   const logMethod =
     pathname === "/api/log-message" || pathname.startsWith("/api/log-edit/")
@@ -178,7 +182,7 @@ export function assertLogProxyInScope(
     pathname === "/api/log-files"
   ) {
     if (!params.has("log_dir")) throw proxyError(request);
-    params.getAll("log_dir").forEach(check);
+    params.getAll("log_dir").forEach(checkDirectory);
     return;
   }
   if (
@@ -215,12 +219,12 @@ export function assertLogProxyInScope(
         for (const sub of subs) {
           // Inspect concatenates and strips leading slashes from dir; unlike
           // UPath, an absolute-looking subdirectory does not replace the base.
-          check(sub ? `${base}/${sub.replace(/^\/+/, "")}` : base);
+          checkDirectory(sub ? `${base}/${sub.replace(/^\/+/, "")}` : base);
         }
       }
     } else {
-      bases.forEach(check);
-      subs.forEach(check);
+      bases.forEach(checkDirectory);
+      subs.forEach(checkDirectory);
     }
     return;
   }

@@ -94,8 +94,13 @@ export function assertScanConfigInScope(
     check((scanner as Record<string, unknown>).file, scope.project);
   }
   for (const validation of Object.values(value.validation ?? {})) {
-    if (typeof validation === "string") check(validation, scope.project);
-    else {
+    if (typeof validation === "string") {
+      check(validation, scope.project);
+      // Scout passes validation files through pathlib.Path before pandas.
+      // Path removes leading ./ components, exposing a home-relative spelling
+      // that pandas expands. model_args uses a different loader and retains ./.
+      check(validation.replace(/^(?:\.[\\/]+)+/, ""), scope.project);
+    } else {
       const cases = (
         validation as { cases: Array<{ target?: unknown; labels?: unknown }> }
       ).cases;

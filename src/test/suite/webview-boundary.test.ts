@@ -42,6 +42,177 @@ const enc = encodeURIComponent;
 const b64 = (s: string) => Buffer.from(s).toString("base64url");
 
 suite("Webview boundary RPC integration", () => {
+  test("directory routes preserve literal percent paths after HTTP decoding", async () => {
+    const view = webview();
+    const seen: string[] = [];
+    const server = {
+      proxyRpcRequest: (request: { path: string }) => {
+        seen.push(request.path);
+        return Promise.resolve("ok");
+      },
+    } as unknown as InspectViewServer;
+    const panel = new LogviewPanel(
+      view.panel,
+      {} as ExtensionContext,
+      server,
+      "dir",
+      Uri.file("/panel")
+    );
+    try {
+      const routes = ["log-dir", "logs", "log-files", "flow", "eval-set"];
+      for (const route of routes) {
+        const path = `/api/${route}?log_dir=${enc("/outside/%2e%2e/panel/nested")}&dir=set`;
+        assert.ok(
+          (await view.request("http_request", [{ method: "GET", path }])).error
+        );
+        assert.strictEqual(seen.length, 0);
+      }
+      for (const route of routes) {
+        for (const directory of [
+          "/panel/with spaces",
+          "/panel/100%",
+          "/panel/%2e%2e",
+          "/panel/a?#b",
+        ]) {
+          const path = `/api/${route}?log_dir=${enc(directory)}&dir=set`;
+          assert.ok(
+            !(await view.request("http_request", [{ method: "GET", path }]))
+              .error,
+            path
+          );
+          assert.strictEqual(seen.at(-1), path);
+        }
+      }
+      assert.strictEqual(seen.length, 20);
+    } finally {
+      panel.dispose();
+    }
+  });
+
+  test("remote scope requires literal object-key identity as well as normalized containment", () => {
+    const root = Uri.parse("s3://bucket/allowed");
+    for (const location of [
+      "s3://bucket/outside/../allowed/run",
+      "s3://bucket/outside/./../allowed/run",
+      "s3://bucket/outside\\..\\allowed/run",
+      "s3://bucket//allowed/run",
+      "s3://other/allowed/run",
+      "s3://bucket/allowed/../../outside",
+    ])
+      assert.ok(!locationInScope([root], location), location);
+    assert.ok(
+      !locationInScope([root], "../allowed/run", {
+        base: Uri.parse("s3://bucket/outside"),
+      })
+    );
+    for (const location of [
+      "run",
+      "a/../run",
+      "a/./run",
+      "a//run",
+      "a\\b",
+      "100%",
+      "with spaces",
+    ]) {
+      assert.ok(
+        locationInScope([root], `s3://bucket/allowed/${location}`),
+        location
+      );
+      assert.ok(locationInScope([root], location, { base: root }), location);
+    }
+    assert.ok(
+      locationInScope(
+        [Uri.parse("https://host/allowed")],
+        "https://host/allowed/run"
+      )
+    );
+    assert.ok(
+      !locationInScope(
+        [Uri.parse("https://host/allowed")],
+        "https://host/allowed/../outside"
+      )
+    );
+  });
+
+  test("remote dot-key escapes are rejected by log, scan and transcript RPCs before forwarding", async () => {
+    const logView = webview();
+    const scanView = webview();
+    let calls = 0;
+    const call = () => {
+      calls++;
+      return Promise.resolve("ok");
+    };
+    const root = Uri.parse("s3://bucket/allowed");
+    const logPanel = new LogviewPanel(
+      logView.panel,
+      {} as ExtensionContext,
+      {
+        proxyRpcRequest: call,
+        evalLogBytes: call,
+      } as unknown as InspectViewServer,
+      "dir",
+      root
+    );
+    const scanPanel = new ScanviewPanel(
+      scanView.panel,
+      {} as ExtensionContext,
+      {
+        legacy: { getScan: call },
+        proxyRpcRequest: call,
+        scanResultsScope: () => [root],
+        transcriptsScope: () => [root],
+        projectScope: () => [Uri.file("/w")],
+        modelEndpoints: () => [],
+      } as unknown as ScoutViewServer
+    );
+    try {
+      const outside = "s3://bucket/outside/../allowed/run";
+      assert.ok(
+        (await logView.request("eval_log_bytes", [outside, 0, 10])).error
+      );
+      assert.ok((await scanView.request("get_scan", [outside])).error);
+      for (const path of [
+        `/api/flow?log_dir=${enc(outside)}`,
+        `/api/log-bytes/${enc(outside)}`,
+      ])
+        assert.ok(
+          (await logView.request("http_request", [{ method: "GET", path }]))
+            .error
+        );
+      for (const path of [
+        `/api/v2/scans/${b64(outside)}/${b64("run")}`,
+        `/api/v2/transcripts/${b64(outside)}/id/info`,
+      ])
+        assert.ok(
+          (await scanView.request("http_request", [{ method: "GET", path }]))
+            .error
+        );
+      for (const [method, path] of [
+        ["POST", "/api/v2/startscan"],
+        ["PUT", "/api/v2/project/config"],
+      ])
+        assert.ok(
+          (
+            await scanView.request("http_request", [
+              { method, path, body: JSON.stringify({ transcripts: outside }) },
+            ])
+          ).error
+        );
+      assert.strictEqual(calls, 0);
+      for (const path of [
+        `/api/v2/scans/${b64("s3://bucket/allowed")}/${b64("run")}`,
+        `/api/v2/transcripts/${b64("s3://bucket/allowed")}/id/info`,
+      ])
+        assert.ok(
+          !(await scanView.request("http_request", [{ method: "GET", path }]))
+            .error
+        );
+      assert.strictEqual(calls, 2);
+    } finally {
+      logPanel.dispose();
+      scanPanel.dispose();
+    }
+  });
   test("directory defaults are bound to the panel and file panels cannot use shared defaults", async () => {
     for (const type of ["file", "dir"] as const) {
       const view = webview();
@@ -52,7 +223,9 @@ suite("Webview boundary RPC integration", () => {
           return Promise.resolve("ok");
         },
       } as unknown as InspectViewServer;
-      const root = Uri.file(type === "file" ? "/panel/run.eval" : "/panel");
+      const root = Uri.file(
+        type === "file" ? "/panel/run.eval" : "/panel/with spaces%"
+      );
       const panel = new LogviewPanel(
         view.panel,
         {} as ExtensionContext,
@@ -85,7 +258,7 @@ suite("Webview boundary RPC integration", () => {
         for (const path of seen)
           assert.strictEqual(
             new URL(`http://localhost${path}`).searchParams.get("log_dir"),
-            root.toString()
+            root.fsPath
           );
       } finally {
         panel.dispose();
@@ -231,6 +404,13 @@ suite("Webview boundary RPC integration", () => {
             ),
             { scans: "~/scans" },
             { validation: { scanner: "~/cases.json" } },
+            ...[
+              "./~/cases.csv",
+              "././/~/cases.csv",
+              ".\\~\\cases.csv",
+              "./~other/cases.csv",
+              "./~/cases.json",
+            ].map((scanner) => ({ validation: { scanner } })),
             { transcripts: { dir: "/w/logs" } },
             { model_base_url: "https://unapproved.example" },
             {
@@ -317,7 +497,31 @@ suite("Webview boundary RPC integration", () => {
           ).error
         );
       }
-      assert.strictEqual(calls, 12);
+      for (const scanner of [
+        "cases.csv",
+        "./cases.csv",
+        "/w/cases.csv",
+        "/w/~/cases.csv",
+        "cases with spaces.csv",
+      ]) {
+        for (const [method, path] of [
+          ["POST", "/api/v2/startscan"],
+          ["PUT", "/api/v2/project/config"],
+        ]) {
+          assert.ok(
+            !(
+              await view.request("http_request", [
+                {
+                  method,
+                  path,
+                  body: JSON.stringify({ validation: { scanner } }),
+                },
+              ])
+            ).error
+          );
+        }
+      }
+      assert.strictEqual(calls, 22);
     } finally {
       panel.dispose();
     }

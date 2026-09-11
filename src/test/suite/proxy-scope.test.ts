@@ -5,6 +5,7 @@ import * as assert from "assert";
 
 import { Uri } from "vscode";
 
+import { locationInScope } from "../../core/package/location-scope";
 import {
   assertLogProxyInScope,
   assertScanProxyInScope,
@@ -21,6 +22,7 @@ const b64url = (v: string) => Buffer.from(v, "utf-8").toString("base64url");
 const logDir = Uri.parse("file:///w/logs");
 const inScope = (loc: string) =>
   logPathInScopeAllowingEncoded("dir", logDir, loc);
+const directoryInScope = (loc: string) => locationInScope([logDir], loc);
 
 type Method = HttpProxyRpcRequest["method"];
 const req = (path: string, method: Method = "GET") => ({ method, path });
@@ -29,10 +31,12 @@ suite("Proxy Scope Test Suite", () => {
   suite("assertLogProxyInScope", () => {
     const ok = (path: string, method?: Method) =>
       assert.doesNotThrow(() =>
-        assertLogProxyInScope(req(path, method), inScope)
+        assertLogProxyInScope(req(path, method), inScope, directoryInScope)
       );
     const rejects = (path: string, method?: Method) =>
-      assert.throws(() => assertLogProxyInScope(req(path, method), inScope));
+      assert.throws(() =>
+        assertLogProxyInScope(req(path, method), inScope, directoryInScope)
+      );
 
     test("allows no-location endpoints", () => {
       ok(`/api/log-dir?log_dir=${enc("file:///w/logs")}`);
