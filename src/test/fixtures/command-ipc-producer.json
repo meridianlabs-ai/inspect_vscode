@@ -1,0 +1,18 @@
+[
+  {
+    "command": "inspect.openSandboxTerminal",
+    "args": [
+      {
+        "container": "inspect-task-service-1"
+      }
+    ]
+  },
+  {
+    "command": "inspect.attachSandbox",
+    "args": [
+      {
+        "container": "inspect-task-service-1"
+      }
+    ]
+  }
+]

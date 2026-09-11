@@ -48,7 +48,7 @@ export function activateOpenLog(
   );
 }
 
-/** Open a validated, user-authorized IPC log without consulting editor associations. */
+/** Open a validated IPC log without consulting editor associations. */
 export async function openCommandLog(
   uri: Uri,
   viewManager: InspectViewManager

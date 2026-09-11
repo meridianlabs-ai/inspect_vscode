@@ -21,7 +21,7 @@ export class CommandDirectory {
     if (!state.isDirectory() || state.isSymbolicLink()) {
       throw new Error("Unsafe Inspect command directory.");
     }
-    this.path = realpathSync(directory);
+    this.path = realpathSync.native(directory);
     this.identity = state;
     this.assertUnchanged();
   }
@@ -46,25 +46,28 @@ export function readCommandFile(
   assertDirectory: () => void = () => {}
 ): unknown {
   assertDirectory();
-  const before = lstatSync(file);
-  if (!before.isFile() || before.nlink !== 1 || before.size > kMaxBytes) {
-    throw new Error(
-      "Command request must be a regular file of at most 64 KiB."
-    );
-  }
   const fd = openSync(
     file,
     constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK
   );
   try {
+    // Check the opened object, not a pathname snapshot taken before open.
+    // O_NONBLOCK makes opening a FIFO safe on POSIX; no data is read until
+    // the descriptor is verified. Windows has no equivalent no-follow flag.
     const opened = fstatSync(fd);
+    const entry = lstatSync(file);
     if (
       !opened.isFile() ||
       opened.nlink !== 1 ||
-      opened.dev !== before.dev ||
-      opened.ino !== before.ino
+      opened.size > kMaxBytes ||
+      !entry.isFile() ||
+      entry.isSymbolicLink() ||
+      opened.dev !== entry.dev ||
+      opened.ino !== entry.ino
     ) {
-      throw new Error("Command file changed while opening.");
+      throw new Error(
+        "Command request must be an unchanged regular file of at most 64 KiB."
+      );
     }
     const buffer = Buffer.alloc(kMaxBytes + 1);
     let length = 0;

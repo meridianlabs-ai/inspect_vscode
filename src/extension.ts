@@ -1,4 +1,4 @@
-import { ExtensionContext, MessageItem, window } from "vscode";
+import { ExtensionContext, MessageItem, window, workspace } from "vscode";
 
 import { Command, CommandManager } from "./core/command";
 import { end, start } from "./core/log";
@@ -149,9 +149,17 @@ export async function activate(context: ExtensionContext) {
 
   // initilisze open log
   activateOpenLog(context, logviewWebviewManager);
-  activateInspectCommands(stateManager, context, async (uri) => {
-    await openCommandLog(uri, logviewWebviewManager);
-  });
+  activateInspectCommands(
+    stateManager,
+    context,
+    async (uri) => {
+      await openCommandLog(uri, logviewWebviewManager);
+    },
+    () => [
+      ...(workspace.workspaceFolders ?? []).map((folder) => folder.uri),
+      workspaceEnvManager.getDefaultLogDir(),
+    ]
+  );
   end("Setup Log Viewer");
 
   // Activate the Activity Bar

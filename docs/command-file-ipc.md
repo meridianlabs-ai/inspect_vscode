@@ -1,6 +1,17 @@
-# Command-file requests
+# Command-file operations
 
-The extension's command-file channel accepts a JSON array containing 1–16 entries:
+The command directory is an **unauthenticated request channel**. Knowing its path
+allows a writer to invoke only the operations below, with validated targets. The
+workspace ID is routing metadata, not a secret; mode 0700 excludes other OS users,
+not same-user writers. Writer authentication is not claimed or required by this
+operation boundary. The extension never forwards a supplied VS Code command ID or
+shell command.
+
+Each file contains a JSON array of 1–16 requests with exactly `command` and `args`.
+The whole batch is validated before any operation. Unknown commands, extra fields,
+invalid arguments and mixed invalid batches are rejected with bounded diagnostics.
+
+## Open a log
 
 ```json
 [
@@ -11,141 +22,122 @@ The extension's command-file channel accepts a JSON array containing 1–16 entr
 ]
 ```
 
-Only this command is supported. Each entry must have exactly `command` and `args`,
-with one URI string. The supported locations are local `file` URIs and
-`http`, `https`, or `s3` URLs ending in `.eval` or `.json`. Hosted file/UNC paths,
-fragments, control characters, extra arguments, duplicate or unknown query
-parameters, and executable URI schemes are rejected. Sample selection uses
-`sample_id` and a non-negative integer `epoch`.
+The argument is one URI, at most 8192 characters, with a `.eval` or `.json` path.
+Supported schemes are `file`, `http`, `https`, `s3`, `gs`, `gcs`, `az`, `abfs` and
+`abfss`; the active Python environment must have the corresponding storage backend.
+Executable URI schemes, fragments, control characters, ambiguous authorities,
+backslashes, extra arguments and unknown/duplicate query parameters are rejected.
+Only `sample_id` and a non-negative safe-integer `epoch` are accepted. Sample IDs
+are opaque text; the viewer's `jsonForScript` encoding protects embedded HTML.
+Older Python Windows drive-path forms are normalized only when unambiguously local.
 
-The entire batch is validated before any prompt or viewer action. The user must
-confirm the displayed locations before the extension opens them. The extension
-selects Inspect's custom editor explicitly, bypassing workspace editor
-associations; older Inspect versions use the existing Inspect view manager.
-Opening a log can read local content or fetch a remote resource using the active
-Python environment's credentials. Confirmation therefore applies to local and
-remote requests alike, and does not permanently trust a writer or directory.
+Ordinary local log requests open **without confirmation**. Remote logs inside the
+configured log directory or open workspace also open directly. A remote location
+outside those roots requires a targeted confirmation because fetching can use
+ambient storage credentials. UNC/hosted file locations are accepted only inside
+those roots; an unconfigured SMB target is rejected before filesystem access.
+Containment requires the same scheme/authority and normalized path boundaries.
 
-Files are limited to 64 KiB. The command directory itself must not be a symlink.
-Its canonical path and identity are captured at activation and checked again
-before stale cleanup, reads and consumption, so stable directory replacements
-are rejected. These pathname checks are not atomic directory-relative operations.
-Reads reject non-regular files and hard links, check
-file identity and size, and use no-follow/nonblocking open flags where supported
-by Node on the host platform. On Windows those no-follow/nonblocking flags are
-not available: pathname checks and descriptor identity checks reject stable links
-and prevent using mismatched content, but cannot prevent opening a reparse target
-in a pathname race before validation. Ancestor-directory replacement is also not
-confined by a directory handle. These are additional reasons not to claim an
-authenticated or fully confined file channel. During event processing, a request
-is consumed only after both JSON parsing and full command/URI validation succeed;
-other pending requests and unrelated JSON are retained. Creation and change events are serialized through
-a queue capped at 64 paths. An initial read is followed by at most four retries
-at 100 ms intervals; files that remain invalid are left in place, and a later change can
-retry them. At activation, up to 64 stale entries are enumerated and files/links removed
-without reading or executing them. Excess stale files can remain until manual
-cleanup.
-Diagnostics are bounded and rate limited; rejections also produce a user-visible
-warning. Missing files (such as late watcher events for consumed requests) are
-ignored. These controls bound each read and the
-in-memory queue; they do not prevent a writer from filling its own writable
-directory, repeatedly changing files, or causing repeated confirmation prompts.
+The extension explicitly selects Inspect's editor instead of consulting arbitrary
+editor associations. Its older viewer remains supported. The operation can display
+any locally readable `.eval`/`.json` target; it is not a workspace-only read sandbox.
+The normal viewer and Python storage layer still parse the content and may follow
+local symlinks, network redirects or backend configuration. It does not return data
+to the request writer, but a writer can cause log displays and repeated work. A
+storage backend can fetch using the user's credentials. These are residual powers
+of the accepted operation, not proof of writer identity or complete filesystem and
+network confinement. Task execution, extension installation, arbitrary terminal
+input and deleting logs are not available through this channel.
 
-## Compatibility and current limits
+## Docker sandbox operations
 
-The Inspect producer writes the legacy JSON array directly to a randomly named
-file. No wire-format change is required for its log and sample links. Evaluation
-completion notifications and terminal links are separate extension features and
-remain available. Producers with no log location emit an empty argument list;
-this is rejected, as the viewer requires a target.
+```json
+[
+  {
+    "command": "inspect.openSandboxTerminal",
+    "args": [{ "container": "inspect-task-service-1", "user": "1000:1000" }]
+  }
+]
+```
 
-The Python human-agent panel also uses this channel for terminal login
-(`workbench.action.terminal.new` and `workbench.action.terminal.sendSequence`) and
-`remote-containers.attachToRunningContainer`. Sandbox plugins can supply other
-command IDs. Those requests are now rejected with a diagnostic directing
-the user to the command palette. Manually invoking Dev Containers' attach action
-remains available, but **the existing one-click Python terminal-login and container links are not
-preserved by this candidate**. This compatibility decision must be resolved before
-claiming the complete IPC migration is ready. Non-S3 fsspec schemes (such as
-`gs` and `az`), hosted/UNC files even inside a workspace, and sample IDs containing
-markup characters are also rejected by the narrower legacy-file grammar. These
-compatibility restrictions are explicit; parity with all producer inputs is not
-claimed.
+```json
+[
+  {
+    "command": "inspect.attachSandbox",
+    "args": [{ "container": "inspect-task-service-1" }]
+  }
+]
+```
 
-The extension host and Python process must share the existing platform-specific
-Inspect data directory. That routing remains unchanged for remote extension
-hosts, devcontainers, and WSL. URI and filesystem checks execute on that host;
-remote-host behavior and Windows link/race handling still need platform evidence.
-The tests exercise real platform watchers and the parser, including a readiness
-probe before event assertions, but are not a paired Python-producer test. In particular, the inspected Python `to_uri` helper
-has its own Windows path serialization problem that needs a producer-side fix.
+Only a container name or full ID and, for terminals only, an optional Unix user or
+UID (optionally with a group/GID) are accepted. Shell text, command arguments,
+options and other fields are rejected. No container-name prefix is trusted.
 
-## Writer authentication: unresolved
+The extension queries `docker ps` without a shell, with bounded output and timeout.
+The request must match exactly one running container from that daemon. The user
+then selects that actual target, with its full ID and requested operation/user
+shown. This selection provides the trusted context: the extension has no independent
+inventory binding terminal-launched evaluations to a workspace. Merely knowing a
+container name or writing a request cannot start a terminal or attachment.
 
-This patch does **not** authenticate the file writer. Knowing only the directory
-path can still submit a request, but cannot open a log without a user confirming
-it. The confirmation authenticates a user decision, not the Python process.
-The workspace ID is routing metadata. A mode-0700 directory excludes other OS
-users under normal filesystem permissions, not another process running as the
-same user. A token beside the requests, or a token inherited by every terminal
-or evaluation process, would not establish a boundary against those writers.
-The scoped threat is a file-write primitive or constrained same-user process;
-there is no claim of protection from a fully privileged same-user adversary.
+After selection the extension rechecks the full ID to prevent name reuse from
+retargeting the operation. A terminal launches `docker` directly with the fixed
+argument vector `exec -it [--user USER] FULL_ID bash -l`. No `sendText`, shell parser
+or supplied shell string is used. Attachment calls the constant Dev Containers
+attach action with the full ID. This permits an interactive container shell or
+installation of the Dev Containers server in a **user-selected** container, including
+containers not launched by Inspect. It does not create, build or modify container
+configuration. Docker context/PATH and the selected container's setup are trusted
+user environment, not file inputs. Docker access and, for attachment, Dev Containers
+must be installed on the appropriate extension host.
 
-A coordinated protocol needs a trusted principal separate from untrusted eval
-code. The current Python terminal UI and evaluation code can share a process;
-a capability handed to that process is available to its eval code too. Merely
-adding HMAC fields to this producer would not solve that problem.
+## Producer compatibility and rollout
 
-### Proposed coordinated design (not implemented)
+Existing Python log/sample requests retain their wire format. The extension
+advertises supported command IDs in `INSPECT_VSCODE_OPERATIONS` for new terminals
+and debug launches. This is capability negotiation only, not a credential.
 
-1. Run the trusted request UI/broker separately from evaluation code, launched
-   by the extension. Bind it to an inherited duplex pipe or connected handle
-   owned by the extension host. Do not publish a listening bearer capability in
-   the command directory or terminal environment. Untrusted eval children must
-   not inherit the handle. On Windows use explicitly restricted handle
-   inheritance; on POSIX close it in eval children. Keep the broker and extension
-   together on the remote host for remote/devcontainer/WSL sessions.
-2. Bind each session to one workspace, a fresh random session ID, and a monotonic
-   request sequence. Negotiate protocol 2 over that connected handle before
-   accepting requests. Frame messages with a bounded length (64 KiB maximum).
-   A request is `{version: 2, session, sequence, action, payload}`. The fixed
-   actions are `open_log` with `{uri}`, `attach_container` with `{container_id}`,
-   and `open_sandbox_terminal` with `{container_id, user}`.
-   Validate the whole message, session, sequence and action schema before effects;
-   reject replay, stale sessions, missing fields and unknown actions.
-3. Treat eval-supplied display data as untrusted. Only a gesture in the trusted
-   UI can submit an action. Keep explicit confirmation for container attachment
-   and log targets that can fetch with ambient credentials. The extension maps
-   each action to its own implementation and a constant downstream command;
-   never accept a VS Code command ID from a protocol-2 payload. Validate container identifiers and users against the broker's current evaluation/container inventory, not merely a printable-string
-   pattern. For terminal login, construct a fixed executable/argument list from
-   that inventory (for example a Docker exec adapter) rather than accepting shell
-   text. Other sandbox types need their own typed adapters or an explicit manual
-   fallback.
-4. Keep protocol-1 log files as untrusted, per-request-confirmed requests during
-   migration. Do not claim those writers are authenticated. Publish producer
-   capability negotiation before advertising protocol-2 support. An old extension
-   must cause the new producer to retain its legacy log UI; an old producer with
-   the new extension retains confirmed log opening. No credential failure may
-   downgrade to an automatically executed file. For legacy terminal-login and container links,
-   choose either a separately confirmed adapter with a fixed action or a paired
-   producer update that offers manual connection instructions. That choice
-   changes the strict extension-owned-ID policy and needs an explicit decision.
-5. Validate extension and producer together: successful trusted UI gestures;
-   missing/wrong handle or session; replay and sequence gaps; reconnect and host
-   restart; eval-child inheritance; directory-only writer; malformed/oversized
-   frames; old/new version pairs; arbitrary CLI evaluations; sandbox terminal login and Docker attachment;
-   Windows, Linux, remote extension host, devcontainer and WSL behavior.
+Older producers still send terminal creation plus arbitrary `sendSequence` text,
+or a plugin-supplied VS Code command. Those forms remain rejected. A minimal paired
+producer patch is required to preserve the sandbox buttons: emit the typed requests
+above when advertised; carry the Docker user as a structured connection field;
+keep legacy behavior with older extensions; display existing manual instructions
+for unsupported sandbox types/capabilities. The proposed patch is review evidence,
+not a published producer change. Until paired release, old sandbox buttons do not
+work with this extension. This is an explicit rollout prerequisite, not parity.
+Non-Docker plugins need separately specified adapters; their arbitrary shell strings
+cannot be admitted. Restart terminals when changing extension capability versions.
 
-A process-bound channel excludes directory-only writers and constrained processes
-without the inherited handle. It does not defeat a process able to inspect the
-broker's memory or duplicate its handles. Supporting arbitrary terminal-launched
-Python UIs without trusting eval code needs a user-mediated pairing or moving
-that UI into the extension, not a global token.
+## File handling and limits
 
-The remaining decision is whether per-request user authorization is the accepted
-boundary for the legacy channel, and which coordinated broker/container migration
-to implement. The viewer-only patch is reviewable mitigation, not completion of
-writer authentication or the full compatibility requirement. No producer change
-is included here.
+The command directory must be a real directory, with canonical path and identity
+checked before cleanup, reads and consumption. Native canonicalization resolves
+Windows short-name aliases before watching and comparing event paths. Failure to
+initialize the directory disables only this channel and warns once; the rest of
+extension activation continues.
+
+The reader opens the file and validates its descriptor, rather than trusting a
+pathname check made before open. It requires a regular file, one hard link and at
+most 64 KiB, checks that the directory entry matches the opened object before
+reading, bounds the read and checks for modifications. POSIX no-follow/nonblocking
+flags reject symlinks and permit rejecting FIFOs without blocking. Windows lacks
+those flags: a reparse target can be opened briefly before descriptor/entry checks
+reject it. Directory checks and final unlink are not atomic directory-relative
+operations; a process able to replace ancestors can still race them. The change
+eliminates the stale pre-open decision; it does not claim all pathname races or
+same-user filesystem powers are eliminated.
+
+Only fully validated requests are consumed. Other requests and invalid JSON remain.
+Creation/change events are serialized; the queue and startup cleanup are capped at
+64 entries, each read gets an initial attempt plus four 100 ms retries, and warnings
+are rate limited. Late events for consumed files are ignored. Disposing the channel
+prevents pending authorizations from starting actions. Stalled writers, flooding or
+writes during watcher startup are not guaranteed delivery; the directory is not a
+reliable message queue. The producer creates then writes a file, so partial writes
+are retried without requiring an atomic producer rename.
+
+Routing stays on the extension host shared with Python, including remote hosts,
+devcontainers and WSL. Platform CI, isolated watcher tests, paired producer payload
+checks and runtime evidence are recorded in the PR; Docker integration and remote
+host behavior require their own environment and must not be inferred from parser
+tests alone.

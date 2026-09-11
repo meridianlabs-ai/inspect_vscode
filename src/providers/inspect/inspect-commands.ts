@@ -23,30 +23,56 @@ import {
   handleCommandRequest,
   parseCommandRequest,
 } from "./command-request";
+import { prepareSandboxOperation } from "./command-sandbox";
 
 export function activateInspectCommands(
   stateManager: WorkspaceStateManager,
   context: ExtensionContext,
-  openLog: (uri: Uri) => Promise<void>
+  openLog: (uri: Uri) => Promise<void>,
+  trustedRoots: () => readonly Uri[] = () => []
 ) {
-  const dispatcher = new InspectCommandDispatcher(
-    inspectCommandsDir(stateManager),
-    {
-      confirm: async (targets) => {
-        const choice = await window.showWarningMessage(
-          "A local process requested opening Inspect logs. Open only if you expected this request.",
-          {
-            modal: true,
-            detail: targets.map((target) => target.toString()).join("\n"),
-          },
-          "Open Logs"
-        );
-        return choice === "Open Logs";
-      },
-      openLog,
-    }
-  );
-  context.subscriptions.push(dispatcher);
+  // Directory failures disable this optional channel, not the rest of activation.
+  return startInspectCommands(() => inspectCommandsDir(stateManager), context, {
+    trustedRoots,
+    prepareSandbox: prepareSandboxOperation,
+    confirmRemote: async (targets) => {
+      const choice = await window.showWarningMessage(
+        "A local process requested Inspect logs from an unconfigured remote location. Opening them may use your storage credentials.",
+        {
+          modal: true,
+          detail: targets.map((target) => target.toString()).join("\n"),
+        },
+        "Open Logs"
+      );
+      return choice === "Open Logs";
+    },
+    openLog,
+  });
+}
+
+export function startInspectCommands(
+  directory: () => string,
+  context: Pick<ExtensionContext, "subscriptions">,
+  actions: CommandRequestActions,
+  notify: (message: string) => void = (message) => {
+    void window.showWarningMessage(message);
+  }
+): InspectCommandDispatcher | undefined {
+  try {
+    const dispatcher = new InspectCommandDispatcher(
+      directory(),
+      actions,
+      notify
+    );
+    context.subscriptions.push(dispatcher);
+    return dispatcher;
+  } catch {
+    const message =
+      "Inspect command-file requests are disabled because their directory is unavailable or unsafe. Other Inspect features remain available.";
+    log.warn(message);
+    notify(message);
+    return undefined;
+  }
 }
 
 /** Compare using the extension host's filesystem rules (including Windows casing). */
@@ -133,8 +159,13 @@ export class InspectCommandDispatcher implements Disposable {
           }
           if (this.disposed_) break;
           try {
-            value = readCommandFile(file, parseCommandRequest, () =>
-              this.directory_.assertUnchanged()
+            value = readCommandFile(
+              file,
+              (value) =>
+                parseCommandRequest(value, {
+                  trustedRoots: this.actions_.trustedRoots?.(),
+                }),
+              () => this.directory_.assertUnchanged()
             );
             received = true;
             break;
@@ -154,8 +185,18 @@ export class InspectCommandDispatcher implements Disposable {
         if (received && !this.disposed_) {
           try {
             await handleCommandRequest(value, {
-              confirm: async (targets) =>
-                (await this.actions_.confirm(targets)) && !this.disposed_,
+              trustedRoots: this.actions_.trustedRoots,
+              prepareSandbox: async (operation) => {
+                const effect = await this.actions_.prepareSandbox?.(operation);
+                return effect
+                  ? async () => {
+                      if (!this.disposed_) await effect();
+                    }
+                  : undefined;
+              },
+              confirmRemote: async (targets) =>
+                (await this.actions_.confirmRemote?.(targets)) === true &&
+                !this.disposed_,
               openLog: async (target) => {
                 if (!this.disposed_) await this.actions_.openLog(target);
               },

@@ -11,7 +11,10 @@ import {
 } from "vscode";
 
 import { sleep } from "../../core/wait";
-import { extensionVersion } from "../../providers/environment";
+import {
+  extensionVersion,
+  kCommandOperations,
+} from "../../providers/environment";
 import {
   DocumentState,
   WorkspaceStateManager,
@@ -105,6 +108,7 @@ export class ExecManager {
       const env = {
         INSPECT_WORKSPACE_ID: this.stateManager_.getWorkspaceInstance(),
         INSPECT_VSCODE_EXT_VERSION: extensionVersion(this.context_),
+        INSPECT_VSCODE_OPERATIONS: kCommandOperations,
       };
 
       await runDebugger(

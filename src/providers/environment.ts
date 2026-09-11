@@ -23,6 +23,9 @@ export async function activateWorkspaceEnvironment(
   env.delete("INSPECT_WORKSPACE_ID");
   env.append("INSPECT_WORKSPACE_ID", workspaceId);
 
+  // Capability advertisement only; not a credential or authorization input.
+  env.replace("INSPECT_VSCODE_OPERATIONS", kCommandOperations);
+
   env.delete("INSPECT_VSCODE_EXT_VERSION");
   env.append("INSPECT_VSCODE_EXT_VERSION", version);
 }
@@ -30,3 +33,6 @@ export async function activateWorkspaceEnvironment(
 export const extensionVersion = (context: ExtensionContext) => {
   return `${(context.extension.packageJSON as { version: string }).version}`;
 };
+
+export const kCommandOperations =
+  "inspect.openLogViewer,inspect.openSandboxTerminal,inspect.attachSandbox";

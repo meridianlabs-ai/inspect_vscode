@@ -1,4 +1,5 @@
 import * as assert from "node:assert";
+import { execFileSync } from "node:child_process";
 import {
   linkSync,
   mkdirSync,
@@ -38,10 +39,14 @@ suite("Command-file IPC", () => {
       "file:///home/user/logs/run.eval?sample_id=hello+world&epoch=1",
       "s3://bucket/logs/run.eval?sample_id=42&epoch=2",
       "https://example.com/logs/run.json",
+      "abfss://logs@account.dfs.core.windows.net/run.eval",
       "http://localhost:7575/logs/run.eval",
     ]) {
       assert.deepStrictEqual(
-        parseCommandRequest([request(target)]).map((uri) => uri.toString()),
+        parseCommandRequest([request(target)]).map((uri) => {
+          assert.ok(uri instanceof Uri);
+          return uri.toString();
+        }),
         [Uri.parse(target).toString()]
       );
     }
@@ -62,7 +67,7 @@ suite("Command-file IPC", () => {
     ]) {
       await assert.rejects(
         handleCommandRequest([valid, { command, args: [] }], {
-          confirm: () => {
+          confirmRemote: () => {
             assert.fail("invalid batch prompted");
           },
           openLog: () => {
@@ -104,7 +109,7 @@ suite("Command-file IPC", () => {
       "file:////attacker/share/run.eval",
       "file:///tmp/run.sh",
       "file:///tmp/run.eval#fragment",
-      "file:///tmp/run.eval?sample_id=%3Cscript%3E&epoch=1",
+
       "file:///tmp/run.eval?epoch=-1",
       "file:///tmp/run.eval?epoch=1&epoch=2",
       "file:///tmp/run.eval?command=inspect.runTask",
@@ -119,10 +124,10 @@ suite("Command-file IPC", () => {
       assert.throws(() => parseCommandRequest([request(target)]), target);
   });
 
-  test("a valid unauthenticated file has no effect without explicit user consent", async () => {
+  test("local logs need no prompt; unconfigured remote denial has no effects", async () => {
     let opened = 0;
-    await handleCommandRequest([valid], {
-      confirm: () => Promise.resolve(false),
+    await handleCommandRequest([request("s3://bucket/run.eval")], {
+      confirmRemote: () => Promise.resolve(false),
       openLog: () => {
         opened++;
         return Promise.resolve();
@@ -130,8 +135,8 @@ suite("Command-file IPC", () => {
     });
     assert.strictEqual(opened, 0);
     await handleCommandRequest([valid, request("s3://bucket/run.eval")], {
-      confirm: (targets) => {
-        assert.strictEqual(targets.length, 2);
+      confirmRemote: (targets) => {
+        assert.strictEqual(targets.length, 1);
         return Promise.resolve(true);
       },
       openLog: () => {
@@ -140,6 +145,76 @@ suite("Command-file IPC", () => {
       },
     });
     assert.strictEqual(opened, 2);
+  });
+
+  test("normal local and configured remote requests open without a modal", async () => {
+    const opened: string[] = [];
+    await handleCommandRequest([valid, request("gs://bucket/logs/run.eval")], {
+      trustedRoots: () => [Uri.parse("gs://bucket/logs")],
+      confirmRemote: () => {
+        assert.fail("unexpected confirmation");
+      },
+      openLog: (uri) => {
+        opened.push(uri.toString());
+        return Promise.resolve();
+      },
+    });
+    assert.strictEqual(opened.length, 2);
+  });
+
+  test("preserves opaque sample IDs and trusted UNC workspaces", () => {
+    const sample = "<sample>&\"'`";
+    const target =
+      "file:///tmp/run.eval?" +
+      new URLSearchParams({ sample_id: sample, epoch: "1" }).toString();
+    assert.strictEqual(
+      new URLSearchParams(
+        (parseCommandRequest([request(target)])[0] as Uri).query
+      ).get("sample_id"),
+      sample
+    );
+    const roots = [Uri.parse("file://server/share/work")];
+    assert.strictEqual(
+      parseCommandRequest([request("file://server/share/work/run.eval")], {
+        trustedRoots: roots,
+      }).length,
+      1
+    );
+    for (const path of [
+      "file://other/share/work/run.eval",
+      "file://server/share/work/../run.eval",
+      "file://server/share/work-evil/run.eval",
+    ]) {
+      assert.throws(() =>
+        parseCommandRequest([request(path)], { trustedRoots: roots })
+      );
+    }
+    for (const scheme of ["gs", "gcs", "az", "abfs", "abfss"])
+      assert.strictEqual(
+        parseCommandRequest([request(`${scheme}://bucket/run.eval`)]).length,
+        1
+      );
+  });
+
+  test("normalizes only unambiguous legacy Windows drive requests", () => {
+    for (const target of [
+      "C:\\logs\\run.eval?sample_id=one&epoch=1",
+      "file://C%3A%5Clogs%5Crun.eval?sample_id=one&epoch=1",
+    ]) {
+      const result = parseCommandRequest([request(target)], {
+        platform: "win32",
+      })[0] as Uri;
+      assert.strictEqual(result.path.toLowerCase(), "/c:/logs/run.eval");
+      assert.strictEqual(
+        new URLSearchParams(result.query).get("sample_id"),
+        "one"
+      );
+    }
+    assert.throws(() =>
+      parseCommandRequest([request("file://server/share/run.eval")], {
+        platform: "win32",
+      })
+    );
   });
 
   suite("isolated command files", () => {
@@ -209,6 +284,29 @@ suite("Command-file IPC", () => {
         writeFileSync(file, contents);
         assert.throws(() => readCommandFile(file, parseCommandRequest));
       }
+    });
+
+    test("rejects a replacement introduced during validation without consuming it", () => {
+      const file = join(dir, "request");
+      writeFileSync(file, JSON.stringify([valid]));
+      assert.throws(() =>
+        readCommandFile(file, (value) => {
+          parseCommandRequest(value);
+          renameSync(file, join(dir, "original"));
+          writeFileSync(file, "keep replacement");
+        })
+      );
+      assert.strictEqual(readFileSync(file, "utf8"), "keep replacement");
+    });
+
+    test("descriptor validation rejects FIFOs without blocking", function () {
+      if (process.platform === "win32") this.skip();
+      const fifo = join(dir, "pipe");
+      execFileSync("mkfifo", [fifo]);
+      const reader = require.resolve("../../providers/inspect/command-file");
+      const probe =
+        "const {readCommandFile}=require(process.argv[1]); try {readCommandFile(process.argv[2],()=>{}); process.exit(1);} catch {process.exit(0);}";
+      execFileSync("node", ["-e", probe, reader, fifo], { timeout: 3000 });
     });
 
     test("rejects directories and links without reading or removing their targets", function () {
