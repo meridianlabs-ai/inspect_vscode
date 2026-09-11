@@ -17,11 +17,23 @@ import { TerminalOptions, version, window } from "vscode";
 import { ExecProfile, runCommand } from "../core/package/exec-manager";
 import { AbsolutePath } from "../core/path";
 
-export async function verifyRunTerminal(): Promise<boolean> {
+export async function verifyRunTerminal(
+  shell: "startup" | "powershell" = "startup"
+): Promise<boolean> {
   const windows = process.platform === "win32";
-  if (!windows && spawnSync("fish", ["--version"]).error) {
+  if (
+    shell === "startup" &&
+    !windows &&
+    spawnSync("fish", ["--version"]).error
+  ) {
     if (process.env.REQUIRE_FISH_TESTS) {
       assert.fail("fish is required");
+    }
+    return false;
+  }
+  if (shell === "powershell" && spawnSync("pwsh", ["--version"]).error) {
+    if (process.env.REQUIRE_PWSH_TESTS) {
+      assert.fail("PowerShell is required");
     }
     return false;
   }
@@ -97,9 +109,11 @@ export async function verifyRunTerminal(): Promise<boolean> {
     value: (options: TerminalOptions) => {
       const terminal = create({
         ...options,
-        ...(windows
-          ? {}
-          : { shellPath: "/bin/bash", shellArgs: ["--rcfile", rcfile] }),
+        ...(shell === "powershell"
+          ? { shellPath: "pwsh", shellArgs: ["-NoLogo", "-NoProfile"] }
+          : windows
+            ? {}
+            : { shellPath: "/bin/bash", shellArgs: ["--rcfile", rcfile] }),
         env: {
           PYTHONPATH: root,
           TRANSPORT_RESULT: result,
@@ -140,6 +154,13 @@ export async function verifyRunTerminal(): Promise<boolean> {
         rmSync(result, { force: true });
         const args = [
           "eval",
+          label === "first"
+            ? "tasks”; New-Item INJECTED -ItemType File; “x/task.py@demo"
+            : "demo’; New-Item INJECTED -ItemType File; #/task.py@demo",
+          ...["“", "”", "„", "‘", "’", "‚", "‛"].map(
+            (quote) =>
+              `task${quote}; New-Item INJECTED -ItemType File; #.py@demo`
+          ),
           "t\\';echo INJECTED>INJECTED;#'.py@demo",
           label,
           "%PATH%",

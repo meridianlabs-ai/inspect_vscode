@@ -494,7 +494,12 @@ suite("Run on hosts without shell identity", () => {
           disposables.push(
             await runCommand(
               profile,
-              ["eval", "t\\';echo INJECTED;#'.py@demo"],
+              [
+                "eval",
+                "tasks”; New-Item INJECTED -ItemType File; “x/task.py@demo",
+                "demo’; New-Item INJECTED -ItemType File; #/task.py@demo",
+                "“”„‘’‚‛",
+              ],
               "/cwd [literal]",
               { path: "/selected/python" } as AbsolutePath
             )
@@ -505,6 +510,11 @@ suite("Run on hosts without shell identity", () => {
       for (const line of emitted) {
         assert.match(line, /^python3? -I -c "/);
         assert.ok(!line.includes("INJECTED"));
+        assert.match(
+          line,
+          /^[\x20-\x7e]+$/,
+          "task Unicode quotes never enter shell source"
+        );
         assert.ok(!line.includes("/cwd"));
         assert.ok(!line.includes("/selected/python"));
         assert.ok(!line.startsWith("cd "));

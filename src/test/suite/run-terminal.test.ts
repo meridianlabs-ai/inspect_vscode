@@ -7,4 +7,10 @@ suite("Run in a real integrated terminal", () => {
       this.skip();
     }
   });
+  test("smart-quote task paths remain literal in PowerShell", async function () {
+    this.timeout(90000);
+    if (!(await verifyRunTerminal("powershell"))) {
+      this.skip();
+    }
+  });
 });

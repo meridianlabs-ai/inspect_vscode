@@ -50,6 +50,11 @@ const shells: { name: string; executable: string; args: string[] }[] = windows
       },
     ]
   : [
+      {
+        name: "Unix PowerShell",
+        executable: "pwsh",
+        args: ["-NoProfile", "-Command"],
+      },
       { name: "sh", executable: "/bin/sh", args: ["-c"] },
       {
         name: "bash",
@@ -91,6 +96,13 @@ suite("Run transport through real shells", () => {
         probe.error &&
         shell.name.includes("fish") &&
         !process.env.REQUIRE_FISH_TESTS
+      ) {
+        this.skip();
+      }
+      if (
+        probe.error &&
+        shell.name === "Unix PowerShell" &&
+        !process.env.REQUIRE_PWSH_TESTS
       ) {
         this.skip();
       }
@@ -139,6 +151,10 @@ suite("Run transport through real shells", () => {
         "a^b",
         "[demo]",
         "quotes'\"‘’",
+        ...["“", "”", "„", "‘", "’", "‚", "‛"].map(
+          (quote) =>
+            `tasks${quote}; New-Item INJECTED -ItemType File; #/task.py@demo`
+        ),
         "$(touch INJECTED)",
         "`touch INJECTED`",
         "t\\';echo INJECTED>INJECTED;#'.py@demo",
@@ -225,7 +241,8 @@ suite("Run transport through real shells", () => {
       join(root, "missing")
     );
     try {
-      const shell = shells[0]!;
+      const shell =
+        shells.find((candidate) => candidate.name === "sh") ?? shells[0]!;
       const run = runShell(shell, transport.commandLine);
       assert.notStrictEqual(run.status, 0);
       assert.doesNotMatch(run.stdout, /Zen of Python/);

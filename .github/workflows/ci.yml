@@ -52,6 +52,7 @@ jobs:
         if: runner.os == 'Linux'
         env:
           REQUIRE_FISH_TESTS: "1"
+          REQUIRE_PWSH_TESTS: "1"
           VSCODE_TEST_VERSION: ${{ matrix.vscode }}
         run: |
           sudo apt-get update
