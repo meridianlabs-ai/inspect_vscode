@@ -130,16 +130,13 @@ export class LogviewPanel extends Disposable {
       return target;
     };
 
-    // post_search/get_search_result receive `transcriptDir` as a scheme-stripped,
-    // still-percent-encoded path. Scout does not unquote its base64-decoded
-    // location, so decode the viewer value here and authorize exactly what
-    // we forward to Scout.
+    // Inspect listings (including evalLogsSolo) preserve literal filenames.
+    // The search adapter only strips file://; Scout only decodes base64.
+    // Authorize and forward that literal location without interpreting %XX.
     const requireSearchScope = (target: unknown): string => {
-      const location =
-        typeof target === "string" ? decodeURIComponent(target) : undefined;
       if (
-        location === undefined ||
-        !locationInScope([uri], location, { exact: type === "file" })
+        typeof target !== "string" ||
+        !locationInScope([uri], target, { exact: type === "file" })
       ) {
         throw new Error(
           `Refusing to access "${String(
@@ -147,7 +144,7 @@ export class LogviewPanel extends Disposable {
           )}": outside the scope of this log view.`
         );
       }
-      return location;
+      return target;
     };
 
     // serve eval log api to webview

@@ -7,6 +7,7 @@ import { Disposable, Event, EventEmitter, Uri } from "vscode";
 import { Command } from "../../core/command";
 import { clearEnv, envFilePathIsSafe, readEnv, writeEnv } from "../../core/env";
 import { log } from "../../core/log";
+import { locationUri } from "../../core/package/location-scope";
 import {
   toAbsolutePath,
   workspacePath,
@@ -23,6 +24,9 @@ import { workspaceEnvCommands } from "./workspace-env-commands";
  * path relative to the workspace such as `./scans`) to a Uri.
  */
 export function scoutLocationToUri(location: string): Uri {
+  // A drive letter is a filesystem root, not a URI scheme. Use the same
+  // representation as the request boundary before capturing host authority.
+  if (/^[a-zA-Z]:[\\/]/.test(location)) return locationUri(location);
   try {
     return Uri.parse(location, true);
   } catch {

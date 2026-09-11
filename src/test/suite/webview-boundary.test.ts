@@ -1,5 +1,5 @@
 import * as assert from "assert";
-import { mkdtempSync, rmSync } from "fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 
@@ -108,51 +108,71 @@ suite("Webview boundary RPC integration", () => {
     }
   });
 
-  test("named search forwards the exact decoded viewer location it authorizes", async () => {
+  test("named search preserves literal filenames produced by evalLogsSolo", async () => {
     const workspace = mkdtempSync(join(tmpdir(), "log-search-"));
-    const location = join(workspace, "%2e%2e", "%2e%2e", "space %.eval");
-    const seen: string[] = [];
-    const search = (target: string) => {
-      seen.push(target);
-      return Promise.resolve("ok");
-    };
-    const view = webview();
-    const panel = new LogviewPanel(
-      view.panel,
-      {} as ExtensionContext,
-      {
-        postSearch: search,
-        getSearchResult: search,
-      } as unknown as InspectViewServer,
-      "file",
-      Uri.file(location)
-    );
+    const producer = Object.create(
+      InspectViewServer.prototype
+    ) as InspectViewServer;
+    Object.assign(producer, { haveInspectEvalLogFormat: () => false });
     try {
-      const viewerPath = Uri.file(location).toString().slice("file://".length);
-      for (const method of ["post_search", "get_search_result"]) {
-        assert.ok(!(await view.request(method, [viewerPath, "id", {}])).error);
-        // VS Code's URI serialization canonicalizes Windows drive letters.
-        assert.strictEqual(
-          seen.at(-1),
-          Uri.parse(Uri.file(location).toString()).path
-        );
-        assert.strictEqual(
-          Uri.file(seen.at(-1)!).toString(),
-          Uri.file(location).toString()
-        );
-        assert.ok(
-          (
-            await view.request(method, [
-              enc(join(workspace, "outside.eval")),
-              "id",
-              {},
-            ])
-          ).error
-        );
+      const names = [
+        "literal%20name.eval",
+        "literal name.eval",
+        "space %.eval",
+        "malformed%E0%A4%A.eval",
+        "literal%2Fname.eval",
+      ];
+      for (const [index, name] of names.entries())
+        writeFileSync(join(workspace, name), `marker-${index}`);
+      for (const type of ["file", "dir"] as const) {
+        for (const [index, name] of names.entries()) {
+          const file = Uri.file(join(workspace, name));
+          const listing = JSON.parse(await producer.evalLogsSolo(file)) as {
+            files: { name: string }[];
+          };
+          // This is the real search adapter's sole transformation of a listing.
+          const target = listing.files[0]!.name.replace(/^file:\/\//, "");
+          const view = webview();
+          const seen: string[] = [];
+          const search = (location: string) => {
+            seen.push(location);
+            return Promise.resolve(
+              readFileSync(Uri.file(location).fsPath, "utf8")
+            );
+          };
+          const panel = new LogviewPanel(
+            view.panel,
+            {} as ExtensionContext,
+            {
+              postSearch: search,
+              getSearchResult: search,
+            } as unknown as InspectViewServer,
+            type,
+            type === "file" ? file : Uri.file(workspace)
+          );
+          try {
+            for (const method of ["post_search", "get_search_result"]) {
+              const result = await view.request(method, [target, "id", {}]);
+              assert.ok(!result.error, `${type}: ${name}`);
+              assert.strictEqual(result.result, `marker-${index}`);
+              assert.strictEqual(seen.at(-1), target);
+              assert.ok(
+                (
+                  await view.request(method, [
+                    join(workspace, "..", "outside.eval"),
+                    "id",
+                    {},
+                  ])
+                ).error
+              );
+            }
+            assert.strictEqual(seen.length, 2);
+          } finally {
+            panel.dispose();
+          }
+        }
       }
-      assert.strictEqual(seen.length, 2);
     } finally {
-      panel.dispose();
       rmSync(workspace, { recursive: true, force: true });
     }
   });
@@ -176,14 +196,12 @@ suite("Webview boundary RPC integration", () => {
     try {
       for (const method of ["post_search", "get_search_result"]) {
         const supplied = "/review/outside/%2e%2e/panel/run.eval";
-        assert.ok(!(await view.request(method, [supplied, "id", {}])).error);
-        assert.strictEqual(seen.at(-1), "/review/outside/../panel/run.eval");
-        assert.notStrictEqual(seen.at(-1), supplied);
+        assert.ok((await view.request(method, [supplied, "id", {}])).error);
         assert.ok(
           (await view.request(method, [enc(supplied), "id", {}])).error
         );
       }
-      assert.strictEqual(seen.length, 2);
+      assert.strictEqual(seen.length, 0);
     } finally {
       panel.dispose();
     }
@@ -674,7 +692,7 @@ suite("Webview boundary RPC integration", () => {
       panel.dispose();
     }
   });
-  test("every named log family rejects encoded escapes before calling the server", async () => {
+  test("every named log family rejects consumer-specific escapes before calling the server", async () => {
     const view = webview();
     let calls = 0;
     const call = () => {
@@ -716,12 +734,16 @@ suite("Webview boundary RPC integration", () => {
         "post_search",
         "get_search_result",
       ]) {
-        for (const location of [
-          "/w/logs/..%2F..%2Foutside",
-          "file:///w/logs/x%23/../../outside",
-          "file:///w/logs/x%3F/../../outside",
-          "/w/logs/%E0%A4%A",
-        ]) {
+        for (const location of ["post_search", "get_search_result"].includes(
+          method
+        )
+          ? ["/w/outside.eval", "/w/logs/../../outside.eval"]
+          : [
+              "/w/logs/..%2F..%2Foutside",
+              "file:///w/logs/x%23/../../outside",
+              "file:///w/logs/x%3F/../../outside",
+              "/w/logs/%E0%A4%A",
+            ]) {
           const response = await view.request(method, [
             method === "eval_log_headers" ? [location] : location,
             0,

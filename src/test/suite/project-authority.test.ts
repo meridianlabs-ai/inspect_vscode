@@ -6,6 +6,7 @@ import { join } from "path";
 import { Uri } from "vscode";
 
 import { locationInScope } from "../../core/package/location-scope";
+import { assertScanConfigInScope } from "../../core/package/scan-config-scope";
 import * as paths from "../../core/path";
 import {
   captureProjectAuthority,
@@ -15,8 +16,55 @@ import {
   normalizeScoutProjectConfig,
   ScoutProjectManager,
 } from "../../providers/scout/scout-project";
+import { scoutLocationToUri } from "../../providers/workspace/workspace-env-provider";
 
 suite("Effective project authority", () => {
+  test("production resolver captures configured Windows drive roots as file authority", () => {
+    for (const root of [
+      "C:\\external\\data",
+      "C:/external/data",
+      "file:///C:/external/data",
+      "s3://bucket/external/data",
+    ]) {
+      const authority = captureProjectAuthority(
+        normalizeScoutProjectConfig({ scans: root, transcripts: root }),
+        scoutLocationToUri
+      );
+      const remote = root.startsWith("s3:");
+      const child = remote
+        ? "s3://bucket/external/data/run"
+        : "C:/external/data/run";
+      const outside = remote ? "s3://bucket/outside/run" : "C:/outside/run";
+      assert.strictEqual(authority.scans[0]!.scheme, remote ? "s3" : "file");
+      const scans = (location: string) =>
+        locationInScope(authority.scans, location);
+      const transcripts = (location: string) =>
+        locationInScope(authority.transcripts, location);
+      assert.ok(scans(child), root);
+      assert.ok(transcripts(child), root);
+      assert.ok(!scans(outside), root);
+      assert.ok(!transcripts(outside), root);
+      assert.doesNotThrow(() =>
+        assertScanConfigInScope(
+          JSON.stringify({ scans: child, transcripts: child }),
+          { scans, transcripts, project: () => false }
+        )
+      );
+      assert.throws(() =>
+        assertScanConfigInScope(JSON.stringify({ scans: outside }), {
+          scans,
+          transcripts,
+          project: () => false,
+        })
+      );
+    }
+    const broad = captureProjectAuthority(
+      normalizeScoutProjectConfig({ scans: "C:\\", transcripts: "C:/" }),
+      scoutLocationToUri
+    );
+    assert.deepStrictEqual(broad.scans, []);
+    assert.deepStrictEqual(broad.transcripts, []);
+  });
   test("reads local overrides with atomic model settings and freezes their authority", async () => {
     const root = mkdtempSync(join(tmpdir(), "scout-authority-"));
     const original = paths.activeWorkspacePath;
