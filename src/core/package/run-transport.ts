@@ -220,12 +220,24 @@ function windowsCommandLine(
     );
   }
   const powershell = `${root}/System32/WindowsPowerShell/v1.0/powershell.exe`;
-  const [program, ...rest] = argv;
+  const [program, ...rest] = argv as [string, ...string[]];
+  let fileName = program;
+  let argumentString = rest.map(crtQuote).join(" ");
+  // CreateProcess runs batch files through an implicit `cmd /c` whose quote
+  // handling breaks a quoted path with spaces. Start such wrappers through
+  // cmd.exe explicitly: /s strips exactly the outer quotes, /v:off keeps `!`
+  // literal, and cmd, like Windows PowerShell, lives under SystemRoot.
+  if (/\.(cmd|bat)$/i.test(program)) {
+    fileName = `${root.replace(/\//g, "\\")}\\System32\\cmd.exe`;
+    argumentString = `/d /v:off /s /c "${[program, ...rest]
+      .map(crtQuote)
+      .join(" ")}"`;
+  }
   const script = [
     "$ErrorActionPreference='Stop'",
     "$i=New-Object System.Diagnostics.ProcessStartInfo",
-    `$i.FileName=${powershellString(program!)}`,
-    `$i.Arguments=${powershellString(rest.map(crtQuote).join(" "))}`,
+    `$i.FileName=${powershellString(fileName)}`,
+    `$i.Arguments=${powershellString(argumentString)}`,
     "$i.UseShellExecute=$false",
     "try{$p=[System.Diagnostics.Process]::Start($i)}catch{[Console]::Error.WriteLine('Inspect: could not start '+$i.FileName+': '+$_.Exception.Message);exit 1}",
     "$p.WaitForExit()",

@@ -14,14 +14,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import {
-  basename,
-  delimiter,
-  dirname,
-  join,
-  relative,
-  resolve,
-} from "node:path";
+import { basename, delimiter, dirname, join, resolve } from "node:path";
 
 import {
   createRunTransport,
@@ -478,6 +471,33 @@ suite("Run transport command lines", () => {
     }
   });
 
+  test("Windows: a batch wrapper is started through cmd.exe /s /c", () => {
+    const transport = createRunTransport(
+      ["C:\\Tools dir\\py wrapper.cmd", "--wrapped"],
+      "inspect-ai",
+      "inspect",
+      [],
+      "C:\\cwd",
+      "win32",
+      "C:\\WINDOWS"
+    );
+    try {
+      const encoded = transport.commandLine.split('-EncodedCommand "')[1]!;
+      const script = Buffer.from(encoded.slice(0, -1), "base64").toString(
+        "utf16le"
+      );
+      assert.ok(
+        script.includes("$i.FileName='C:\\WINDOWS\\System32\\cmd.exe'")
+      );
+      assert.match(
+        script,
+        /\$i\.Arguments='\/d \/v:off \/s \/c ""C:\\Tools dir\\py wrapper\.cmd" --wrapped "?[^"]*inspect_run_launcher\.py"? "?[^"]*run\.json"?"'/
+      );
+    } finally {
+      transport.dispose();
+    }
+  });
+
   test("Windows: an unsupported SystemRoot is refused rather than searched", () => {
     for (const systemRoot of ["", "C:\\Win dows", "relative", "C:\\W$"]) {
       assert.throws(
@@ -566,8 +586,9 @@ suite("Launch vector resolution", () => {
   test("a bare name is looked up on PATH only, never in the current directory", () => {
     // Only cwd has python; PATH lists an empty entry, a relative entry that
     // names cwd, and a trusted absolute directory without python.
+    // Relative entries stay relative even across Windows drives.
     const env = {
-      PATH: ["", relative(process.cwd(), cwd), pathDir].join(delimiter),
+      PATH: ["", ".", basename(cwd), pathDir].join(delimiter),
       PATHEXT: ".COM;.EXE;.BAT;.CMD",
     };
     try {
