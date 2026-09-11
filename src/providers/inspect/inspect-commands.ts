@@ -1,5 +1,5 @@
-import { existsSync, mkdirSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { existsSync, mkdirSync, opendirSync, unlinkSync } from "node:fs";
+import { join, posix, win32 } from "node:path";
 
 import {
   Disposable,
@@ -17,23 +17,69 @@ import { kPythonPackageName } from "../../inspect/props";
 import { WorkspaceStateManager } from "../workspace/workspace-state-provider";
 
 import { readCommandFile } from "./command-file";
-import { handleCommandRequest } from "./command-request";
+import { CommandRequestActions, handleCommandRequest } from "./command-request";
 
 export function activateInspectCommands(
   stateManager: WorkspaceStateManager,
   context: ExtensionContext,
   openLog: (uri: Uri) => Promise<void>
 ) {
-  const dispatcher = new InspectCommandDispatcher(stateManager, openLog);
+  const dispatcher = new InspectCommandDispatcher(
+    inspectCommandsDir(stateManager),
+    {
+      confirm: async (targets) => {
+        const choice = await window.showWarningMessage(
+          "A local process requested opening Inspect logs. Open only if you expected this request.",
+          {
+            modal: true,
+            detail: targets.map((target) => target.toString()).join("\n"),
+          },
+          "Open Logs"
+        );
+        return choice === "Open Logs";
+      },
+      openLog,
+    }
+  );
   context.subscriptions.push(dispatcher);
+}
+
+/** Compare using the extension host's filesystem rules (including Windows casing). */
+export function isDirectCommandFile(
+  directory: string,
+  file: string,
+  platform = process.platform
+): boolean {
+  const paths = platform === "win32" ? win32 : posix;
+  return paths.relative(directory, paths.dirname(file)) === "";
 }
 
 export class InspectCommandDispatcher implements Disposable {
   constructor(
-    stateManager: WorkspaceStateManager,
-    private readonly openLog_: (uri: Uri) => Promise<void>
+    private readonly commandsDir_: string,
+    private readonly actions_: CommandRequestActions,
+    private readonly notifyRejected_: (message: string) => void = (message) => {
+      void window.showWarningMessage(message);
+    }
   ) {
-    this.commandsDir_ = inspectCommandsDir(stateManager);
+    // Do not execute requests left by a previous session. Bound enumeration and
+    // cleanup too: a writer can put arbitrarily many entries in this directory.
+    const directory = opendirSync(this.commandsDir_);
+    try {
+      for (let count = 0; count < 64; count++) {
+        const entry = directory.readSync();
+        if (!entry) break;
+        if (entry.isFile() || entry.isSymbolicLink()) {
+          try {
+            unlinkSync(join(this.commandsDir_, entry.name));
+          } catch {
+            this.diagnostic("Unable to remove a stale command file.");
+          }
+        }
+      }
+    } finally {
+      directory.closeSync();
+    }
     this.commandsWatcher_ = workspace.createFileSystemWatcher(
       new RelativePattern(Uri.file(this.commandsDir_), "*"),
       false,
@@ -49,7 +95,8 @@ export class InspectCommandDispatcher implements Disposable {
   }
 
   private enqueue(uri: Uri) {
-    if (this.disposed_ || dirname(uri.fsPath) !== this.commandsDir_) return;
+    if (this.disposed_ || !isDirectCommandFile(this.commandsDir_, uri.fsPath))
+      return;
     if (this.pending_.size >= 64) {
       this.diagnostic("Too many pending command files.");
       return;
@@ -68,13 +115,16 @@ export class InspectCommandDispatcher implements Disposable {
         let value: unknown;
         let received = false;
         for (let attempt = 0; attempt < 5 && !this.disposed_; attempt++) {
-          await new Promise((resolve) => setTimeout(resolve, 100));
+          if (attempt > 0) {
+            await new Promise((resolve) => setTimeout(resolve, 100));
+          }
           if (this.disposed_) break;
           try {
             value = readCommandFile(file);
             received = true;
             break;
-          } catch {
+          } catch (error) {
+            if ((error as NodeJS.ErrnoException).code === "ENOENT") break;
             if (attempt === 4) {
               this.diagnostic(
                 "Unreadable, unsafe, oversized, or incomplete command file."
@@ -85,21 +135,10 @@ export class InspectCommandDispatcher implements Disposable {
         if (received && !this.disposed_) {
           try {
             await handleCommandRequest(value, {
-              confirm: async (targets) => {
-                const choice = await window.showWarningMessage(
-                  "A local process requested opening Inspect logs. Open only if you expected this request.",
-                  {
-                    modal: true,
-                    detail: targets
-                      .map((target) => target.toString())
-                      .join("\n"),
-                  },
-                  "Open Logs"
-                );
-                return choice === "Open Logs" && !this.disposed_;
-              },
+              confirm: async (targets) =>
+                (await this.actions_.confirm(targets)) && !this.disposed_,
               openLog: async (target) => {
-                if (!this.disposed_) await this.openLog_(target);
+                if (!this.disposed_) await this.actions_.openLog(target);
               },
             });
           } catch (error) {
@@ -121,7 +160,9 @@ export class InspectCommandDispatcher implements Disposable {
   private diagnostic(message: string) {
     // A hostile writer must not flood the output channel with file contents.
     if (Date.now() - this.lastDiagnostic_ >= 5000) {
-      log.warn(`Inspect command request rejected: ${message}`);
+      const diagnostic = `Inspect command request rejected: ${message}`;
+      log.warn(diagnostic);
+      this.notifyRejected_(diagnostic);
       this.lastDiagnostic_ = Date.now();
     }
   }
@@ -135,7 +176,6 @@ export class InspectCommandDispatcher implements Disposable {
     this.commandsWatcher_.dispose();
   }
 
-  private readonly commandsDir_: string;
   private readonly commandsWatcher_: FileSystemWatcher;
   private readonly subscriptions_: Disposable[];
   private readonly pending_ = new Set<string>();

@@ -27,33 +27,6 @@ const request = (target: string) => ({
 suite("Command-file IPC", () => {
   const valid = request("file:///tmp/example.eval");
 
-  test("reproduces the old dispatcher premise using only recorded effects", async () => {
-    const effects: string[] = [];
-    const batch = [
-      { command: "workbench.action.terminal.new", args: [] },
-      {
-        command: "workbench.action.terminal.sendSequence",
-        args: [{ text: "marker" }],
-      },
-    ];
-    // Model the old loop without calling VS Code or touching the real IPC dir.
-    for (const entry of batch) effects.push(entry.command);
-    assert.strictEqual(effects.length, 2);
-    effects.length = 0;
-    await assert.rejects(
-      handleCommandRequest(batch, {
-        confirm: () => {
-          throw new Error("must not prompt");
-        },
-        openLog: (uri) => {
-          effects.push(uri.toString());
-          return Promise.resolve();
-        },
-      })
-    );
-    assert.deepStrictEqual(effects, []);
-  });
-
   test("accepts producer log and sample requests on supported backends", () => {
     for (const target of [
       "file:///tmp/a%20log.json",

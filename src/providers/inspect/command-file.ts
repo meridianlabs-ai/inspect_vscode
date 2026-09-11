@@ -10,7 +10,7 @@ import {
 
 const kMaxBytes = 64 * 1024;
 
-/** Read a bounded regular file without following its final symlink. */
+/** Read bounded regular-file data, using no-follow flags where supported. */
 export function readCommandFile(file: string): unknown {
   const before = lstatSync(file);
   if (!before.isFile() || before.nlink !== 1 || before.size > kMaxBytes) {
