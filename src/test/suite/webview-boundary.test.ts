@@ -121,6 +121,9 @@ suite("Webview boundary RPC integration", () => {
         "space %.eval",
         "malformed%E0%A4%A.eval",
         "literal%2Fname.eval",
+        "literal%23name.eval",
+        "literal#name.eval",
+        ...(process.platform === "win32" ? [] : ["literal?name.eval"]),
       ];
       for (const [index, name] of names.entries())
         writeFileSync(join(workspace, name), `marker-${index}`);
@@ -131,7 +134,12 @@ suite("Webview boundary RPC integration", () => {
             files: { name: string }[];
           };
           // This is the real search adapter's sole transformation of a listing.
-          const target = listing.files[0]!.name.replace(/^file:\/\//, "");
+          const target =
+            type === "file"
+              ? listing.files[0]!.name.replace(/^file:\/\//, "")
+              : process.platform === "win32"
+                ? file.fsPath.replace(/\\/g, "/")
+                : file.fsPath;
           const view = webview();
           const seen: string[] = [];
           const search = (location: string) => {
@@ -155,7 +163,13 @@ suite("Webview boundary RPC integration", () => {
               const result = await view.request(method, [target, "id", {}]);
               assert.ok(!result.error, `${type}: ${name}`);
               assert.strictEqual(result.result, `marker-${index}`);
-              assert.strictEqual(seen.at(-1), target);
+              // Solo serialization can collide for # and literal %23. The
+              // panel's host-owned URI must determine the actual file read.
+              assert.strictEqual(
+                Uri.file(seen.at(-1)!).toString(),
+                file.toString()
+              );
+              if (type === "dir") assert.strictEqual(seen.at(-1), target);
               assert.ok(
                 (
                   await view.request(method, [

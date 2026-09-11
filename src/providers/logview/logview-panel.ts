@@ -130,13 +130,16 @@ export class LogviewPanel extends Disposable {
       return target;
     };
 
-    // Inspect listings (including evalLogsSolo) preserve literal filenames.
-    // The search adapter only strips file://; Scout only decodes base64.
-    // Authorize and forward that literal location without interpreting %XX.
+    // Directory listings preserve literal filenames; the search adapter only
+    // strips file:// and Scout only decodes base64. Solo listings use VS Code's
+    // toString(true), which still escapes URI delimiters. Match that producer
+    // value to the host-owned file, rather than guessing whether %XX is encoded.
     const requireSearchScope = (target: unknown): string => {
       if (
         typeof target !== "string" ||
-        !locationInScope([uri], target, { exact: type === "file" })
+        (type === "file"
+          ? target !== uri.toString(true).replace(/^file:\/\//, "")
+          : !locationInScope([uri], target))
       ) {
         throw new Error(
           `Refusing to access "${String(
@@ -144,7 +147,11 @@ export class LogviewPanel extends Disposable {
           )}": outside the scope of this log view.`
         );
       }
-      return target;
+      return type === "file"
+        ? uri.scheme === "file"
+          ? uri.fsPath
+          : `${uri.scheme}://${uri.authority}${uri.path}`
+        : target;
     };
 
     // serve eval log api to webview
