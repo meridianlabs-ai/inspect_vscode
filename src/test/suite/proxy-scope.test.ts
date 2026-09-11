@@ -46,6 +46,22 @@ suite("Proxy Scope Test Suite", () => {
       ok("/api/scout/searches?type=events&count=10");
     });
 
+    test("Scout search authorizes literal base64 paths without percent decoding", () => {
+      for (const [suffix, method] of [
+        ["search", "POST"],
+        ["searches/result", "GET"],
+      ] as const) {
+        rejects(
+          `/api/scout/transcripts/${b64url("/w/outside/%2e%2e/logs/run.eval")}/id/${suffix}`,
+          method
+        );
+        ok(
+          `/api/scout/transcripts/${b64url("/w/logs/%2e%2e/%2e%2e/space %.eval")}/id/${suffix}`,
+          method
+        );
+      }
+    });
+
     test("rejects shared defaults unless the panel has bound an explicit location", () => {
       for (const path of [
         "/api/log-dir",

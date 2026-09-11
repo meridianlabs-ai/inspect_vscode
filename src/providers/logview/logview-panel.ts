@@ -131,12 +131,15 @@ export class LogviewPanel extends Disposable {
     };
 
     // post_search/get_search_result receive `transcriptDir` as a scheme-stripped,
-    // still-percent-encoded path, so use the encoding-tolerant scope check (the
-    // raw value is returned unchanged — that is what the server uses).
-    const requireScopeAllowingEncoded = (target: unknown): string => {
+    // still-percent-encoded path. Scout does not unquote its base64-decoded
+    // location, so decode the viewer value here and authorize exactly what
+    // we forward to Scout.
+    const requireSearchScope = (target: unknown): string => {
+      const location =
+        typeof target === "string" ? decodeURIComponent(target) : undefined;
       if (
-        typeof target !== "string" ||
-        !logPathInScopeAllowingEncoded(type, uri, target)
+        location === undefined ||
+        !locationInScope([uri], location, { exact: type === "file" })
       ) {
         throw new Error(
           `Refusing to access "${String(
@@ -144,7 +147,7 @@ export class LogviewPanel extends Disposable {
           )}": outside the scope of this log view.`
         );
       }
-      return target;
+      return location;
     };
 
     // serve eval log api to webview
@@ -216,13 +219,13 @@ export class LogviewPanel extends Disposable {
         server_.listSearches(params[0] as string, params[1] as number),
       [kMethodPostSearch]: (params: unknown[]) =>
         server_.postSearch(
-          requireScopeAllowingEncoded(params[0]),
+          requireSearchScope(params[0]),
           params[1] as string,
           params[2]
         ),
       [kMethodGetSearchResult]: (params: unknown[]) =>
         server_.getSearchResult(
-          requireScopeAllowingEncoded(params[0]),
+          requireSearchScope(params[0]),
           params[1] as string,
           params[2] as string,
           params[3] as { events?: string; messages?: string } | undefined

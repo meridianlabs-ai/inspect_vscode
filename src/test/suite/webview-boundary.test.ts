@@ -1,8 +1,12 @@
 import * as assert from "assert";
+import { mkdtempSync, rmSync } from "fs";
+import { tmpdir } from "os";
+import { join } from "path";
 
 import { ExtensionContext, Uri } from "vscode";
 
 import { locationInScope } from "../../core/package/location-scope";
+import { assertScanConfigInScope } from "../../core/package/scan-config-scope";
 import { HostWebviewPanel } from "../../hooks";
 import { InspectViewServer } from "../../providers/inspect/inspect-view-server";
 import { LogviewPanel } from "../../providers/logview/logview-panel";
@@ -42,6 +46,134 @@ const enc = encodeURIComponent;
 const b64 = (s: string) => Buffer.from(s).toString("base64url");
 
 suite("Webview boundary RPC integration", () => {
+  test("POSIX backslash names cannot disguise an outside location", function () {
+    if (process.platform === "win32") this.skip();
+    const root = Uri.file("/review/panel");
+    for (const location of [
+      "/review/outside/..\\panel/run.eval",
+      "../outside/..\\panel/run.eval",
+    ]) {
+      assert.ok(!locationInScope([root], location, { base: root }));
+      assert.ok(
+        !locationInScope([root], enc(location), { base: root, decode: true })
+      );
+      const inScope = (value: string) =>
+        locationInScope([root], value, { base: root });
+      assert.throws(() =>
+        assertScanConfigInScope(JSON.stringify({ scans: location }), {
+          scans: inScope,
+          transcripts: inScope,
+          project: inScope,
+        })
+      );
+    }
+    assert.ok(locationInScope([root], "inside\\name.eval", { base: root }));
+  });
+
+  test("log content and directory RPCs reject literal POSIX backslash escapes", async function () {
+    if (process.platform === "win32") this.skip();
+    const view = webview();
+    let calls = 0;
+    const call = () => {
+      calls++;
+      return Promise.resolve("ok");
+    };
+    const panel = new LogviewPanel(
+      view.panel,
+      {} as ExtensionContext,
+      { evalLog: call, proxyRpcRequest: call } as unknown as InspectViewServer,
+      "dir",
+      Uri.file("/review/panel")
+    );
+    try {
+      const outside = "/review/outside/..\\panel/run.eval";
+      assert.ok((await view.request("eval_log", [outside])).error);
+      for (const path of [
+        `/api/log-bytes/${enc(outside)}`,
+        `/api/logs?log_dir=${enc(outside)}`,
+      ]) {
+        assert.ok(
+          (await view.request("http_request", [{ method: "GET", path }])).error
+        );
+      }
+      assert.strictEqual(calls, 0);
+    } finally {
+      panel.dispose();
+    }
+  });
+
+  test("named search forwards the exact decoded viewer location it authorizes", async () => {
+    const workspace = mkdtempSync(join(tmpdir(), "log-search-"));
+    const location = join(workspace, "%2e%2e", "%2e%2e", "space %.eval");
+    const seen: string[] = [];
+    const search = (target: string) => {
+      seen.push(target);
+      return Promise.resolve("ok");
+    };
+    const view = webview();
+    const panel = new LogviewPanel(
+      view.panel,
+      {} as ExtensionContext,
+      {
+        postSearch: search,
+        getSearchResult: search,
+      } as unknown as InspectViewServer,
+      "file",
+      Uri.file(location)
+    );
+    try {
+      const viewerPath = Uri.file(location).toString().slice("file://".length);
+      for (const method of ["post_search", "get_search_result"]) {
+        assert.ok(!(await view.request(method, [viewerPath, "id", {}])).error);
+        assert.strictEqual(seen.at(-1), Uri.file(location).path);
+        assert.ok(
+          (
+            await view.request(method, [
+              enc(join(workspace, "outside.eval")),
+              "id",
+              {},
+            ])
+          ).error
+        );
+      }
+      assert.strictEqual(seen.length, 2);
+    } finally {
+      panel.dispose();
+      rmSync(workspace, { recursive: true, force: true });
+    }
+  });
+  test("named search cannot forward an outside literal path authorized by decoding", async () => {
+    const view = webview();
+    const seen: string[] = [];
+    const search = (location: string) => {
+      seen.push(location);
+      return Promise.resolve("ok");
+    };
+    const panel = new LogviewPanel(
+      view.panel,
+      {} as ExtensionContext,
+      {
+        postSearch: search,
+        getSearchResult: search,
+      } as unknown as InspectViewServer,
+      "dir",
+      Uri.file("/review/panel")
+    );
+    try {
+      for (const method of ["post_search", "get_search_result"]) {
+        const supplied = "/review/outside/%2e%2e/panel/run.eval";
+        assert.ok(!(await view.request(method, [supplied, "id", {}])).error);
+        assert.strictEqual(seen.at(-1), "/review/outside/../panel/run.eval");
+        assert.notStrictEqual(seen.at(-1), supplied);
+        assert.ok(
+          (await view.request(method, [enc(supplied), "id", {}])).error
+        );
+      }
+      assert.strictEqual(seen.length, 2);
+    } finally {
+      panel.dispose();
+    }
+  });
   test("directory routes preserve literal percent paths after HTTP decoding", async () => {
     const view = webview();
     const seen: string[] = [];
@@ -215,6 +347,7 @@ suite("Webview boundary RPC integration", () => {
   });
   test("directory defaults are bound to the panel and file panels cannot use shared defaults", async () => {
     for (const type of ["file", "dir"] as const) {
+      const workspace = mkdtempSync(join(tmpdir(), "log-default-"));
       const view = webview();
       const seen: string[] = [];
       const server = {
@@ -224,7 +357,7 @@ suite("Webview boundary RPC integration", () => {
         },
       } as unknown as InspectViewServer;
       const root = Uri.file(
-        type === "file" ? "/panel/run.eval" : "/panel/with spaces%"
+        join(workspace, type === "file" ? "run.eval" : "with spaces%")
       );
       const panel = new LogviewPanel(
         view.panel,
@@ -262,6 +395,7 @@ suite("Webview boundary RPC integration", () => {
           );
       } finally {
         panel.dispose();
+        rmSync(workspace, { recursive: true, force: true });
       }
     }
   });

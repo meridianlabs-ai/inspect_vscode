@@ -45,10 +45,7 @@ export function locationUri(location: string, base?: Uri): Uri {
     throw new Error("Relative location without an authorized base");
   }
   return base.with({
-    path:
-      base.scheme === "file"
-        ? path.posix.join(base.path, location.replace(/\\/g, "/"))
-        : `${base.path.replace(/\/$/, "")}/${location}`,
+    path: `${base.path.replace(/\/$/, "")}/${location}`,
   });
 }
 
@@ -63,6 +60,17 @@ export function locationInScope(
     return roots.some((root) => {
       if (root.toString() === target.toString()) return true;
       if (options.exact || getRelativeUri(root, target) === null) return false;
+      // POSIX filesystems keep backslashes in names. The shared URI helper
+      // also accepts Windows separators, so check the POSIX interpretation
+      // independently before authorizing a local consumer.
+      if (root.scheme === "file" && process.platform !== "win32") {
+        const relative = path.posix.relative(root.path, target.path);
+        return (
+          relative !== ".." &&
+          !relative.startsWith("../") &&
+          !path.posix.isAbsolute(relative)
+        );
+      }
       // Object stores preserve dot segments, repeated slashes and backslashes
       // in keys. Require their literal prefix too, before accepting the shared
       // helper's filesystem/URL-normalized interpretation. Neither reading may

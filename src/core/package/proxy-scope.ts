@@ -242,7 +242,8 @@ export function assertLogProxyInScope(
     if (!dirSegment) {
       throw proxyError(request);
     }
-    return check(decodeBase64Url(dirSegment, request));
+    // Scout uses the decoded base64 location literally, without URI unquoting.
+    return checkDirectory(decodeBase64Url(dirSegment, request));
   }
 
   throw proxyError(request);
