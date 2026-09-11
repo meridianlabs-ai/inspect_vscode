@@ -222,7 +222,8 @@ export class CreateTaskCommand implements Command {
   constructor(private readonly context_: ExtensionContext) {}
   async execute(): Promise<void> {
     // Bind authorization to this workspace before awaiting user input.
-    const root = realpathSync(workspacePath().path);
+    const selectedWorkspace = workspacePath();
+    const root = realpathSync(selectedWorkspace.path);
     // Gather the task name
     const taskName = await window.showInputBox({
       placeHolder: "Name of the task to create",
@@ -250,16 +251,17 @@ export class CreateTaskCommand implements Command {
       });
 
       // Exclusive creation also handles a competing file/link after validation.
-      let target: string;
       try {
-        target = createTaskFile(root, taskName, content);
+        createTaskFile(root, taskName, content);
       } catch (error) {
         await window.showErrorMessage(
           `Unable to create task: ${error instanceof Error ? error.message : String(error)}`
         );
         return;
       }
-      const document = await workspace.openTextDocument(target);
+      const document = await workspace.openTextDocument(
+        selectedWorkspace.child(taskFileName(taskName)).path
+      );
       await window.showTextDocument(document);
     }
   }

@@ -14,7 +14,9 @@ import { isValidPythonFnName } from "./python/code";
 export function taskFileName(input: string): string {
   const name = input.toLowerCase();
   if (!isValidPythonFnName(name))
-    throw new Error("The task name contains invalid characters.");
+    throw new Error(
+      "The task name must be a valid Python identifier and not a reserved keyword."
+    );
   return `${name}.py`;
 }
 
@@ -29,6 +31,9 @@ export function taskFileExists(root: string, input: string): boolean {
 /** root is the canonical workspace directory captured before the input dialog.
  * The target has exactly one path component; no repository-controlled ancestor
  * is traversed. Exclusive creation refuses a link/file arriving after validation.
+ * This assumes the workspace and its ancestors remain in place. The post-open
+ * check prevents writing after a detected replacement, but cannot undo an empty
+ * file created if an actor replaces a parent during open.
  */
 export function createTaskFile(
   root: string,

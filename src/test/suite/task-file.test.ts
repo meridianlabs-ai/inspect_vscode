@@ -125,18 +125,26 @@ suite("Create Task filesystem boundary", () => {
         )
     );
     try {
+      let ready = 0;
       const outcomes = workers.map(
         (worker) =>
           new Promise<{ won: boolean; content?: string }>((resolve, reject) => {
             worker.on("error", reject);
+            worker.on("exit", (code) =>
+              reject(new Error(`Worker exited before reporting: ${code}`))
+            );
             worker.on("message", (message: unknown) => {
-              if (message !== "ready")
+              if (message === "ready") {
+                if (++ready === workers.length) {
+                  Atomics.store(new Int32Array(gate), 0, 1);
+                  Atomics.notify(new Int32Array(gate), 0);
+                }
+              } else {
                 resolve(message as { won: boolean; content?: string });
+              }
             });
           })
       );
-      Atomics.store(new Int32Array(gate), 0, 1);
-      Atomics.notify(new Int32Array(gate), 0);
       const results = await Promise.all(outcomes);
       assert.strictEqual(results.filter((result) => result.won).length, 1);
       assert.strictEqual(
