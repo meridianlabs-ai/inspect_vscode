@@ -782,6 +782,147 @@ suite("LogListing Test Suite", () => {
         ".hidden/x.eval"
       );
     });
+
+    // Uri.joinPath treats '\\' as a separator only for file URIs on Windows;
+    // in S3 keys and POSIX file names it is a literal character that joinPath
+    // preserves, so the '.'/empty-segment check must not split on it there.
+    const kPlatforms: NodeJS.Platform[] = ["darwin", "linux", "win32"];
+
+    test("keeps literal backslashes in S3 keys on every platform", () => {
+      for (const platform of kPlatforms) {
+        for (const name of ["team/\\x.eval", "team\\./x.eval", "a\\\\b.eval"]) {
+          assert.strictEqual(
+            relativeLogPath(
+              "s3://bucket/logs",
+              `s3://bucket/logs/${name}`,
+              platform
+            ),
+            name,
+            `${platform} prefix ${name}`
+          );
+          assert.strictEqual(
+            relativeLogPath("s3://bucket/logs", name, platform),
+            name,
+            `${platform} relative ${name}`
+          );
+        }
+      }
+    });
+
+    test("keeps literal backslashes in POSIX file names", () => {
+      for (const platform of ["darwin", "linux"] as NodeJS.Platform[]) {
+        for (const name of ["team/\\x.eval", "team\\./x.eval"]) {
+          assert.strictEqual(
+            relativeLogPath(
+              "file:///tmp/logs",
+              `file:///tmp/logs/${name}`,
+              platform
+            ),
+            name,
+            `${platform} prefix ${name}`
+          );
+          assert.strictEqual(
+            relativeLogPath("file:///tmp/logs", name, platform),
+            name,
+            `${platform} relative ${name}`
+          );
+        }
+      }
+    });
+
+    test("drops, rather than renames, a literal backslash on the containment fallback", () => {
+      // getRelativeUri folds '\\' to '/' when it normalizes, so through the
+      // fallback 'team/\\x.eval' would come back as 'team/x.eval' and the node
+      // would open a different object. Dropping it is the safe outcome; the
+      // usual string-prefix path above keeps such names intact.
+      for (const platform of ["darwin", "linux"] as NodeJS.Platform[]) {
+        assert.strictEqual(
+          relativeLogPath(
+            "file:///tmp/logs",
+            "/tmp/logs/team/\\x.eval",
+            platform
+          ),
+          null
+        );
+        assert.strictEqual(
+          relativeLogPath(
+            "file:///tmp/my%20logs",
+            "file:///tmp/my logs/team/\\x.eval",
+            platform
+          ),
+          null
+        );
+        // ordinary fallback entries are unaffected
+        assert.strictEqual(
+          relativeLogPath(
+            "file:///tmp/my%20logs",
+            "file:///tmp/my logs/team/x.eval",
+            platform
+          ),
+          "team/x.eval"
+        );
+      }
+      // On Windows a backslash in a file path is a separator, so the folded
+      // relative names the same file and is kept (the prefix path keeps the
+      // raw spelling; either joins to the same URI there).
+      assert.strictEqual(
+        relativeLogPath(
+          "file:///C:/my%20logs",
+          "file:///C:/my logs/team\\x.eval",
+          "win32"
+        ),
+        "team/x.eval"
+      );
+      assert.strictEqual(
+        relativeLogPath(
+          "file:///C:/logs",
+          "file:///C:/logs/team\\x.eval",
+          "win32"
+        ),
+        "team\\x.eval"
+      );
+    });
+
+    test("treats backslash as a separator for Windows file paths", () => {
+      for (const logDir of ["file:///C:/logs", "C:\\logs"]) {
+        for (const name of ["team\\.\\x.eval", "team\\\\x.eval", ".\\x.eval"]) {
+          assert.strictEqual(
+            relativeLogPath(logDir, name, "win32"),
+            null,
+            `${logDir} ${name}`
+          );
+        }
+        assert.strictEqual(
+          relativeLogPath(logDir, "team\\x.eval", "win32"),
+          "team\\x.eval"
+        );
+      }
+      assert.strictEqual(
+        relativeLogPath(
+          "file:///C:/logs",
+          "file:///C:/logs/team\\.\\x.eval",
+          "win32"
+        ),
+        null
+      );
+    });
+
+    test("still rejects a backslash '..' traversal for every scheme", () => {
+      for (const platform of kPlatforms) {
+        for (const logDir of ["s3://bucket/logs", "file:///tmp/logs"]) {
+          assert.strictEqual(
+            relativeLogPath(logDir, `${logDir}/team\\..\\x.eval`, platform),
+            null,
+            `${platform} ${logDir} prefix`
+          );
+          assert.strictEqual(
+            relativeLogPath(logDir, "..\\x.eval", platform),
+            null,
+            `${platform} ${logDir} relative`
+          );
+        }
+      }
+    });
   });
 
   suite("MRU (Most Recently Used) Tracking", () => {
@@ -918,6 +1059,30 @@ suite("LogListing Test Suite", () => {
         "s3://bucket/logs/team.v2/x.eval",
         "s3://bucket/logs/z.eval",
       ]);
+    });
+
+    test("keeps S3 keys with literal backslashes as distinct nodes", async () => {
+      // Backslash is not a separator in an S3 key: joinPath keeps it, so these
+      // are valid, distinct objects and must stay listed.
+      const listing = new LogListing(logDir, mru, () =>
+        Promise.resolve({
+          log_dir: "s3://bucket/logs",
+          items: [
+            item("s3://bucket/logs/team/\\x.eval"),
+            item("s3://bucket/logs/team/x.eval"),
+            item("s3://bucket/logs/team\\./x.eval"),
+          ],
+        })
+      );
+      const uris = collectUris(listing, await listing.ls()).sort();
+      assert.deepStrictEqual(uris, [
+        "s3://bucket/logs/team",
+        "s3://bucket/logs/team%5C.",
+        "s3://bucket/logs/team%5C./x.eval",
+        "s3://bucket/logs/team/%5Cx.eval",
+        "s3://bucket/logs/team/x.eval",
+      ]);
+      assert.strictEqual(new Set(uris).size, uris.length, "duplicate ids");
     });
   });
 });

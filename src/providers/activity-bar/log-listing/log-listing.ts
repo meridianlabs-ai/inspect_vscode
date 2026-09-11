@@ -1,3 +1,4 @@
+import * as os from "os";
 import path from "path";
 
 import { format, isThisYear, isToday } from "date-fns";
@@ -70,15 +71,25 @@ export interface Logs {
  * a name would share an id with — and open — a different entry (for an S3 key
  * a different object). They are not the log directory's own listing form, so
  * nothing legitimate is lost.
+ *
+ * That check follows Uri.joinPath's own segment rules: '/' always separates,
+ * and '\' separates only for a file location on Windows (win32 joining). For
+ * S3 keys and POSIX file names a backslash is an ordinary character that
+ * joinPath preserves, so 'team/\x.eval' stays a distinct, valid entry there.
+ * The '..' rejection is deliberately stricter and treats '\' as a separator
+ * everywhere, matching getRelativeUri's containment check.
  */
 export function relativeLogPath(
   logDir: string,
-  location: string
+  location: string,
+  platform: NodeJS.Platform = os.platform()
 ): string | null {
   const dirWithSlash = logDir.endsWith("/") ? logDir : `${logDir}/`;
   if (location.startsWith(dirWithSlash)) {
     const relative = location.slice(dirWithSlash.length);
-    return hasIrregularSegments(relative) ? null : relative;
+    return hasIrregularSegments(relative, isFileLocation(logDir), platform)
+      ? null
+      : relative;
   }
   try {
     if (isUri(location) || path.isAbsolute(location)) {
@@ -87,10 +98,28 @@ export function relativeLogPath(
       // normalizes before comparing, so check the raw path's segments first —
       // a normalized relative would silently name a different entry.
       const locationUri = resolveToUri(location);
-      if (hasIrregularSegments(locationUri.path.replace(/^\//, ""))) {
+      const windowsFile = locationUri.scheme === "file" && platform === "win32";
+      if (
+        hasIrregularSegments(
+          locationUri.path.replace(/^\//, ""),
+          locationUri.scheme === "file",
+          platform
+        )
+      ) {
         return null;
       }
-      return getRelativeUri(resolveToUri(logDir), locationUri);
+      const relative = getRelativeUri(resolveToUri(logDir), locationUri);
+      if (relative === null) {
+        return null;
+      }
+      // getRelativeUri folds '\' to '/' before normalizing (its traversal
+      // check), so where a backslash is literal the relative it returns would
+      // name a different object than the one listed. Keep the entry only if
+      // the raw location actually ends with the relative it was given.
+      const rawPath = windowsFile
+        ? locationUri.path.replace(/\\/g, "/")
+        : locationUri.path;
+      return rawPath.endsWith(`/${relative}`) ? relative : null;
     }
   } catch {
     // unparseable dir or location — treat as outside the log dir
@@ -98,17 +127,40 @@ export function relativeLogPath(
   }
   // Otherwise the server returned a name already relative to the log dir; keep
   // it unless it uses '..' to climb out or has '.'/empty segments.
-  return hasIrregularSegments(location) ? null : location;
+  return hasIrregularSegments(location, isFileLocation(logDir), platform)
+    ? null
+    : location;
+}
+
+/**
+ * Whether a log dir names a file location (a plain path or a file: URI) rather
+ * than a remote store, for choosing the path separators Uri.joinPath applies.
+ */
+function isFileLocation(logDir: string): boolean {
+  return !isUri(logDir) || /^file:/i.test(logDir);
 }
 
 /**
  * Whether a log-dir-relative name contains a '..' (escape), '.' or empty
  * segment — the segments Uri.joinPath resolves away (see relativeLogPath).
+ *
+ * '..' is checked on both separators regardless of scheme: it is the traversal
+ * defense and stays as strict as getRelativeUri. '.'/empty segments are only
+ * what joinPath would actually fold, so '\' counts as a separator there only
+ * for a file location on Windows; elsewhere it is a literal character.
  */
-function hasIrregularSegments(relative: string): boolean {
+function hasIrregularSegments(
+  relative: string,
+  fileLocation: boolean,
+  platform: NodeJS.Platform
+): boolean {
+  if (relative.split(/[\\/]/).includes("..")) {
+    return true;
+  }
+  const separators = fileLocation && platform === "win32" ? /[\\/]/ : "/";
   return relative
-    .split(/[\\/]/)
-    .some((segment) => segment === "" || segment === "." || segment === "..");
+    .split(separators)
+    .some((segment) => segment === "" || segment === ".");
 }
 
 export class LogListing {

@@ -15,16 +15,17 @@ function render(markdown: string): string {
   return marked.parse(markdown, { async: false, gfm: true });
 }
 
-// The visible text of the rendered HTML, with entities decoded.
-function visibleText(html: string): string {
-  return html
-    .replace(/<[^>]+>/g, "")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&amp;/g, "&")
-    .trim();
+// How marked HTML-encodes text content, so a rendered paragraph can be
+// compared byte-for-byte against the literal it should contain.
+function htmlText(text: string): string {
+  const entities: Record<string, string> = {
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  };
+  return text.replace(/[&<>"']/g, (c) => entities[c] ?? c);
 }
 
 // Tooltip shapes from log-listing-server-queue.ts / scan-listing-provider.ts.
@@ -79,8 +80,12 @@ suite("escapeMarkdown", () => {
       "gpt-4o-mini",
       "localhost:8080/x",
     ]) {
-      const html = render(`para: ${escapeMarkdown(value)}`);
-      assert.strictEqual(visibleText(html), `para: ${value}`);
+      // Exactly one paragraph whose content is the value, encoded as text:
+      // nothing else (no link, image, heading, code or table) was produced.
+      assert.strictEqual(
+        render(`para: ${escapeMarkdown(value)}`),
+        `<p>para: ${htmlText(value)}</p>\n`
+      );
     }
   });
 
