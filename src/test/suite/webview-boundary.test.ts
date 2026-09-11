@@ -131,7 +131,15 @@ suite("Webview boundary RPC integration", () => {
       const viewerPath = Uri.file(location).toString().slice("file://".length);
       for (const method of ["post_search", "get_search_result"]) {
         assert.ok(!(await view.request(method, [viewerPath, "id", {}])).error);
-        assert.strictEqual(seen.at(-1), Uri.file(location).path);
+        // VS Code's URI serialization canonicalizes Windows drive letters.
+        assert.strictEqual(
+          seen.at(-1),
+          Uri.parse(Uri.file(location).toString()).path
+        );
+        assert.strictEqual(
+          Uri.file(seen.at(-1)!).toString(),
+          Uri.file(location).toString()
+        );
         assert.ok(
           (
             await view.request(method, [
