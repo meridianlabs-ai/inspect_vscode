@@ -1,4 +1,4 @@
-import { writeFileSync } from "fs";
+import { realpathSync } from "fs";
 
 import {
   commands,
@@ -25,8 +25,12 @@ import {
 import { readTemplate, templates } from "../../components/templates";
 import { Command } from "../../core/command";
 import { ExecManager } from "../../core/package/exec-manager";
-import { pathExists, toAbsolutePath, workspacePath } from "../../core/path";
-import { isValidPythonFnName } from "../../core/python";
+import { toAbsolutePath, workspacePath } from "../../core/path";
+import {
+  createTaskFile,
+  taskFileExists,
+  taskFileName,
+} from "../../core/task-file";
 import { ActiveTaskManager } from "../active-task/active-task-provider";
 import { InspectViewManager } from "../logview/logview-view";
 
@@ -217,16 +221,20 @@ export const findTargetViewColumn = (logViewColumn?: ViewColumn) => {
 export class CreateTaskCommand implements Command {
   constructor(private readonly context_: ExtensionContext) {}
   async execute(): Promise<void> {
+    // Bind authorization to this workspace before awaiting user input.
+    const root = realpathSync(workspacePath().path);
     // Gather the task name
     const taskName = await window.showInputBox({
       placeHolder: "Name of the task to create",
       prompt: "Task name",
       validateInput: (input) => {
-        if (!isValidPythonFnName(input)) {
-          return "The task name contains invalid characters.";
-        }
-        if (pathExists(`${input}.py`)) {
-          return `There is already a file in this workspace named '${input}'`;
+        try {
+          taskFileName(input);
+          if (taskFileExists(root, input)) {
+            return `There is already a file in this workspace named '${taskFileName(input)}'`;
+          }
+        } catch (error) {
+          return error instanceof Error ? error.message : String(error);
         }
         return null;
       },
@@ -241,13 +249,17 @@ export class CreateTaskCommand implements Command {
         taskName: taskNameLower,
       });
 
-      // Create ${task}.py, populate it, and open it
-      const absPath = workspacePath(`${taskNameLower}.py`);
-
-      writeFileSync(absPath.path, content, { encoding: "utf-8" });
-
-      // Create empty document
-      const document = await workspace.openTextDocument(absPath.path);
+      // Exclusive creation also handles a competing file/link after validation.
+      let target: string;
+      try {
+        target = createTaskFile(root, taskName, content);
+      } catch (error) {
+        await window.showErrorMessage(
+          `Unable to create task: ${error instanceof Error ? error.message : String(error)}`
+        );
+        return;
+      }
+      const document = await workspace.openTextDocument(target);
       await window.showTextDocument(document);
     }
   }
