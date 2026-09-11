@@ -22,8 +22,8 @@ import {
   webviewPanelJsonRpcServer,
 } from "../../core/jsonrpc";
 import { log } from "../../core/log";
+import { parseProxyRequest } from "../../core/package/proxy-request";
 import { assertLogProxyInScope } from "../../core/package/proxy-scope";
-import { HttpProxyRpcRequest } from "../../core/package/view-server";
 import { AbsolutePath } from "../../core/path";
 import { getRelativeUri, resolveToUri } from "../../core/uri";
 import {
@@ -223,7 +223,9 @@ export class LogviewPanel extends Disposable {
         // token, so confine it to the panel scope like the named methods. The
         // server percent-decodes the locations it receives (normalize_uri), so
         // use the encoding-tolerant check to scope the decoded form.
-        const request = params[0] as HttpProxyRpcRequest;
+        // Validate the untrusted payload (exact method token, well-formed path,
+        // headers and body) before any policy check reads it.
+        const request = parseProxyRequest(params[0]);
         try {
           assertLogProxyInScope(request, (target) =>
             logPathInScopeAllowingEncoded(type, uri, target)

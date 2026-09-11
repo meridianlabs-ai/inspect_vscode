@@ -10,8 +10,8 @@ import {
   webviewPanelJsonRpcServer,
 } from "../../core/jsonrpc";
 import { log } from "../../core/log";
+import { parseProxyRequest } from "../../core/package/proxy-request";
 import { assertScanProxyInScope } from "../../core/package/proxy-scope";
-import { HttpProxyRpcRequest } from "../../core/package/view-server";
 import { AbsolutePath } from "../../core/path";
 import { getRelativeUri, resolveToUri } from "../../core/uri";
 import {
@@ -117,7 +117,9 @@ export class ScanviewPanel extends Disposable {
         // Transcripts are read from the project's configured transcripts
         // location (not the scan results dir), so those routes get a scope
         // that also admits it.
-        const request = params[0] as HttpProxyRpcRequest;
+        // Validate the untrusted payload (exact method token, well-formed path,
+        // headers and body) before any policy check reads it.
+        const request = parseProxyRequest(params[0]);
         try {
           assertScanProxyInScope(
             request,

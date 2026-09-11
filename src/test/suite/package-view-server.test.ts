@@ -2,7 +2,7 @@ import * as assert from "assert";
 import { ChildProcess, spawn } from "child_process";
 import { once } from "events";
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "fs";
-import { createServer } from "http";
+import { createServer, validateHeaderValue } from "http";
 import { tmpdir } from "os";
 import { join } from "path";
 
@@ -10,11 +10,13 @@ import { ExtensionContext, Uri, window } from "vscode";
 
 import { PackageManager } from "../../core/package/manager";
 import { PackageViewServer } from "../../core/package/view-server";
+import type { HttpProxyRpcRequest } from "../../core/package/view-server";
 import * as paths from "../../core/path";
 import * as ports from "../../core/port";
 import * as processes from "../../core/process";
 import * as python from "../../core/python/exec";
 import { HostWebviewPanel } from "../../hooks";
+import { InspectViewServer } from "../../providers/inspect/inspect-view-server";
 import { LogviewPanel } from "../../providers/logview/logview-panel";
 
 import {
@@ -54,6 +56,20 @@ class TestServer extends PackageViewServer {
   }
   resource(data: unknown) {
     return this.resourcePath(JSON.stringify(data));
+  }
+  // The extension's own tree commands delete through the typed API, not the
+  // webview proxy.
+  deleteScan() {
+    return this.api_json("/api/v2/scans/ZGly/c2Nhbg", "DELETE");
+  }
+  // Run the real Inspect method against this server: its webview-supplied etag
+  // becomes a request header.
+  evalLogPendingSamples(file: string, etag?: string) {
+    return InspectViewServer.prototype.evalLogPendingSamples.call(
+      this as unknown as InspectViewServer,
+      file,
+      etag
+    );
   }
 }
 
@@ -157,6 +173,121 @@ suite("PackageViewServer lifecycle", () => {
     await waitFor(() => children.length > index);
     outputs[index]!.stdout!("Running on http://127.0.0.1\n");
   }
+
+  test("malformed proxy input leaves the shared child and in-flight requests alive", async () => {
+    const starting = server.start();
+    await ready();
+    await starting;
+    // Behave like undici: structurally invalid input rejects instead of
+    // connecting. Anything else stays pending until the test releases it.
+    let finish!: (response: Response) => void;
+    let fetches = 0;
+    global.fetch = (url, options) => {
+      fetches++;
+      try {
+        new Request(url, options);
+        new Headers(options?.headers).forEach((value, name) =>
+          validateHeaderValue(name, value)
+        );
+      } catch (error) {
+        return Promise.reject(
+          error instanceof Error ? error : new Error(String(error))
+        );
+      }
+      return new Promise<Response>((resolve) => {
+        finish = resolve;
+      });
+    };
+    const otherPanel = server.json();
+    await waitFor(() => finish !== undefined);
+    assert.strictEqual(fetches, 1);
+    for (const request of [
+      { method: "GET", path: "api/log-dir" },
+      { method: "GET", path: "/api/log-dir", body: "x" },
+      { method: "GET X", path: "/api/log-dir" },
+      { method: "delete", path: "/api/log-dir" },
+      {
+        method: "GET",
+        path: "/api/dist",
+        headers: { "Keep-Alive": "timeout=5" },
+      },
+      {
+        method: "GET",
+        path: "/api/dist",
+        headers: { test: `bad${String.fromCharCode(1)}value` },
+      },
+      { method: "GET", path: "/api/log-dir", headers: { test: "x\ny" } },
+      {
+        method: "GET",
+        path: "/api/log-dir",
+        headers: { "content-length": "100" },
+      },
+      { method: "POST", path: "/api/log-dir", body: {} },
+      null,
+    ]) {
+      await assert.rejects(
+        server.proxyRpcRequest(request as HttpProxyRpcRequest)
+      );
+      assert.strictEqual(children[0]!.killed, false);
+      assert.strictEqual(children.length, 1);
+    }
+    // Validation happened before transport: only the in-flight request fetched.
+    assert.strictEqual(fetches, 1);
+
+    // A named RPC method whose webview-supplied argument becomes a header must
+    // fail the same way, through the real panel and JSON-RPC boundary.
+    const receivers = new Set<(data: unknown) => void>();
+    let posted!: (data: { error?: unknown }) => void;
+    const host = {
+      webview: {
+        onDidReceiveMessage: (handler: (data: unknown) => void) => {
+          receivers.add(handler);
+          return { dispose() {} };
+        },
+        postMessage: (data: { error?: unknown }) => posted(data),
+      },
+    } as unknown as HostWebviewPanel;
+    const panel = new LogviewPanel(
+      host,
+      new MockExtensionContext() as unknown as ExtensionContext,
+      server as unknown as InspectViewServer,
+      "dir",
+      Uri.file("/w/logs")
+    );
+    try {
+      const response = new Promise<{ error?: unknown }>((resolve) => {
+        posted = resolve;
+      });
+      for (const receive of receivers)
+        receive({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "eval_log_pending_samples",
+          params: ["/w/logs/run.eval", `bad${String.fromCharCode(1)}value`],
+        });
+      assert.ok((await response).error);
+      assert.strictEqual(children[0]!.killed, false);
+      assert.strictEqual(fetches, 1);
+    } finally {
+      panel.dispose();
+    }
+
+    finish(new Response("other panel completed"));
+    assert.strictEqual((await otherPanel).data, "other panel completed");
+    assert.strictEqual(children[0]!.killed, false);
+    assert.strictEqual(children.length, 1);
+  });
+
+  test("extension-owned DELETE requests still reach the server", async () => {
+    const first = server.start();
+    await ready();
+    await first;
+    await server.deleteScan();
+    assert.strictEqual(calls.length, 1);
+    assert.strictEqual(calls[0]!.options?.method, "DELETE");
+    assert.ok(calls[0]!.url.endsWith("/api/v2/scans/ZGly/c2Nhbg"));
+    assert.strictEqual(children[0]!.killed, false);
+  });
 
   test("concurrent startup waits for a split readiness banner and shares one child", async () => {
     const requests = [

@@ -192,8 +192,9 @@ export function jsonRpcPostMessageServer(
         return;
       }
 
-      // dispatch method
-      method(request.params || [])
+      // dispatch method (a synchronous throw must answer like a rejection)
+      Promise.resolve()
+        .then(() => method(request.params || []))
         .then((value) => {
           target.postMessage(jsonRpcResponse(request, value));
         })

@@ -1,6 +1,7 @@
 import { ChildProcess, SpawnOptions } from "child_process";
 import { randomUUID } from "crypto";
 import { existsSync, realpathSync } from "fs";
+import { validateHeaderValue } from "http";
 import * as os from "os";
 import { isAbsolute, join, relative, sep } from "path";
 
@@ -18,6 +19,7 @@ import { runPython } from "../../core/python/exec";
 import { shQuote } from "../../core/string";
 
 import { PackageManager } from "./manager";
+import { parseProxyRequest } from "./proxy-request";
 
 // Custom request/response types for JSON-RPC proxy communication.
 // We can't use fetch's Request/Response/Headers because:
@@ -32,7 +34,7 @@ import { PackageManager } from "./manager";
 // - Multi-value headers (e.g. Set-Cookie) collapse to single string
 // - Large request bodies must fit in memory
 export interface HttpProxyRpcRequest {
-  method: "GET" | "POST" | "PUT" | "DELETE";
+  method: "GET" | "HEAD" | "POST" | "PUT" | "DELETE";
   path: string;
   headers?: Record<string, string>;
   body?: string;
@@ -92,7 +94,7 @@ export class PackageViewServer implements Disposable {
 
   protected async api_json(
     path: string,
-    method: "GET" | "POST" | "PUT" | "DELETE" = "GET",
+    method: "GET" | "HEAD" | "POST" | "PUT" | "DELETE" = "GET",
     headers?: Record<string, string>,
     handleError?: (status: number) => string | undefined
   ): Promise<{ data: string; headers: Headers }> {
@@ -105,7 +107,7 @@ export class PackageViewServer implements Disposable {
 
   protected async api_bytes(
     path: string,
-    method: "GET" | "POST" | "PUT" | "DELETE" = "GET"
+    method: "GET" | "HEAD" | "POST" | "PUT" | "DELETE" = "GET"
   ): Promise<{ data: Uint8Array; headers: Headers }> {
     const result = await this.api(path, method, {}, true);
     return {
@@ -120,7 +122,7 @@ export class PackageViewServer implements Disposable {
    */
   protected async serverFetch(
     path: string,
-    method: "GET" | "POST" | "PUT" | "DELETE",
+    method: "GET" | "HEAD" | "POST" | "PUT" | "DELETE",
     headers: Headers,
     body?: string
   ): Promise<{
@@ -168,7 +170,9 @@ export class PackageViewServer implements Disposable {
   public async proxyRpcRequest(
     request: HttpProxyRpcRequest
   ): Promise<HttpProxyRpcResponse> {
-    await this.ensureRunning();
+    // The panels validate before their scope checks; validate again here so
+    // no caller can hand unchecked webview data to the transport.
+    request = parseProxyRequest(request);
 
     const { status, headers, data } = await this.serverFetch(
       request.path,
@@ -193,7 +197,7 @@ export class PackageViewServer implements Disposable {
 
   protected async api(
     path: string,
-    method: "GET" | "POST" | "PUT" | "DELETE" = "GET",
+    method: "GET" | "HEAD" | "POST" | "PUT" | "DELETE" = "GET",
     headers: Record<string, string> = {},
     binary: boolean = false,
     handleError?: (status: number) => string | undefined
@@ -240,12 +244,22 @@ export class PackageViewServer implements Disposable {
     options: RequestInit,
     consume: (response: Response) => Promise<T>
   ): Promise<T> {
+    // Invalid caller input is not a failed server connection. The catch below
+    // treats a rejected fetch as a dead instance, so apply the Fetch API's and
+    // Node's own request rules here, before the lifecycle and transport path.
+    // This also covers the named RPC methods, whose webview-supplied arguments
+    // can become headers.
+    const headers = new Headers(options.headers);
+    headers.forEach((value, name) => validateHeaderValue(name, value));
+    if (!path.startsWith("/")) {
+      throw new Error(`Invalid ${this.packageBin_} view request path`);
+    }
+    new Request(`http://${kServerHost}${path}`, { ...options, headers });
     await this.ensureRunning();
     const instance = this.server_;
     if (!instance || !this.isRunning(instance)) {
       throw new Error(`${this.packageBin_} view is not running`);
     }
-    const headers = new Headers(options.headers);
     headers.set("Authorization", instance.token);
     let response: Response;
     try {
