@@ -61,6 +61,14 @@ suite("Webview boundary RPC integration", () => {
         root
       );
       try {
+        for (const route of ["flow", "eval-set"]) {
+          const path = `/api/${route}?log_dir=${enc("/outside")}&dir=${enc("/panel")}`;
+          assert.ok(
+            (await view.request("http_request", [{ method: "GET", path }]))
+              .error
+          );
+          assert.strictEqual(seen.length, 0);
+        }
         for (const path of [
           "/api/flow",
           "/api/eval-set",
@@ -218,6 +226,11 @@ suite("Webview boundary RPC integration", () => {
             },
             { validation: { scanner: "/outside/cases.json" } },
             { model_args: "/outside/args.json" },
+            ...["~", "~/args.json", "~other/args.json", "~\\args.json"].map(
+              (model_args) => ({ model_args })
+            ),
+            { scans: "~/scans" },
+            { validation: { scanner: "~/cases.json" } },
             { transcripts: { dir: "/w/logs" } },
             { model_base_url: "https://unapproved.example" },
             {
@@ -261,6 +274,25 @@ suite("Webview boundary RPC integration", () => {
         );
       }
       assert.strictEqual(calls, 2);
+      for (const model_args of [
+        "./args.json",
+        "/w/args.json",
+        "./~/args.json",
+        "args with spaces.json",
+      ]) {
+        for (const [method, path] of [
+          ["POST", "/api/v2/startscan"],
+          ["PUT", "/api/v2/project/config"],
+        ]) {
+          assert.ok(
+            !(
+              await view.request("http_request", [
+                { method, path, body: JSON.stringify({ model_args }) },
+              ])
+            ).error
+          );
+        }
+      }
       const nestedBody = JSON.stringify({
         results: "./scans",
         scanners: { scanner: { name: "scanner", file: "scanner.py" } },
@@ -285,7 +317,7 @@ suite("Webview boundary RPC integration", () => {
           ).error
         );
       }
-      assert.strictEqual(calls, 4);
+      assert.strictEqual(calls, 12);
     } finally {
       panel.dispose();
     }

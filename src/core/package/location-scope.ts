@@ -34,6 +34,10 @@ export function locationUri(location: string, base?: Uri): Uri {
     });
   }
   if (location.startsWith("/")) return Uri.file(location);
+  // Local fsspec consumers expand home-relative forms before opening them.
+  // Use an authorized absolute path, or ./ for a literal tilde name.
+  if (location.startsWith("~"))
+    throw new Error("Unsupported home-relative path");
   // A leading backslash is drive-rooted or UNC on Windows, never relative to
   // the project. These ambiguous forms require an explicit supported URI/path.
   if (location.startsWith("\\")) throw new Error("Unsupported rooted path");

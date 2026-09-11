@@ -210,8 +210,12 @@ export function assertLogProxyInScope(
     const subs = params.getAll("dir");
     if (bases.length > 0 && subs.length > 0) {
       for (const base of bases) {
+        // An empty base makes Inspect fall back to the shared server default.
+        if (!base) throw proxyError(request);
         for (const sub of subs) {
-          check(joinLocation(base, sub));
+          // Inspect concatenates and strips leading slashes from dir; unlike
+          // UPath, an absolute-looking subdirectory does not replace the base.
+          check(sub ? `${base}/${sub.replace(/^\/+/, "")}` : base);
         }
       }
     } else {

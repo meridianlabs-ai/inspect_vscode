@@ -93,7 +93,7 @@ suite("Proxy Scope Test Suite", () => {
       rejects(`/api/log-bytes/${enc("file:///home/v/.ssh/id_rsa")}`);
       rejects(`/api/log-edit/${enc("file:///etc/cron.d/x")}`, "POST");
       rejects(`/api/eval-set?log_dir=${enc("file:///w/logs")}&dir=../../etc`);
-      rejects(`/api/eval-set?log_dir=${enc("file:///w/logs")}&dir=/etc`);
+      ok(`/api/eval-set?log_dir=${enc("file:///w/logs")}&dir=/etc`);
       rejects(`/api/logs?log_dir=${enc("file:///")}`);
       rejects(`/api/pending-samples?log=${enc("file:///etc/passwd")}`);
       // one in-scope and one out-of-scope file → rejected
@@ -106,6 +106,24 @@ suite("Proxy Scope Test Suite", () => {
         `/api/scout/transcripts/${b64url("file:///other")}/tid/search`,
         "POST"
       );
+    });
+
+    test("flow and eval-set check Inspect concatenation, including repeated and empty parameters", () => {
+      for (const route of ["flow", "eval-set"]) {
+        const url = (base: string, sub: string) =>
+          `/api/${route}?log_dir=${enc(base)}&dir=${enc(sub)}`;
+        rejects(url("/outside", "/w/logs"));
+        rejects(url("/outside", "///w/logs"));
+        rejects(url("", "/w/logs"));
+        rejects(url("/outside", ""));
+        rejects(url("/w/logs", "../../outside"));
+        rejects(`${url("/w/logs", "set")}&log_dir=${enc("/outside")}`);
+        rejects(`${url("/w/logs", "set")}&dir=${enc("../../outside")}`);
+        ok(url("/w/logs", "set"));
+        ok(url("/w/logs", "/set"));
+        ok(url("/w/logs", ""));
+        ok(url("/w", "logs/set"));
+      }
     });
 
     test("checks the whole {log:path} remainder, not just its first segment", () => {
