@@ -17,13 +17,13 @@ import { TerminalOptions, version, window } from "vscode";
 import { ExecProfile, runCommand } from "../core/package/exec-manager";
 import { AbsolutePath } from "../core/path";
 
-export async function verifyRunTerminal() {
+export async function verifyRunTerminal(): Promise<boolean> {
   const windows = process.platform === "win32";
   if (!windows && spawnSync("fish", ["--version"]).error) {
     if (process.env.REQUIRE_FISH_TESTS) {
       assert.fail("fish is required");
     }
-    return;
+    return false;
   }
   const selected = spawnSync(
     windows ? "python" : "python3",
@@ -49,8 +49,10 @@ export async function verifyRunTerminal() {
     [
       "import json,os,sys",
       "def main():",
-      " with open(os.environ['TRANSPORT_RESULT'], 'w', encoding='utf-8') as f:",
+      " result=os.environ['TRANSPORT_RESULT']",
+      " with open(result+'.tmp', 'w', encoding='utf-8') as f:",
       "  json.dump({'args':sys.argv[1:],'cwd':os.getcwd(),'activation':os.environ['TRANSPORT_ACTIVATED']},f)",
+      " os.replace(result+'.tmp',result)",
       " print('Inspect test output')",
     ].join("\n")
   );
@@ -73,15 +75,21 @@ export async function verifyRunTerminal() {
   const terminals: ReturnType<typeof create>[] = [];
   const cleanups: { dispose: () => void }[] = [];
   let output = "";
+  const reading = new Set<(typeof terminals)[number]>();
   const outputListener = window.onDidStartTerminalShellExecution((event) => {
     if (terminals.includes(event.terminal)) {
+      reading.add(event.terminal);
       void (async () => {
         for await (const data of event.execution.read()) {
           output = (output + data).slice(-20000);
         }
-      })().catch((error: unknown) => {
-        output += String(error);
-      });
+      })()
+        .catch((error: unknown) => {
+          output += String(error);
+        })
+        .finally(() => {
+          reading.delete(event.terminal);
+        });
     }
   });
   Object.defineProperty(window, "createTerminal", {
@@ -163,6 +171,17 @@ export async function verifyRunTerminal() {
         );
         assert.strictEqual(actual.activation, "terminal-activation");
         assert.strictEqual(existsSync(join(cwd, "INJECTED")), false);
+        // A result file can appear before Python has exited. Normal repeated
+        // Run happens at the shell prompt, not while the prior task owns stdin.
+        const terminal = terminals[terminals.length - 1]!;
+        const completedBy = Date.now() + 10000;
+        while (reading.has(terminal) && Date.now() < completedBy) {
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+        assert.ok(
+          !reading.has(terminal),
+          "previous terminal command should finish"
+        );
       }
     }
     assert.strictEqual(
@@ -204,4 +223,5 @@ export async function verifyRunTerminal() {
       retryDelay: 100,
     });
   }
+  return true;
 }

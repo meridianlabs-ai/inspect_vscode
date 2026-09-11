@@ -5,7 +5,11 @@ import { verifyRunTerminal } from "./run-terminal-fixture";
 // Mocha 12 requires a newer Node than VS Code 1.93 embeds. Exercise the actual
 // terminal API here without loading that development-only dependency.
 export async function run(): Promise<void> {
-  await verifyRunTerminal();
+  if (!(await verifyRunTerminal())) {
+    throw new Error(
+      "The minimum-host terminal regression requires fish on Unix."
+    );
+  }
   console.log(
     `VS Code ${version}: first/repeated Run, startup shell replacement, argv, cwd and activation passed`
   );
