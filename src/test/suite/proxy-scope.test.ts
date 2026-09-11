@@ -161,6 +161,11 @@ suite("Proxy Scope Test Suite", () => {
       );
     });
 
+    test("rejects a path without its leading slash instead of repairing it", () => {
+      rejects("api/log-dir");
+      rejects(`api/logs/${enc("file:///w/logs/run.eval")}`);
+    });
+
     test("rejects DELETE and the log-delete route", () => {
       rejects(`/api/log-delete/${enc("file:///w/logs/run.eval")}`, "DELETE");
       rejects(`/api/log-delete/${enc("file:///w/logs/run.eval")}`);
@@ -294,6 +299,11 @@ suite("Proxy Scope Test Suite", () => {
       ok(`/api/v2/validations/${v}`, "DELETE");
       ok(`/api/v2/validations/${v}/rename`, "PUT");
       ok(`/api/v2/validations/${v}/${b64url("case-1")}`, "DELETE");
+    });
+
+    test("rejects a path without its leading slash instead of repairing it", () => {
+      rejects("api/v2/dist");
+      rejects(`api/scan/${enc("file:///w/scans/scan_id=x")}`);
     });
 
     test("rejects DELETE everywhere else", () => {

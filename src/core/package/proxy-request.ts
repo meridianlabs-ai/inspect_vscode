@@ -26,7 +26,10 @@ export function parseProxyRequest(value: unknown): HttpProxyRpcRequest {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     throw invalid("request");
   }
-  const { method, path, headers, body } = value as Record<string, unknown>;
+  const { method, path, headers } = value as Record<string, unknown>;
+  // A fetch-style init defaults its body to null, and null (unlike undefined)
+  // survives postMessage serialization; treat it as "no body".
+  const body = (value as Record<string, unknown>).body ?? undefined;
 
   if (typeof method !== "string" || !kMethods.has(method)) {
     throw invalid("method");

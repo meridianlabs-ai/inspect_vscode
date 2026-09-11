@@ -137,6 +137,16 @@ suite("webview http_request validation at the RPC boundary", () => {
         });
       }
       assert.deepStrictEqual(spy.forwarded, allowed);
+
+      // A null body from a fetch-style init is forwarded as no body.
+      const nullBody = await view.request("http_request", [
+        { method: "GET", path: "/api/log-dir", body: null },
+      ]);
+      assert.strictEqual(nullBody.error, undefined);
+      assert.deepStrictEqual(spy.forwarded.at(-1), {
+        method: "GET",
+        path: "/api/log-dir",
+      });
     } finally {
       panel.dispose();
     }
@@ -281,6 +291,14 @@ suite("parseProxyRequest", () => {
       assert.strictEqual(
         parseProxyRequest({ method, path: "/api/x" }).method,
         method
+      );
+    }
+    // A fetch-style init defaults body to null; that means "no body", even on
+    // GET and HEAD, and is dropped from the parsed request.
+    for (const method of ["GET", "HEAD", "POST"]) {
+      assert.deepStrictEqual(
+        parseProxyRequest({ method, path: "/api/x", body: null }),
+        { method, path: "/api/x" }
       );
     }
     // Percent-encoding, query strings and tab-free printable values pass.
