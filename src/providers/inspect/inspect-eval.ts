@@ -22,7 +22,7 @@ export function activateEvalManager(
     terminal: "Inspect Eval",
     command: "inspect",
     subcommand: "eval",
-    binPath: inspectBinPath(),
+    binPath: inspectBinPath,
     execArgs: (docState: DocumentState, debug: boolean) => {
       const args: string[] = [];
 

@@ -1,15 +1,13 @@
 // The kind of shell a command line will be sent to. We send run commands to a
 // VS Code integrated terminal via `terminal.sendText`, so the string must be
 // escaped according to the shell that terminal is actually running.
-export type ShellKind = "posix" | "powershell" | "cmd";
+export type ShellKind = "posix" | "fish" | "powershell" | "cmd";
 
 /**
- * Positively identify a {@link ShellKind} from a shell executable path, or
- * `undefined` when the path is empty or unrecognized. Unlike
- * {@link detectShellKind} this never guesses a platform default — the caller can
- * distinguish "known to be X" from "could not determine", which matters because
- * quoting for the wrong shell (PowerShell single quotes are inert in cmd.exe,
- * letting an embedded `&` execute) is a command-injection vector.
+ * Identify a {@link ShellKind} from a shell executable path or from one of the
+ * shell type identifiers VS Code reports through `terminal.state.shell`
+ * (`bash`, `gitbash`, `pwsh`, `cmd`, …). Returns `undefined` when the value is
+ * empty or unrecognized so the caller can fall through to its next signal.
  */
 export function shellKindFromPath(
   shellPath: string | undefined
@@ -18,8 +16,13 @@ export function shellKindFromPath(
   if (!name) {
     return undefined;
   }
-  if (/(^|[\\/])(bash|zsh|sh|fish|dash|ksh)(\.exe)?$/.test(name)) {
+  if (
+    /(^|[\\/])(bash|gitbash|zsh|sh|dash|ksh|csh|tcsh|wsl)(\.exe)?$/.test(name)
+  ) {
     return "posix";
+  }
+  if (/(^|[\\/])fish(\.exe)?$/.test(name)) {
+    return "fish";
   }
   if (/(^|[\\/])(pwsh|powershell)(\.exe)?$/.test(name)) {
     return "powershell";
@@ -28,59 +31,6 @@ export function shellKindFromPath(
     return "cmd";
   }
   return undefined;
-}
-
-// Characters that neither cmd.exe nor PowerShell leaves inert inside a
-// double-quoted string: `$` and backtick (PowerShell expansion), `%` and `!`
-// (cmd variable / delayed expansion), the double quote itself, and newlines.
-// Everything else — including `&`, `|`, `<`, `>`, `(`, `)`, `^`, `'` — is
-// literal inside double quotes in BOTH shells.
-const kUnknownShellUnsafe = /[$`"%!\r\n]/;
-
-/**
- * Quote a single argument for a Windows terminal whose shell we could not
- * identify. Double quotes neutralize the command separators in both cmd.exe and
- * PowerShell, closing the quoting mismatch. Returns `null` if the value contains
- * a character that is not inert under double quoting in both shells, so the
- * caller can refuse to run rather than risk injection.
- */
-export function quoteArgUnknownShell(value: string): string | null {
-  // Leave tokens that are safe unquoted in the strictest shell (PowerShell) bare
-  // — this is what keeps the leading command (e.g. `inspect`) unquoted, so
-  // PowerShell actually executes it rather than parsing `"inspect"` as a string
-  // literal. A bare safe token is inert in cmd.exe and POSIX shells too.
-  if (isSafeUnquoted(value, "powershell")) {
-    return value;
-  }
-  if (kUnknownShellUnsafe.test(value)) {
-    return null;
-  }
-  return `"${value}"`;
-}
-
-/**
- * Quote each part for an unidentified shell, or return `null` if any part cannot
- * be safely quoted (see {@link quoteArgUnknownShell}).
- */
-export function quoteCommandLineUnknownShell(parts: string[]): string | null {
-  const quoted: string[] = [];
-  for (let i = 0; i < parts.length; i++) {
-    const part = parts[i] ?? "";
-    // The leading command token can't be double-quoted for an unknown shell:
-    // PowerShell parses a quoted first token as a string literal, not a command
-    // (invoking it would need the `&` operator). If it isn't safe bare — e.g. a
-    // discovered interpreter path containing a space — refuse rather than emit a
-    // line that errors in the terminal.
-    if (i === 0 && !isSafeUnquoted(part, "powershell")) {
-      return null;
-    }
-    const q = quoteArgUnknownShell(part);
-    if (q === null) {
-      return null;
-    }
-    quoted.push(q);
-  }
-  return quoted.join(" ");
 }
 
 // Characters that are safe to pass unquoted in any of our supported shells.
@@ -118,6 +68,10 @@ export function quoteArg(value: string, kind: ShellKind): string {
     return value;
   }
   switch (kind) {
+    case "fish":
+      // Fish interprets both backslash and quote escapes inside single quotes.
+      // Escape both together so a backslash cannot change the quote boundary.
+      return `'${value.replace(/[\\']/g, "\\$&")}'`;
     case "posix":
       // Single quotes suppress all interpretation in POSIX shells. The only
       // character that can't appear literally inside single quotes is the
@@ -128,23 +82,62 @@ export function quoteArg(value: string, kind: ShellKind): string {
       // Single-quoted PowerShell strings are literal; an embedded single quote
       // is escaped by doubling it. PowerShell's tokenizer also treats the
       // Unicode single-quotation marks U+2018–U+201B as single-quote
-      // characters, so an embedded smart quote would otherwise terminate the
-      // string and let the following text execute — double those too.
+      // characters (they appear in file names typed on macOS), so an embedded
+      // smart quote would otherwise terminate the string — double those too.
       return `'${value.replace(/['\u2018\u2019\u201A\u201B]/g, (q) => q + q)}'`;
-    case "cmd": {
-      // cmd.exe has no robust quoting, but double quotes plus caret-escaping
-      // the command separators closes the common injection vectors. Embedded
-      // double quotes are doubled.
-      const escaped = value.replace(/"/g, '""').replace(/([&|<>()^])/g, "^$1");
-      return `"${escaped}"`;
-    }
+    case "cmd":
+      // Two parsers read this text. cmd.exe only tracks the double quotes:
+      // inside them `& | < > ( ) ^` stay literal, so a task at
+      // "tasks (1)/demo.py" arrives intact, and a caret is *not* an escape
+      // character there (it would be handed to the program). The program's C
+      // runtime then splits the same text by its own rules: a backslash run
+      // is literal unless it precedes a quote, where 2n backslashes become n
+      // and an odd run also escapes the quote. So a run before an embedded
+      // quote or the closing quote is doubled — a directory parameter ending
+      // in a separator keeps it — and an embedded quote is written as "",
+      // which the runtime reads back as one literal quote while cmd.exe sees
+      // one quoted span end and another begin rather than a quote-toggling
+      // `\"` that would expose the rest of the value to the shell.
+      return `"${value.replace(
+        /(\\*)("|$)/g,
+        (_match, slashes: string, quote: string) =>
+          slashes + slashes + (quote ? '""' : "")
+      )}"`;
   }
 }
 
 /**
  * Quotes each part for the given shell where necessary and joins them into a
- * command line string.
+ * command line string. PowerShell parses a quoted first token as a string
+ * expression rather than a command, so a program path that needs quoting (one
+ * with spaces, the common case under `C:\Users\First Last`) is invoked through
+ * the call operator: `& 'C:\...\inspect.exe' eval ...`.
  */
 export function quoteCommandLine(parts: string[], kind: ShellKind): string {
-  return parts.map((part) => quoteArg(part, kind)).join(" ");
+  const quoted = parts.map((part) => quoteArg(part, kind));
+  if (kind === "powershell" && quoted.length > 0 && quoted[0] !== parts[0]) {
+    quoted[0] = `& ${quoted[0]}`;
+  }
+  return quoted.join(" ");
+}
+
+/**
+ * The command that moves a reused terminal back to `cwd`. cmd.exe needs `/d`
+ * to follow a directory on another drive; PowerShell's `cd` (Set-Location)
+ * expands wildcards such as `[` unless the path is given literally.
+ */
+export function changeDirectoryCommand(cwd: string, kind: ShellKind): string {
+  switch (kind) {
+    case "cmd":
+      // `cd` is a cmd.exe built-in, not a program: the shell strips the quotes
+      // itself and no C runtime parses the argument, so the directory is
+      // quoted plainly and a trailing separator is passed as typed rather
+      // than doubled as {@link quoteArg} does for program arguments. A `"`
+      // cannot occur in a Windows path.
+      return `cd /d "${cwd}"`;
+    case "powershell":
+      return `cd -LiteralPath ${quoteArg(cwd, kind)}`;
+    default:
+      return `cd ${quoteArg(cwd, kind)}`;
+  }
 }

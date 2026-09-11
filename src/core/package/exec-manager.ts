@@ -1,8 +1,10 @@
+import { existsSync } from "node:fs";
 import * as os from "os";
 
 import {
   debug,
   DebugConfiguration,
+  env,
   ExtensionContext,
   MessageItem,
   Terminal,
@@ -24,10 +26,8 @@ import {
 } from "../path";
 import { findEnvPythonPath } from "../python";
 import {
-  quoteArg,
-  quoteArgUnknownShell,
+  changeDirectoryCommand,
   quoteCommandLine,
-  quoteCommandLineUnknownShell,
   ShellKind,
   shellKindFromPath,
 } from "../shell-quote";
@@ -41,7 +41,9 @@ export interface ExecProfile {
   terminal: "Inspect Eval" | "Scout Scan";
   command: "inspect" | "scout";
   subcommand: "eval" | "scan";
-  binPath: AbsolutePath | null;
+  // Resolved at Run time: the selected interpreter (and with it the console
+  // script location) can change after the extension has activated.
+  binPath: () => AbsolutePath | null;
   execArgs: (docState: DocumentState, debug: boolean) => string[];
 }
 
@@ -109,7 +111,7 @@ export class ExecManager {
 
       await runDebugger(
         this.profile_,
-        this.profile_.binPath?.path || this.profile_.command,
+        this.profile_.binPath()?.path || this.profile_.command,
         args,
         workspaceDir.path,
         env,
@@ -176,29 +178,82 @@ export class ExecManager {
 /**
  * Builds the program and argument vector for a run command.
  *
- * Returns the executable to invoke (`python -m <packageName>` when a python
- * interpreter is supplied, otherwise the bare command) plus the arguments as
- * plain, *unquoted* strings. Quoting is the caller's responsibility because it
- * depends on the shell the command will be sent to (see {@link runCommand} and
- * the `shell-quote` module).
+ * The program is the console script of the environment that owns the package,
+ * named by absolute path so the terminal runs the selected environment's
+ * `inspect`/`scout` whether or not that environment is on the terminal's PATH
+ * (activation disabled, activation still running, or a different `inspect`
+ * earlier on PATH):
  *
- * Pure and side-effect free so it can be unit tested with hostile inputs.
+ * - a workspace subdirectory environment the user approved: the console
+ *   script that environment installed (see {@link environmentConsoleScript}),
+ *   or that package's runnable module through the environment's interpreter
+ *   when the script is missing, so Python reports a missing package honestly;
+ * - otherwise the selected interpreter's console script from
+ *   {@link ExecProfile.binPath};
+ * - otherwise the bare command, leaving resolution to the terminal.
+ *
+ * Arguments are returned as plain, *unquoted* strings. Quoting is the caller's
+ * responsibility because it depends on the shell the command will be sent to
+ * (see {@link runCommand} and the `shell-quote` module).
  */
 export const buildRunCommand = (
   profile: ExecProfile,
   args: string[],
-  python?: AbsolutePath
+  python?: AbsolutePath,
+  platform: NodeJS.Platform = os.platform()
 ): { command: string; args: string[] } => {
   if (python) {
+    const script = environmentConsoleScript(python, profile.command, platform);
+    if (script) {
+      return { command: script.path, args };
+    }
     return {
       command: python.path,
-      args: ["-m", profile.packageName, ...args],
+      args: ["-m", kRunnableModule[profile.packageName], ...args],
     };
   }
   return {
-    command: profile.command,
+    command: profile.binPath()?.path ?? profile.command,
     args,
   };
+};
+
+/**
+ * The module `python -m` can start for each package when its console script
+ * is absent. `inspect_ai` ships a package `__main__`. `inspect_scout` does
+ * not (`python -m inspect_scout` fails), so its console-script entry point
+ * module `inspect_scout/_cli/main.py`, which runs `main()` under
+ * `__name__ == "__main__"`, is named instead.
+ */
+const kRunnableModule: Record<ExecProfile["packageName"], string> = {
+  "inspect-ai": "inspect_ai",
+  "inspect-scout": "inspect_scout._cli.main",
+};
+
+/**
+ * The console script `command` installed by the environment that owns
+ * `python`, if it exists. pip places scripts in the interpreter's own
+ * directory (`.venv/bin/inspect`, `.venv\Scripts\inspect.exe`), but a Conda
+ * environment on Windows keeps `python.exe` at the environment root with its
+ * scripts under `Scripts`, so the script directory is derived from the
+ * environment root; the interpreter's directory is kept as a second candidate.
+ */
+const environmentConsoleScript = (
+  python: AbsolutePath,
+  command: string,
+  platform: NodeJS.Platform
+): AbsolutePath | undefined => {
+  const windows = platform === "win32";
+  const name = windows ? `${command}.exe` : command;
+  const pythonDir = python.dirname();
+  const root = /^(scripts|bin)$/i.test(pythonDir.filename())
+    ? pythonDir.dirname()
+    : pythonDir;
+  const candidates = [
+    root.child(windows ? "Scripts" : "bin").child(name),
+    pythonDir.child(name),
+  ];
+  return candidates.find((candidate) => existsSync(candidate.path));
 };
 
 /**
@@ -231,7 +286,7 @@ const waitForShellIntegration = (
   });
 };
 
-const runCommand = async (
+export const runCommand = async (
   profile: ExecProfile,
   args: string[],
   cwd: string,
@@ -250,9 +305,9 @@ const runCommand = async (
   const { command, args: commandArgs } = buildRunCommand(profile, args, python);
 
   // Prefer shell integration (available in VS Code 1.93+): it fires after the
-  // shell's init sequence completes, so the Python env is activated and
-  // `inspect` is on PATH before the command is sent. It also handles quoting
-  // and gives the terminal proper command decorations.
+  // shell's init sequence completes, so the Python environment activation is
+  // in place (and inherited by the task) before the command is sent. It also
+  // gives the terminal proper command decorations.
   //
   // On a reused terminal integration is usually already active; on a new
   // terminal we wait up to 10 s for it to activate. If it doesn't (shell
@@ -264,46 +319,15 @@ const runCommand = async (
     kShellIntegrationTimeoutMs
   );
 
-  // Quote for the shell that actually runs in the terminal. The command line is
-  // sent verbatim, so quoting for a different shell than the one interpreting it
-  // is a command-injection vector — PowerShell single quotes are inert in
-  // cmd.exe, so an `&` in an attacker-controlled task path/name would execute.
-  // Identify the shell from the explicit creation path, then the actual shell
-  // reported after integration activates, then the configured default profile.
-  const creationOptions = terminal.creationOptions;
-  const creationShellPath =
-    "shellPath" in creationOptions ? creationOptions.shellPath : undefined;
-  const actualShell = (terminal.state as { shell?: string }).shell;
-  const shell: ShellKind | undefined =
-    shellKindFromPath(creationShellPath) ??
-    shellKindFromPath(actualShell) ??
-    configuredDefaultShellKind();
-
-  // Build the command line (and optional `cd`). When the shell can't be
-  // identified, fall back to cross-shell-safe double quoting; if a token can't
-  // be safely quoted for an unknown shell, refuse to run rather than risk
-  // injection.
-  let commandLine: string;
-  let cdLine: string | undefined;
-  if (shell) {
-    commandLine = quoteCommandLine([command, ...commandArgs], shell);
-    cdLine = reusedTerminal ? `cd ${quoteArg(cwd, shell)}` : undefined;
-  } else {
-    const line = quoteCommandLineUnknownShell([command, ...commandArgs]);
-    const cwdQuoted = reusedTerminal ? quoteArgUnknownShell(cwd) : "";
-    if (line === null || cwdQuoted === null) {
-      await window.showErrorMessage(
-        `Unable to ${profile.target === "Scan" ? "run scan" : "run task"}: the task path or arguments contain characters that can't be safely quoted for this terminal's shell. Select a known shell profile (PowerShell, cmd, or a POSIX shell) or rename the offending file/parameters.`
-      );
-      return;
-    }
-    commandLine = line;
-    cdLine = reusedTerminal ? `cd ${cwdQuoted}` : undefined;
-  }
+  // Quote for the shell running in the terminal, then emit a `cd` first on
+  // reused terminals (executeCommand doesn't change the working directory).
+  const shell = terminalShellKind(terminal);
+  const commandLine = quoteCommandLine([command, ...commandArgs], shell);
+  const cdLine = reusedTerminal
+    ? changeDirectoryCommand(cwd, shell)
+    : undefined;
 
   if (integration) {
-    // Shell integration is active: the env is ready. Emit a `cd` first on
-    // reused terminals (executeCommand doesn't change the working directory).
     if (cdLine) {
       integration.executeCommand(cdLine);
     }
@@ -322,54 +346,28 @@ const runCommand = async (
 };
 
 /**
- * Best-effort identification of the shell VS Code's default terminal profile
- * launches, used when the terminal itself doesn't report its shell. Consults the
- * platform-appropriate defaultProfile so that, e.g., a pwsh default on macOS or
- * Linux isn't quoted as POSIX. Returns POSIX as the fallback on unix-like
- * platforms (their near-universal default) and `undefined` on Windows when the
- * profile can't be mapped, so the caller uses cross-shell-safe quoting instead
- * of guessing.
+ * Best-effort identification of the shell in `terminal`, in order of how much
+ * each signal knows about that particular terminal: the shell type VS Code
+ * reports once shell integration is active (newer hosts; absent on 1.93), the
+ * executable the terminal was created with, the default shell VS Code launches
+ * for terminals created without one (`env.shell` already reflects the
+ * `terminal.integrated.defaultProfile` setting), and finally the platform's
+ * own default: PowerShell on Windows, a POSIX shell elsewhere.
  */
-const configuredDefaultShellKind = (): ShellKind | undefined => {
-  const platform = os.platform();
-  const key =
-    platform === "win32" ? "windows" : platform === "darwin" ? "osx" : "linux";
-  const unixFallback: ShellKind | undefined =
-    platform === "win32" ? undefined : "posix";
-
-  const cfg = workspace.getConfiguration("terminal.integrated");
-  const profileName = cfg.get<string>(`defaultProfile.${key}`) ?? undefined;
-  if (!profileName) {
-    return unixFallback;
-  }
-  const profiles =
-    cfg.get<Record<string, { path?: string | string[]; source?: string }>>(
-      `profiles.${key}`
-    ) ?? {};
-  const profile = profiles[profileName];
-  const pathVal = profile?.path;
-  const path = Array.isArray(pathVal) ? pathVal[0] : pathVal;
-  const byPath = shellKindFromPath(path) ?? shellKindFromPath(profile?.source);
-  if (byPath) {
-    return byPath;
-  }
-  const lower = profileName.toLowerCase();
-  if (lower.includes("command prompt") || lower === "cmd") {
-    return "cmd";
-  }
-  if (lower.includes("powershell") || lower.includes("pwsh")) {
-    return "powershell";
-  }
-  if (
-    lower.includes("git bash") ||
-    lower.includes("wsl") ||
-    lower.includes("bash") ||
-    lower.includes("zsh") ||
-    lower.includes("fish")
-  ) {
-    return "posix";
-  }
-  return unixFallback;
+export const terminalShellKind = (
+  terminal: Pick<Terminal, "creationOptions" | "state">,
+  defaultShell: string = env.shell,
+  platform: NodeJS.Platform = os.platform()
+): ShellKind => {
+  const reported = (terminal.state as { shell?: string }).shell;
+  const options = terminal.creationOptions;
+  const launched = "shellPath" in options ? options.shellPath : undefined;
+  return (
+    shellKindFromPath(reported) ??
+    shellKindFromPath(launched) ??
+    shellKindFromPath(defaultShell) ??
+    (platform === "win32" ? "powershell" : "posix")
+  );
 };
 
 const runDebugger = async (
