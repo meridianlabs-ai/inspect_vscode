@@ -2,15 +2,18 @@
  * Tests for log-listing.ts and log-listing-data.ts - LogListing and TreeDataProviders
  */
 import * as assert from "assert";
+import * as os from "os";
 
 import { Uri } from "vscode";
 
 import { ListingMRU } from "../../core/listing-mru";
 import {
+  listingRelativePath,
   LogListing,
   LogNode as RealLogNode,
   relativeLogPath,
 } from "../../providers/activity-bar/log-listing/log-listing";
+import { ScansTreeDataProvider } from "../../providers/activity-bar/log-listing/scan-listing-data";
 
 /**
  * Mock LogItem for testing
@@ -620,6 +623,11 @@ suite("LogListing Test Suite", () => {
     });
   });
 
+  // Uri.joinPath treats '\\' as a separator only for file URIs on Windows;
+  // in S3 keys and POSIX file names it is a literal character that joinPath
+  // preserves, so the '.'/empty-segment checks must not split on it there.
+  const kPlatforms: NodeJS.Platform[] = ["darwin", "linux", "win32"];
+
   suite("relativeLogPath", () => {
     test("strips a file:// log dir prefix from a file:// location", () => {
       assert.strictEqual(
@@ -783,11 +791,6 @@ suite("LogListing Test Suite", () => {
       );
     });
 
-    // Uri.joinPath treats '\\' as a separator only for file URIs on Windows;
-    // in S3 keys and POSIX file names it is a literal character that joinPath
-    // preserves, so the '.'/empty-segment check must not split on it there.
-    const kPlatforms: NodeJS.Platform[] = ["darwin", "linux", "win32"];
-
     test("keeps literal backslashes in S3 keys on every platform", () => {
       for (const platform of kPlatforms) {
         for (const name of ["team/\\x.eval", "team\\./x.eval", "a\\\\b.eval"]) {
@@ -830,27 +833,21 @@ suite("LogListing Test Suite", () => {
       }
     });
 
-    test("drops, rather than renames, a literal backslash on the containment fallback", () => {
-      // getRelativeUri folds '\\' to '/' when it normalizes, so through the
-      // fallback 'team/\\x.eval' would come back as 'team/x.eval' and the node
-      // would open a different object. Dropping it is the safe outcome; the
-      // usual string-prefix path above keeps such names intact.
+    test("keeps a literal backslash on the containment fallback", function () {
+      // The fallback is reached when the location's spelling misses the log
+      // dir string prefix: a plain absolute path against a file: dir (the
+      // scan listing's shape) or a percent-encoding difference. The name must
+      // come back exactly as listed and join to the object that was listed,
+      // not be folded to 'team/x.eval' (another file) or dropped.
+      const name = "team/\\x.eval";
       for (const platform of ["darwin", "linux"] as NodeJS.Platform[]) {
-        assert.strictEqual(
-          relativeLogPath(
-            "file:///tmp/logs",
-            "/tmp/logs/team/\\x.eval",
-            platform
-          ),
-          null
-        );
         assert.strictEqual(
           relativeLogPath(
             "file:///tmp/my%20logs",
             "file:///tmp/my logs/team/\\x.eval",
             platform
           ),
-          null
+          name
         );
         // ordinary fallback entries are unaffected
         assert.strictEqual(
@@ -860,6 +857,29 @@ suite("LogListing Test Suite", () => {
             platform
           ),
           "team/x.eval"
+        );
+      }
+      assert.strictEqual(
+        Uri.joinPath(Uri.parse("file:///tmp/my%20logs"), name).toString(),
+        "file:///tmp/my%20logs/team/%5Cx.eval"
+      );
+      // A plain path goes through Uri.file, which on a Windows host folds
+      // '\\' to '/' regardless of the platform argument, so the plain-path
+      // form is only meaningful on a POSIX host.
+      if (os.platform() !== "win32") {
+        for (const platform of ["darwin", "linux"] as NodeJS.Platform[]) {
+          assert.strictEqual(
+            relativeLogPath(
+              "file:///tmp/logs",
+              "/tmp/logs/team/\\x.eval",
+              platform
+            ),
+            name
+          );
+        }
+        assert.strictEqual(
+          Uri.joinPath(Uri.parse("file:///tmp/logs"), name).toString(),
+          "file:///tmp/logs/team/%5Cx.eval"
         );
       }
       // On Windows a backslash in a file path is a separator, so the folded
@@ -921,6 +941,149 @@ suite("LogListing Test Suite", () => {
             `${platform} ${logDir} relative`
           );
         }
+      }
+    });
+  });
+
+  suite("listingRelativePath", () => {
+    const s3 = Uri.parse("s3://bucket/logs");
+
+    test("keeps literal backslashes in remote and POSIX names", () => {
+      for (const platform of kPlatforms) {
+        for (const name of [
+          "\\.",
+          "\\\\.",
+          "team\\",
+          "\\./x.eval",
+          "team/\\x.eval",
+        ]) {
+          assert.strictEqual(
+            listingRelativePath(s3, Uri.joinPath(s3, name), platform),
+            name,
+            `${platform} ${name}`
+          );
+        }
+      }
+      const posix = Uri.parse("file:///tmp/logs");
+      for (const platform of ["darwin", "linux"] as NodeJS.Platform[]) {
+        for (const name of ["\\.", "team/\\x.eval"]) {
+          assert.strictEqual(
+            listingRelativePath(
+              posix,
+              Uri.parse(`file:///tmp/logs/${encodeURIComponent(name)}`),
+              platform
+            ),
+            name,
+            `${platform} ${name}`
+          );
+        }
+      }
+    });
+
+    test("never returns the log dir itself or an alias of it", () => {
+      for (const platform of kPlatforms) {
+        for (const target of [
+          "s3://bucket/logs",
+          "s3://bucket/logs/",
+          "s3://bucket/logs/.",
+          "s3://bucket/logs//",
+          "s3://bucket/logs/team/..",
+        ]) {
+          assert.strictEqual(
+            listingRelativePath(s3, Uri.parse(target), platform),
+            null,
+            `${platform} ${target}`
+          );
+        }
+      }
+    });
+
+    test("treats backslash as a separator only for Windows file locations", () => {
+      const win = Uri.parse("file:///C:/logs");
+      assert.strictEqual(
+        listingRelativePath(
+          win,
+          Uri.parse("file:///C:/logs/team\\x.eval"),
+          "win32"
+        ),
+        "team/x.eval"
+      );
+      for (const bad of [
+        "\\.",
+        "team\\",
+        "team\\.\\x.eval",
+        "team\\\\x.eval",
+      ]) {
+        assert.strictEqual(
+          listingRelativePath(
+            win,
+            Uri.parse(`file:///C:/logs/${encodeURIComponent(bad)}`),
+            "win32"
+          ),
+          null,
+          bad
+        );
+      }
+      // the log dir may itself be spelled with backslashes on Windows
+      assert.strictEqual(
+        listingRelativePath(
+          Uri.parse("file:///C:\\logs"),
+          Uri.parse("file:///C:/logs/team/x.eval"),
+          "win32"
+        ),
+        "team/x.eval"
+      );
+    });
+
+    test("rejects traversal, siblings and other roots for every scheme", () => {
+      for (const platform of kPlatforms) {
+        const cases: [string, string][] = [
+          ["s3://bucket/logs", "s3://bucket/logs/team/../../etc/x.eval"],
+          ["s3://bucket/logs", "s3://bucket/logs/team%5C..%5Cx.eval"],
+          ["s3://bucket/logs", "s3://bucket/logs-evil/x.eval"],
+          ["s3://bucket/logs", "s3://other/logs/x.eval"],
+          ["s3://bucket/logs", "file:///bucket/logs/x.eval"],
+          ["file:///tmp/logs", "file:///tmp/logs/%5C../x.eval"],
+          ["file:///tmp/logs", "file:///tmp/logs/../x.eval"],
+          ["file:///tmp/logs", "file:///tmp/logs-evil/x.eval"],
+        ];
+        for (const [dir, target] of cases) {
+          assert.strictEqual(
+            listingRelativePath(Uri.parse(dir), Uri.parse(target), platform),
+            null,
+            `${platform} ${dir} ${target}`
+          );
+        }
+      }
+    });
+
+    test("normalizes the log dir spelling but not the target", () => {
+      assert.strictEqual(
+        listingRelativePath(
+          Uri.parse("s3://bucket/logs/"),
+          Uri.parse("s3://bucket/logs/team/x.eval")
+        ),
+        "team/x.eval"
+      );
+      assert.strictEqual(
+        listingRelativePath(
+          Uri.parse("s3://bucket/./logs"),
+          Uri.parse("s3://bucket/logs/team/x.eval")
+        ),
+        "team/x.eval"
+      );
+      // '.'/empty segments anywhere in the target's path mean it is not the
+      // listed object's canonical spelling
+      for (const target of [
+        "s3://bucket/./logs/team/x.eval",
+        "s3://bucket/logs/./team/x.eval",
+        "s3://bucket/logs/team//x.eval",
+      ]) {
+        assert.strictEqual(
+          listingRelativePath(s3, Uri.parse(target)),
+          null,
+          target
+        );
       }
     });
   });
@@ -1083,6 +1246,102 @@ suite("LogListing Test Suite", () => {
         "s3://bucket/logs/team/x.eval",
       ]);
       assert.strictEqual(new Set(uris).size, uris.length, "duplicate ids");
+    });
+
+    // Tree item ids as the real provider builds them (uriForNode -> id), plus
+    // the URI each file item's open command receives.
+    async function providerIds(listing: LogListing) {
+      const provider = new ScansTreeDataProvider();
+      provider.setLogListing(listing);
+      const ids: string[] = [];
+      const commandUris: string[] = [];
+      const visit = async (nodes: RealLogNode[]) => {
+        for (const node of nodes) {
+          const item = provider.getTreeItem(node);
+          ids.push(String(item.id));
+          if (node.type === "file") {
+            const args = (item.command?.arguments ?? []) as Uri[];
+            commandUris.push(String(args[0]?.toString()));
+          }
+          await visit(await provider.getChildren(node));
+        }
+      };
+      await visit(await provider.getChildren());
+      provider.dispose();
+      return { ids, commandUris };
+    }
+
+    test("directories whose literal name folds to '.' keep their own id", async () => {
+      // A remote listing may return keys whose backslash-containing segments
+      // would collapse to '.' or '' if '\\' were treated as a separator: '\\.'
+      // and '\\\\.' are distinct S3 "directories" here. Each must get its own
+      // id and URI rather than being clamped onto the log dir's.
+      const listing = new LogListing(logDir, mru, () =>
+        Promise.resolve({
+          log_dir: "s3://bucket/logs",
+          items: [
+            item("s3://bucket/logs/\\./x.eval"),
+            item("s3://bucket/logs/\\\\./y.eval"),
+            item("s3://bucket/logs/team\\/z.eval"),
+          ],
+        })
+      );
+      const { ids, commandUris } = await providerIds(listing);
+      assert.deepStrictEqual([...ids].sort(), [
+        "s3://bucket/logs/%5C%5C.",
+        "s3://bucket/logs/%5C%5C./y.eval",
+        "s3://bucket/logs/%5C.",
+        "s3://bucket/logs/%5C./x.eval",
+        "s3://bucket/logs/team%5C",
+        "s3://bucket/logs/team%5C/z.eval",
+      ]);
+      assert.strictEqual(new Set(ids).size, ids.length, "duplicate ids");
+      assert.ok(!ids.includes(logDir.toString()), "clamped to the log dir");
+      assert.deepStrictEqual([...commandUris].sort(), [
+        "s3://bucket/logs/%5C%5C./y.eval",
+        "s3://bucket/logs/%5C./x.eval",
+        "s3://bucket/logs/team%5C/z.eval",
+      ]);
+      // and the listed object can be found again from its URI
+      const found = listing.nodeForUri(
+        Uri.parse("s3://bucket/logs/%5C./x.eval")
+      );
+      assert.strictEqual(found?.name, "\\./x.eval");
+    });
+
+    test("a plain-path POSIX location keeps its literal backslash", async function () {
+      // The scan listing returns plain absolute paths for a file: dir, which
+      // takes the containment fallback. On a Windows host Uri.file folds the
+      // backslash before the listing sees it, so this is a POSIX-host case.
+      if (os.platform() === "win32") {
+        this.skip();
+      }
+      const fileDir = Uri.parse("file:///tmp/logs");
+      const listing = new LogListing(fileDir, mru, () =>
+        Promise.resolve({
+          log_dir: "file:///tmp/logs",
+          items: [
+            item("/tmp/logs/team/\\x.eval", 2),
+            item("/tmp/logs/team/x.eval", 1),
+          ],
+        })
+      );
+      const { ids, commandUris } = await providerIds(listing);
+      assert.deepStrictEqual([...ids].sort(), [
+        "file:///tmp/logs/team",
+        "file:///tmp/logs/team/%5Cx.eval",
+        "file:///tmp/logs/team/x.eval",
+      ]);
+      assert.deepStrictEqual([...commandUris].sort(), [
+        "file:///tmp/logs/team/%5Cx.eval",
+        "file:///tmp/logs/team/x.eval",
+      ]);
+      const found = listing.nodeForUri(
+        Uri.parse("file:///tmp/logs/team/%5Cx.eval")
+      );
+      assert.ok(found && found.type === "file");
+      assert.strictEqual(found.name, "team/\\x.eval");
+      assert.strictEqual(found.mtime, 2);
     });
   });
 });
