@@ -45,7 +45,15 @@ export function locationUri(location: string, base?: Uri): Uri {
     throw new Error("Relative location without an authorized base");
   }
   return base.with({
-    path: `${base.path.replace(/\/$/, "")}/${location}`,
+    path:
+      base.scheme === "file"
+        ? path.posix.join(
+            base.path,
+            process.platform === "win32"
+              ? location.replace(/\\/g, "/")
+              : location
+          )
+        : `${base.path.replace(/\/$/, "")}/${location}`,
   });
 }
 

@@ -83,8 +83,8 @@ export function logPathInScopeAllowingEncoded(
   )
     return false;
   // Inspect normalize_uri re-parses file URIs after unquoting. Check that
-  // consumer interpretation as well as the whole path used by pending/search
-  // routes, which do not all call normalize_uri.
+  // consumer interpretation as well as the whole path used by pending routes,
+  // which do not all call normalize_uri. Scout search is checked separately.
   const decoded = decodeURIComponent(target);
   if (decoded.startsWith("file://") && /[?#]/.test(decoded)) {
     return locationInScope([panelUri], decoded.split(/[?#]/, 1)[0]!, {

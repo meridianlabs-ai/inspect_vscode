@@ -46,6 +46,12 @@ const enc = encodeURIComponent;
 const b64 = (s: string) => Buffer.from(s).toString("base64url");
 
 suite("Webview boundary RPC integration", () => {
+  test("relative local locations retain current-directory and dot-segment support", () => {
+    const root = Uri.file(join(tmpdir(), "panel"));
+    for (const location of [".", "./", "nested/..", "./inside.eval"])
+      assert.ok(locationInScope([root], location, { base: root }), location);
+    assert.ok(!locationInScope([root], "../outside", { base: root }));
+  });
   test("POSIX backslash names cannot disguise an outside location", function () {
     if (process.platform === "win32") this.skip();
     const root = Uri.file("/review/panel");
