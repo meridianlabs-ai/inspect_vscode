@@ -1,4 +1,3 @@
-import { parseProxyRequest } from "./proxy-request";
 /**
  * Scope confinement for the generic `http_request` proxy exposed to the log and
  * scan webviews.
@@ -18,6 +17,7 @@ import { parseProxyRequest } from "./proxy-request";
  * way `UPath(dir) / scan` joins it (an absolute `scan` replaces `dir`).
  */
 
+import { parseProxyRequest } from "./proxy-request";
 import { assertScanConfigInScope, ScanConfigScope } from "./scan-config-scope";
 import type { HttpProxyRpcRequest } from "./view-server";
 
@@ -39,8 +39,7 @@ interface ParsedRequest {
 function parseRequest(request: HttpProxyRpcRequest): ParsedRequest {
   try {
     const path = parseProxyRequest(request).path;
-    // The view server only serves absolute "/api/..." paths; normalize so a
-    // missing leading slash still parses rather than being treated as relative.
+    // Runtime validation requires an absolute /api/ path.
     const url = new URL("http://127.0.0.1" + path);
     const segments = url.pathname
       .split("/")
@@ -105,13 +104,33 @@ function joinLocation(dir: string, child: string): string {
 
 // Endpoints that carry no file/dir location.
 const kLogNoLocation = new Set([
-  "/api/log-dir",
   "/api/user-info",
   "/api/app-config",
   "/api/events", // last_eval_time only
   "/api/dist",
   "/api/scout/searches", // type + count only
 ]);
+
+const kLogDirectoryRoutes = new Set([
+  "/api/log-dir",
+  "/api/logs",
+  "/api/log-files",
+  "/api/eval-set",
+  "/api/flow",
+]);
+
+/** The shared server's default directory is not authority for this panel. */
+export function bindLogProxyDefault(
+  request: HttpProxyRpcRequest,
+  directory?: string
+): HttpProxyRpcRequest {
+  const { pathname, params } = parseRequest(request);
+  if (!kLogDirectoryRoutes.has(pathname) || params.has("log_dir"))
+    return request;
+  if (!directory) throw proxyError(request);
+  params.set("log_dir", directory);
+  return { ...request, path: `${pathname}?${params.toString()}` };
+}
 
 // Endpoints of the form /api/<name>/{log:path}. `log-delete` is deliberately
 // absent: neither the named RPC surface nor the viewer deletes logs, so the
@@ -134,11 +153,6 @@ export function assertLogProxyInScope(
   request: HttpProxyRpcRequest,
   inScope: InScope
 ): void {
-  // No log-view route needs DELETE, so refuse it outright.
-  if (request.method === "DELETE") {
-    throw proxyError(request);
-  }
-
   const { pathname, params, segments, remainder } = parseRequest(request);
   const check = checker(request, inScope);
 
@@ -156,14 +170,14 @@ export function assertLogProxyInScope(
     return;
   }
 
-  // Endpoints whose location is a query parameter. An ABSENT location means the
-  // server lists/uses its own configured default (not an attacker-chosen path),
-  // which the viewer requests during config load — allow it. Every supplied
-  // value is checked, including empty ones (the server treats "" as a real
-  // location, not the default) and repeats (FastAPI resolves a repeated scalar
-  // parameter to the LAST value, so validating only the first would be a
-  // bypass).
-  if (pathname === "/api/logs" || pathname === "/api/log-files") {
+  // Defaults must already be bound to the panel. Check every repeated value
+  // because FastAPI selects the last scalar parameter.
+  if (
+    pathname === "/api/log-dir" ||
+    pathname === "/api/logs" ||
+    pathname === "/api/log-files"
+  ) {
+    if (!params.has("log_dir")) throw proxyError(request);
     params.getAll("log_dir").forEach(check);
     return;
   }
@@ -172,11 +186,13 @@ export function assertLogProxyInScope(
     pathname === "/api/pending-sample-data" ||
     pathname === "/api/pending-sample-data-urls"
   ) {
+    if (!params.has("log")) throw proxyError(request);
     params.getAll("log").forEach(check);
     return;
   }
   if (pathname === "/api/log-message") {
     // POST form: the log file is the `log_file` query parameter.
+    if (!params.has("log_file")) throw proxyError(request);
     params.getAll("log_file").forEach(check);
     return;
   }
@@ -190,6 +206,7 @@ export function assertLogProxyInScope(
   // server could resolve from the supplied values.
   if (pathname === "/api/eval-set" || pathname === "/api/flow") {
     const bases = params.getAll("log_dir");
+    if (!bases.length) throw proxyError(request);
     const subs = params.getAll("dir");
     if (bases.length > 0 && subs.length > 0) {
       for (const base of bases) {
@@ -227,8 +244,7 @@ export function assertLogProxyInScope(
 // Scout scan view
 // ---------------------------------------------------------------------------
 
-// No-location config/listing/compute endpoints.
-//
+// No-location endpoints, after the explicit project permission checks below.
 const kScanNoLocation = new Set([
   "/api/v2/dist",
   "/api/v2/app-config",
@@ -273,6 +289,9 @@ export function assertScanProxyInScope(
 
   const methods = scanRouteMethods(pathname);
   if (!methods.includes(request.method)) throw proxyError(request);
+  // Validation files and their index belong to the project, not this scan.
+  if (!permissions.fullView && pathname.startsWith("/api/v2/validations"))
+    throw proxyError(request);
   const projectMutation =
     pathname === "/api/v2/startscan" ||
     (pathname === "/api/v2/project/config" && request.method === "PUT") ||

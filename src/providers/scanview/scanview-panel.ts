@@ -27,6 +27,7 @@ import { ScoutViewServer } from "../scout/scout-view-server";
 import { RouteMessage, sanitizeRouteMessage } from "./scanview-message";
 
 /** Whether a webview-supplied scan location is within one of the allowed roots. */
+/** Legacy parsing helper retained for regression comparisons; RPCs use the consumer-aware guard below. */
 export function scanLocationInScope(scope: Uri[], location: string): boolean {
   let target: Uri;
   try {
@@ -43,11 +44,8 @@ export function scanLocationInScope(scope: Uri[], location: string): boolean {
   );
 }
 
-/**
- * Encoding-tolerant variant of {@link scanLocationInScope} for locations that
- * reach the scout server percent-encoded and are decoded there: validates the
- * decoded form so `%2e%2e` traversal is caught and a legitimate `%20` accepted
- * (mirrors `logPathInScopeAllowingEncoded` in the sibling log view).
+/** Check both literal Scout UPath locations and the decoded interpretation used
+ * by older/transcript consumers. Neither may extend the panel's authority.
  */
 export function scanLocationInScopeAllowingEncoded(
   scope: Uri[],
@@ -76,7 +74,9 @@ export class ScanviewPanel extends Disposable {
     const scopeResolver = scope ?? (() => server_.scanResultsScope());
     const fullView = scope === undefined;
     const transcriptsScope = () =>
-      fullView ? [...scopeResolver(), ...server_.transcriptsScope()] : [];
+      fullView
+        ? [...scopeResolver(), ...server_.transcriptsScope()]
+        : server_.transcriptsScope();
 
     // The scan webview renders untrusted scan results and its RPC surface is
     // reachable from injected script, while the token-authorized scout server

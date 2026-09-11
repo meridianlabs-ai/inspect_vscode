@@ -59,7 +59,7 @@ export interface ScoutProjectChangedEvent {
  */
 const DEFAULT_CONFIG: ScoutProjectConfig = {
   scans: "./scans",
-  transcripts: "./logs",
+  transcripts: null,
 };
 
 export function normalizeScoutProjectConfig(
@@ -75,6 +75,30 @@ export function normalizeScoutProjectConfig(
         ? parsed.results
         : DEFAULT_CONFIG.scans) as string | null,
   };
+}
+
+/** Only the fields used for authority: Scout merges locations by explicit
+ * override, and replaces all model fields as a unit if any is supplied locally.
+ */
+export function mergeScoutProjectAuthority(
+  base: ScoutProjectConfig,
+  local: Record<string, unknown>
+): ScoutProjectConfig {
+  const result = { ...base };
+  const modelFields = [
+    "model",
+    "model_base_url",
+    "model_args",
+    "generate_config",
+    "model_roles",
+  ] as const;
+  if (modelFields.some((field) => field in local)) {
+    for (const field of modelFields) delete result[field];
+  }
+  const merged = { ...result, ...local };
+  if (!("scans" in local) && "results" in local)
+    merged.scans = local.results as string | null;
+  return merged;
 }
 
 /**
@@ -145,6 +169,28 @@ export class ScoutProjectManager implements Disposable {
    */
   public getConfigFilePath(): string | undefined {
     return this.configFilePath_;
+  }
+
+  /** Capture local overrides once for authorization, independently of later
+   * base-project watcher updates. Local model fields follow Scout's atomic merge.
+   */
+  public async getAuthorityConfig(): Promise<ScoutProjectConfig> {
+    const base = { ...this.getConfig() };
+    const uri = Uri.file(activeWorkspacePath().child("scout.local.yaml").path);
+    try {
+      const content = await workspace.fs.readFile(uri);
+      const local: unknown = parse(new TextDecoder().decode(content));
+      if (!local || typeof local !== "object" || Array.isArray(local))
+        throw new Error("Invalid scout.local.yaml");
+      return mergeScoutProjectAuthority(base, local as Record<string, unknown>);
+    } catch (error) {
+      if (
+        (error as { code?: string }).code === "FileNotFound" ||
+        (error as { code?: string }).code === "ENOENT"
+      )
+        return base;
+      throw error;
+    }
   }
 
   /**

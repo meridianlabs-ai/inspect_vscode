@@ -2,7 +2,7 @@ import Ajv from "ajv";
 
 import projectSchema from "../../../assets/schemas/project.schema.json";
 
-const validate = new Ajv({ strict: false }).compile({
+export const scanConfigSchema = {
   ...projectSchema,
   additionalProperties: false,
   properties: {
@@ -43,7 +43,8 @@ const validate = new Ajv({ strict: false }).compile({
       ],
     },
   },
-});
+};
+const validate = new Ajv({ strict: false }).compile(scanConfigSchema);
 
 export interface ScanConfigScope {
   scans: (location: string) => boolean;
@@ -94,5 +95,19 @@ export function assertScanConfigInScope(
   }
   for (const validation of Object.values(value.validation ?? {})) {
     if (typeof validation === "string") check(validation, scope.project);
+    else {
+      const cases = (
+        validation as { cases: Array<{ target?: unknown; labels?: unknown }> }
+      ).cases;
+      for (const item of cases) {
+        if (
+          (item.target === null || item.target === undefined) ===
+          (item.labels === null || item.labels === undefined)
+        )
+          throw new Error(
+            "Validation cases require exactly one of target or labels"
+          );
+      }
+    }
   }
 }

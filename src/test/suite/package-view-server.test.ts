@@ -16,6 +16,7 @@ import * as ports from "../../core/port";
 import * as processes from "../../core/process";
 import * as python from "../../core/python/exec";
 import { HostWebviewPanel } from "../../hooks";
+import { InspectViewServer } from "../../providers/inspect/inspect-view-server";
 import { LogviewPanel } from "../../providers/logview/logview-panel";
 
 import {
@@ -55,6 +56,13 @@ class TestServer extends PackageViewServer {
   }
   resource(data: unknown) {
     return this.resourcePath(JSON.stringify(data));
+  }
+  evalLogPendingSamples(file: string, etag?: string) {
+    return InspectViewServer.prototype.evalLogPendingSamples.call(
+      this as unknown as InspectViewServer,
+      file,
+      etag
+    );
   }
 }
 
@@ -194,6 +202,40 @@ suite("PackageViewServer lifecycle", () => {
       );
       assert.strictEqual(children[0]!.killed, false);
       assert.strictEqual(children.length, 1);
+    }
+    const receivers = new Set<(data: unknown) => void>();
+    let posted!: (data: { error?: unknown }) => void;
+    const host = {
+      webview: {
+        onDidReceiveMessage: (handler: (data: unknown) => void) => {
+          receivers.add(handler);
+          return { dispose() {} };
+        },
+        postMessage: (data: { error?: unknown }) => posted(data),
+      },
+    } as unknown as HostWebviewPanel;
+    const panel = new LogviewPanel(
+      host,
+      new MockExtensionContext() as unknown as ExtensionContext,
+      server as unknown as InspectViewServer,
+      "dir",
+      Uri.file("/w/logs")
+    );
+    try {
+      const response = new Promise<{ error?: unknown }>((resolve) => {
+        posted = resolve;
+      });
+      for (const receive of receivers)
+        receive({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "eval_log_pending_samples",
+          params: ["/w/logs/run.eval", "bad\u0001value"],
+        });
+      assert.ok((await response).error);
+      assert.strictEqual(children[0]!.killed, false);
+    } finally {
+      panel.dispose();
     }
     finish(new Response("other panel completed"));
     assert.strictEqual((await otherPanel).data, "other panel completed");

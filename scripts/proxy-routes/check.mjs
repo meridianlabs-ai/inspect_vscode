@@ -174,6 +174,24 @@ for (const [name, assertFn, inScope] of [
     );
   }
   const spec = JSON.parse(readFileSync(specFile, "utf-8"));
+  if (name === "scout") {
+    const { scanConfigSchema } = createRequire(import.meta.url)(
+      resolve(modulePath, "../scan-config-scope.js")
+    );
+    const consumer =
+      spec.openapi.components?.schemas?.ScanJobConfig?.properties;
+    if (!consumer)
+      fail(
+        "Scout OpenAPI is missing ScanJobConfig; cannot check schema drift."
+      );
+    const actual = Object.keys(consumer).sort();
+    const supported = Object.keys(scanConfigSchema.properties).sort();
+    if (JSON.stringify(actual) !== JSON.stringify(supported)) {
+      fail(
+        `Scout ScanJobConfig field drift: backend-only ${actual.filter((key) => !supported.includes(key)).join(", ") || "none"}; extension-only ${supported.filter((key) => !actual.includes(key)).join(", ") || "none"}. Update the boundary schema and location inventory before accepting new fields.`
+      );
+    }
+  }
   const routes = [...routesFromOpenApi(spec), ...EXTRA_ROUTES[name]];
   for (const route of routes) {
     const request = { method: route.method, path: concretePath(route, name) };

@@ -11,7 +11,10 @@ import {
 } from "../workspace/workspace-env-provider";
 
 import { scanviewCommands } from "./commands";
-import { captureProjectAuthority } from "./project-authority";
+import {
+  captureProjectAuthority,
+  defaultProjectTranscripts,
+} from "./project-authority";
 import { activateScanviewEditor } from "./scanview-editor";
 import { ScoutViewManager, ScoutViewWebviewManager } from "./scanview-view";
 
@@ -40,10 +43,9 @@ export function activateScanview(
   // Take project authority once, before serving webview requests. Later
   // project/config writes may change defaults but cannot mint new roots, even
   // if another panel is opened. Environment locations remain host settings.
-  const projectRoots = (workspace.workspaceFolders ?? []).map(
-    (folder) => folder.uri
-  );
-  server.projectScope = () => projectRoots;
+  // Workspace folder changes are explicit host actions, unlike project edits.
+  server.projectScope = () =>
+    (workspace.workspaceFolders ?? []).map((folder) => folder.uri);
   const transcriptRoots: Uri[] = [];
   const modelEndpoints: string[] = [];
   server.modelEndpoints = () => {
@@ -52,11 +54,17 @@ export function activateScanview(
       ? [...modelEndpoints, fromEnv]
       : [...modelEndpoints];
   };
-  server.scopeReady = scoutProjectManager.ready.then(() => {
-    const authority = captureProjectAuthority(
-      scoutProjectManager.getConfig(),
-      scoutLocationToUri
-    );
+  server.scopeReady = scoutProjectManager.ready.then(async () => {
+    const config = await scoutProjectManager.getAuthorityConfig();
+    // Match Scout's default preference: an existing ./transcripts directory,
+    // then the host's Inspect log directory. Both are fixed for this snapshot.
+    if (!config.transcripts) {
+      config.transcripts = await defaultProjectTranscripts(
+        server.projectScope()[0],
+        envMgr.getDefaultLogDir()
+      );
+    }
+    const authority = captureProjectAuthority(config, scoutLocationToUri);
     transcriptRoots.push(...authority.transcripts);
     configuredScanRoots.push(...authority.scans);
     modelEndpoints.push(...authority.modelEndpoints);

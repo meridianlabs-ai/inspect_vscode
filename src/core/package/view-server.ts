@@ -1,6 +1,7 @@
 import { ChildProcess, SpawnOptions } from "child_process";
 import { randomUUID } from "crypto";
 import { existsSync, realpathSync } from "fs";
+import { validateHeaderValue } from "http";
 import * as os from "os";
 import { isAbsolute, join, relative, sep } from "path";
 
@@ -243,13 +244,14 @@ export class PackageViewServer implements Disposable {
   ): Promise<T> {
     // Invalid caller input is not a failed server connection. Construct locally
     // before entering the lifecycle/transport path.
-    new Request(`http://${kServerHost}${path}`, options);
+    const headers = new Headers(options.headers);
+    headers.forEach((value, name) => validateHeaderValue(name, value));
+    new Request(`http://${kServerHost}${path}`, { ...options, headers });
     await this.ensureRunning();
     const instance = this.server_;
     if (!instance || !this.isRunning(instance)) {
       throw new Error(`${this.packageBin_} view is not running`);
     }
-    const headers = new Headers(options.headers);
     headers.set("Authorization", instance.token);
     let response: Response;
     try {

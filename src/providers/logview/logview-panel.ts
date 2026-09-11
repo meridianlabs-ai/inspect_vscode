@@ -24,7 +24,10 @@ import {
 import { log } from "../../core/log";
 import { locationInScope } from "../../core/package/location-scope";
 import { parseProxyRequest } from "../../core/package/proxy-request";
-import { assertLogProxyInScope } from "../../core/package/proxy-scope";
+import {
+  assertLogProxyInScope,
+  bindLogProxyDefault,
+} from "../../core/package/proxy-scope";
 import { AbsolutePath } from "../../core/path";
 import { getRelativeUri, resolveToUri } from "../../core/uri";
 import {
@@ -45,6 +48,7 @@ import { LogviewState } from "./logview-state";
  * file-content RPC methods so injected webview script cannot read or write
  * paths outside what the panel is actually viewing.
  */
+/** Legacy parser retained for regression comparisons; RPCs use the consumer-aware guard below. */
 export function logPathInScope(
   type: "file" | "dir",
   panelUri: Uri,
@@ -63,16 +67,8 @@ export function logPathInScope(
   return type === "dir" && getRelativeUri(panelUri, targetUri) !== null;
 }
 
-/**
- * Scope check for a scheme-stripped, percent-encoded path — the form the viewer
- * passes as `transcriptDir` (stripFileScheme of the log file). The plain
- * {@link logPathInScope} runs such a value through `Uri.file`, which treats
- * `%XX` literally, so it both wrongly rejects a legitimate path containing a
- * space (`%20`) and wrongly *accepts* `%2e%2e` traversal that the server would
- * decode to `..` and escape with. The server percent-decodes the value, so the
- * check must too: validate the decoded form (which matches encoded paths and
- * lets getRelativeUri reject the revealed `..`). The raw value is still what's
- * forwarded to the server.
+/** Decode once like Inspect, retaining the whole path and separately checking
+ * its file-URI normalization. RPCs return the original value to the consumer.
  */
 export function logPathInScopeAllowingEncoded(
   type: "file" | "dir",
@@ -236,7 +232,10 @@ export class LogviewPanel extends Disposable {
         // token, so confine it to the panel scope like the named methods. The
         // server percent-decodes the locations it receives (normalize_uri), so
         // use the encoding-tolerant check to scope the decoded form.
-        const request = parseProxyRequest(params[0]);
+        const request = bindLogProxyDefault(
+          parseProxyRequest(params[0]),
+          type === "dir" ? uri.toString() : undefined
+        );
         try {
           assertLogProxyInScope(request, (target) =>
             logPathInScopeAllowingEncoded(type, uri, target)

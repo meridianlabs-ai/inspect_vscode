@@ -35,18 +35,22 @@ suite("Proxy Scope Test Suite", () => {
       assert.throws(() => assertLogProxyInScope(req(path, method), inScope));
 
     test("allows no-location endpoints", () => {
-      ok("/api/log-dir");
+      ok(`/api/log-dir?log_dir=${enc("file:///w/logs")}`);
       ok("/api/user-info");
       ok("/api/app-config");
       ok("/api/dist");
       ok("/api/scout/searches?type=events&count=10");
     });
 
-    test("allows a listing with no explicit location (server default)", () => {
-      // The viewer requests these during config load; a missing location uses
-      // the server's own default, not an attacker path.
-      ok("/api/logs");
-      ok("/api/log-files");
+    test("rejects shared defaults unless the panel has bound an explicit location", () => {
+      for (const path of [
+        "/api/log-dir",
+        "/api/logs",
+        "/api/log-files",
+        "/api/eval-set",
+        "/api/flow",
+      ])
+        rejects(path);
       ok("/api/log-headers");
       ok("/api/events?last_eval_time=123");
     });

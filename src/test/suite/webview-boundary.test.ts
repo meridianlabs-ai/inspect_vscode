@@ -42,6 +42,48 @@ const enc = encodeURIComponent;
 const b64 = (s: string) => Buffer.from(s).toString("base64url");
 
 suite("Webview boundary RPC integration", () => {
+  test("directory defaults are bound to the panel and file panels cannot use shared defaults", async () => {
+    for (const type of ["file", "dir"] as const) {
+      const view = webview();
+      const seen: string[] = [];
+      const server = {
+        proxyRpcRequest: (request: { path: string }) => {
+          seen.push(request.path);
+          return Promise.resolve("ok");
+        },
+      } as unknown as InspectViewServer;
+      const root = Uri.file(type === "file" ? "/panel/run.eval" : "/panel");
+      const panel = new LogviewPanel(
+        view.panel,
+        {} as ExtensionContext,
+        server,
+        type,
+        root
+      );
+      try {
+        for (const path of [
+          "/api/flow",
+          "/api/eval-set",
+          "/api/logs",
+          "/api/log-files",
+          "/api/log-dir",
+        ]) {
+          const result = await view.request("http_request", [
+            { method: "GET", path },
+          ]);
+          assert.strictEqual(Boolean(result.error), type === "file");
+        }
+        assert.strictEqual(seen.length, type === "file" ? 0 : 5);
+        for (const path of seen)
+          assert.strictEqual(
+            new URL(`http://localhost${path}`).searchParams.get("log_dir"),
+            root.toString()
+          );
+      } finally {
+        panel.dispose();
+      }
+    }
+  });
   test("legacy results authority is captured before applying scans defaults", () => {
     const config = normalizeScoutProjectConfig({ results: "/external/scans" });
     const authority = captureProjectAuthority(config, (location) =>
@@ -59,22 +101,24 @@ suite("Webview boundary RPC integration", () => {
       null
     );
   });
-  test("project edits cannot broaden captured authority, including filesystem and bucket roots", () => {
+  test("project edits cannot broaden captured authority, including filesystem roots", () => {
     const config = { transcripts: "s3://team/logs", scans: "file:///w/scans" };
     const authority = captureProjectAuthority(config, (location) =>
       Uri.parse(location)
     );
+    for (const transcripts of ["s3://team", "s3://team/"]) {
+      const bucket = captureProjectAuthority({ transcripts }, (location) =>
+        Uri.parse(location)
+      );
+      assert.ok(locationInScope(bucket.transcripts, "s3://team/run"));
+      assert.ok(!locationInScope(bucket.transcripts, "s3://other/run"));
+    }
     config.transcripts = "file:///";
     config.scans = "file:///";
     assert.ok(locationInScope(authority.transcripts, "s3://team/logs/run"));
     assert.ok(!locationInScope(authority.transcripts, "/outside"));
     assert.ok(!locationInScope(authority.scans, "/outside"));
-    for (const transcripts of [
-      "file:///",
-      "file:///w/../",
-      "file:///C:/",
-      "s3://team/",
-    ]) {
+    for (const transcripts of ["file:///", "file:///w/../", "file:///C:/"]) {
       assert.deepStrictEqual(
         captureProjectAuthority({ transcripts }, (location) =>
           Uri.parse(location)
@@ -157,6 +201,16 @@ suite("Webview boundary RPC integration", () => {
               ],
             },
             { scans: "/outside" },
+            { scans: "\\outside" },
+            { scans: "\\\\server\\share\\outside" },
+            { transcripts: "\\outside" },
+            { model_args: "\\outside" },
+            { validation: { x: { cases: [{ id: "one" }] } } },
+            {
+              validation: {
+                x: { cases: [{ id: "one", target: true, labels: {} }] },
+              },
+            },
             { results: "/outside" },
             { scanners: [{ name: "scanner", file: "/outside/scanner.py" }] },
             {
@@ -333,7 +387,7 @@ suite("Webview boundary RPC integration", () => {
       },
       proxyRpcRequest: call,
       projectScope: () => [Uri.file("/w")],
-      transcriptsScope: () => [Uri.file("/w")],
+      transcriptsScope: () => [Uri.parse("s3://team/transcripts")],
     } as unknown as ScoutViewServer;
     const panel = new ScanviewPanel(
       view.panel,
@@ -376,6 +430,11 @@ suite("Webview boundary RPC integration", () => {
         { method: "POST", path: "/api/v2/startscan", body: "{}" },
         { method: "PUT", path: "/api/v2/project/config", body: "{}" },
         { method: "POST", path: "/api/v2/validations", body: "{}" },
+        { method: "GET", path: "/api/v2/validations" },
+        {
+          method: "GET",
+          path: `/api/v2/validations/${b64("file:///w/other.json")}`,
+        },
         ...["DELETE", "delete", "Delete", "dElEtE"].map((method) => ({
           method,
           path: `/api/v2/scans/${parent}/${b64("scan_id=own")}`,
@@ -398,6 +457,23 @@ suite("Webview boundary RPC integration", () => {
         );
       }
       assert.strictEqual(calls, 2);
+      for (const [method, suffix] of [
+        ["HEAD", "info"],
+        ["GET", "info"],
+        ["GET", "messages-events"],
+      ]) {
+        assert.ok(
+          !(
+            await view.request("http_request", [
+              {
+                method,
+                path: `/api/v2/transcripts/${b64("s3://team/transcripts")}/transcript-id/${suffix}`,
+              },
+            ])
+          ).error
+        );
+      }
+      assert.strictEqual(calls, 5);
     } finally {
       panel.dispose();
     }

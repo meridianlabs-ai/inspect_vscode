@@ -34,6 +34,9 @@ export function locationUri(location: string, base?: Uri): Uri {
     });
   }
   if (location.startsWith("/")) return Uri.file(location);
+  // A leading backslash is drive-rooted or UNC on Windows, never relative to
+  // the project. These ambiguous forms require an explicit supported URI/path.
+  if (location.startsWith("\\")) throw new Error("Unsupported rooted path");
   if (!base || /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(location)) {
     throw new Error("Relative location without an authorized base");
   }
