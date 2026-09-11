@@ -79,9 +79,19 @@ suite("logview-panel Test Suite", () => {
       );
     });
 
-    test("rejects unparseable targets", () => {
+    test("rejects an empty target without resolving it against the cwd", () => {
       const uri = Uri.file("/w/logs/run.eval");
       assert.strictEqual(logPathInScope("file", uri, ""), false);
+      // a dir panel that contains the extension host's cwd must not accept ""
+      const cwd = Uri.file(process.cwd());
+      assert.strictEqual(logPathInScope("dir", cwd, ""), false);
+      assert.strictEqual(logPathInScopeAllowingEncoded("dir", cwd, ""), false);
+      const parent = Uri.file(path.dirname(process.cwd()));
+      assert.strictEqual(logPathInScope("dir", parent, ""), false);
+      assert.strictEqual(
+        logPathInScopeAllowingEncoded("dir", parent, ""),
+        false
+      );
     });
   });
 
@@ -437,6 +447,7 @@ suite("logview-panel Test Suite", () => {
           "file:///w/logs/..%2F..%2Fetc%2Fpasswd",
           "file:///w/logs/%2e%2e/%2e%2e/etc/passwd",
           "/etc/passwd",
+          "",
         ]) {
           for (const [method, params] of pathMethods(target)) {
             const response = await call(method, params);
@@ -448,6 +459,23 @@ suite("logview-panel Test Suite", () => {
           }
         }
         assert.deepStrictEqual(calls, [], "nothing may reach the server");
+      } finally {
+        panel.dispose();
+      }
+    });
+
+    test("dir panel containing the cwd still refuses an empty location on every method", async () => {
+      const { panel, calls, call } = createPanel(
+        "dir",
+        Uri.file(path.dirname(process.cwd()))
+      );
+      try {
+        for (const [method, params] of pathMethods("")) {
+          const response = await call(method, params);
+          assert.ok(response.error, `${method} must refuse ""`);
+          assert.match(response.error.message, /outside the scope/);
+        }
+        assert.deepStrictEqual(calls, []);
       } finally {
         panel.dispose();
       }

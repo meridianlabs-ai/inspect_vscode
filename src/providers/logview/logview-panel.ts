@@ -58,6 +58,11 @@ export function logPathInScope(
   panelUri: Uri,
   target: string
 ): boolean {
+  // An empty location is never a request for something in the panel scope;
+  // resolving it would name the extension host's working directory.
+  if (target === "") {
+    return false;
+  }
   let targetUri: Uri;
   try {
     targetUri = parseLocationLiterally(target);
