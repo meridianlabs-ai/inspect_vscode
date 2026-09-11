@@ -6,6 +6,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  realpathSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
@@ -179,13 +180,12 @@ export async function verifyRunTerminal(): Promise<void> {
           "the environment's console script ran"
         );
         assert.deepStrictEqual(actual.args, args);
+        // Real paths on both sides: macOS reports /tmp under /private and a
+        // Windows TEMP given as an 8.3 short name (`RUNNER~1`) comes back
+        // from Python's getcwd in its long form.
         assert.strictEqual(
-          resolve(actual.cwd)
-            .replace(/^\/private/, "")
-            .toLowerCase(),
-          resolve(cwd)
-            .replace(/^\/private/, "")
-            .toLowerCase()
+          realpathSync.native(actual.cwd).toLowerCase(),
+          realpathSync.native(cwd).toLowerCase()
         );
         assert.strictEqual(actual.activation, "terminal-activation");
         assert.strictEqual(
