@@ -18,6 +18,7 @@ import { runPython } from "../../core/python/exec";
 import { shQuote } from "../../core/string";
 
 import { PackageManager } from "./manager";
+import { parseProxyRequest } from "./proxy-request";
 
 // Custom request/response types for JSON-RPC proxy communication.
 // We can't use fetch's Request/Response/Headers because:
@@ -32,7 +33,7 @@ import { PackageManager } from "./manager";
 // - Multi-value headers (e.g. Set-Cookie) collapse to single string
 // - Large request bodies must fit in memory
 export interface HttpProxyRpcRequest {
-  method: "GET" | "POST" | "PUT" | "DELETE";
+  method: "GET" | "HEAD" | "POST" | "PUT" | "DELETE";
   path: string;
   headers?: Record<string, string>;
   body?: string;
@@ -92,7 +93,7 @@ export class PackageViewServer implements Disposable {
 
   protected async api_json(
     path: string,
-    method: "GET" | "POST" | "PUT" | "DELETE" = "GET",
+    method: "GET" | "HEAD" | "POST" | "PUT" | "DELETE" = "GET",
     headers?: Record<string, string>,
     handleError?: (status: number) => string | undefined
   ): Promise<{ data: string; headers: Headers }> {
@@ -105,7 +106,7 @@ export class PackageViewServer implements Disposable {
 
   protected async api_bytes(
     path: string,
-    method: "GET" | "POST" | "PUT" | "DELETE" = "GET"
+    method: "GET" | "HEAD" | "POST" | "PUT" | "DELETE" = "GET"
   ): Promise<{ data: Uint8Array; headers: Headers }> {
     const result = await this.api(path, method, {}, true);
     return {
@@ -120,7 +121,7 @@ export class PackageViewServer implements Disposable {
    */
   protected async serverFetch(
     path: string,
-    method: "GET" | "POST" | "PUT" | "DELETE",
+    method: "GET" | "HEAD" | "POST" | "PUT" | "DELETE",
     headers: Headers,
     body?: string
   ): Promise<{
@@ -168,7 +169,9 @@ export class PackageViewServer implements Disposable {
   public async proxyRpcRequest(
     request: HttpProxyRpcRequest
   ): Promise<HttpProxyRpcResponse> {
-    await this.ensureRunning();
+    // The panels validate before their scope checks; validate again here so
+    // no caller can hand an unchecked webview payload to the transport.
+    request = parseProxyRequest(request);
 
     const { status, headers, data } = await this.serverFetch(
       request.path,
@@ -193,7 +196,7 @@ export class PackageViewServer implements Disposable {
 
   protected async api(
     path: string,
-    method: "GET" | "POST" | "PUT" | "DELETE" = "GET",
+    method: "GET" | "HEAD" | "POST" | "PUT" | "DELETE" = "GET",
     headers: Record<string, string> = {},
     binary: boolean = false,
     handleError?: (status: number) => string | undefined
@@ -235,6 +238,13 @@ export class PackageViewServer implements Disposable {
 
   // Keep the process identity through the complete response body read. A response
   // from an instance that stopped or was replaced must never become authority.
+  //
+  // A failed fetch fails only this request. It is not treated as evidence that
+  // the child died: the child's own exit/error events (and the readiness
+  // timeout during startup) are what stop an instance, and the next request
+  // then starts a replacement. Stopping on any rejection would let one bad
+  // request (an invalid header, a body on GET, a transient socket error) kill
+  // the shared server and abort every other panel's in-flight request.
   private async request<T>(
     path: string,
     options: RequestInit,
@@ -256,7 +266,16 @@ export class PackageViewServer implements Disposable {
         redirect: "error",
       });
     } catch (error) {
-      this.stop(instance);
+      if (!this.isRunning(instance)) {
+        throw new Error(`${this.packageBin_} view stopped during request`, {
+          cause: error,
+        });
+      }
+      this.outputChannel_.appendLine(
+        `${this.packageBin_} view request failed: ${options.method ?? "GET"} ${path}: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
       throw error;
     }
     const result = await consume(response);

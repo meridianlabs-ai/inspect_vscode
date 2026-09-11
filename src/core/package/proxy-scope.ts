@@ -37,11 +37,13 @@ interface ParsedRequest {
 function parseRequest(request: HttpProxyRpcRequest): ParsedRequest {
   try {
     const path = request.path;
-    // The view server only serves absolute "/api/..." paths; normalize so a
-    // missing leading slash still parses rather than being treated as relative.
-    const url = new URL(
-      "http://127.0.0.1" + (path.startsWith("/") ? path : "/" + path)
-    );
+    // Callers validate the request first (`parseProxyRequest`), so the path is
+    // already absolute. Refuse rather than repair anything else: a relative
+    // path would otherwise be parsed as part of the host.
+    if (!path.startsWith("/")) {
+      throw proxyError(request);
+    }
+    const url = new URL("http://127.0.0.1" + path);
     const segments = url.pathname
       .split("/")
       .map((segment, index) =>
