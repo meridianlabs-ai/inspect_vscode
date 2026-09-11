@@ -15,6 +15,6 @@ export async function run(): Promise<void> {
     `PowerShell smart-quote Run regression: ${powershell ? "passed" : "skipped (PowerShell unavailable)"}`
   );
   console.log(
-    `VS Code ${version}: first/repeated Run, startup shell replacement, argv, cwd and activation passed`
+    `VS Code ${version}: first/repeated Run, startup shell replacement, argv, cwd, activation, selected interpreter without PATH Python and decoy rejection passed`
   );
 }

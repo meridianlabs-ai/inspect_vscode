@@ -501,14 +501,22 @@ suite("Run on hosts without shell identity", () => {
                 "“”„‘’‚‛",
               ],
               "/cwd [literal]",
-              { path: "/selected/python" } as AbsolutePath
+              { path: "/selected dir/py$thon" } as AbsolutePath
             )
           );
         }
       }
       assert.strictEqual(emitted.length, 4);
       for (const line of emitted) {
-        assert.match(line, /^python3? -I -c "/);
+        // A fixed operating-system launcher at an absolute path; the shell
+        // never searches cwd or PATH for python.
+        assert.match(
+          line,
+          process.platform === "win32"
+            ? /^[A-Za-z]:\/\S+\/powershell\.exe -NoLogo -NoProfile -NonInteractive -EncodedCommand "/
+            : /^\/bin\/sh -c '/
+        );
+        assert.doesNotMatch(line, /^python/);
         assert.ok(!line.includes("INJECTED"));
         assert.match(
           line,
@@ -516,7 +524,8 @@ suite("Run on hosts without shell identity", () => {
           "task Unicode quotes never enter shell source"
         );
         assert.ok(!line.includes("/cwd"));
-        assert.ok(!line.includes("/selected/python"));
+        assert.ok(!line.includes("selected dir"));
+        assert.ok(!line.includes("$thon"));
         assert.ok(!line.startsWith("cd "));
       }
     } finally {

@@ -1,6 +1,7 @@
 import * as assert from "node:assert";
 import { spawnSync } from "node:child_process";
 import {
+  chmodSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -10,7 +11,7 @@ import {
 } from "node:fs";
 import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { delimiter, dirname, join, resolve } from "node:path";
 
 import { TerminalOptions, version, window } from "vscode";
 
@@ -21,17 +22,25 @@ export async function verifyRunTerminal(
   shell: "startup" | "powershell" = "startup"
 ): Promise<boolean> {
   const windows = process.platform === "win32";
-  if (
-    shell === "startup" &&
-    !windows &&
-    spawnSync("fish", ["--version"]).error
-  ) {
+  // The terminal runs with no Python on PATH, so shells are started by
+  // absolute path.
+  const locate = (name: string): string | undefined => {
+    const found = spawnSync(windows ? "where.exe" : "which", [name], {
+      encoding: "utf8",
+    });
+    return found.status === 0
+      ? found.stdout.split(/\r?\n/)[0]?.trim()
+      : undefined;
+  };
+  const fish = locate("fish");
+  if (shell === "startup" && !windows && !fish) {
     if (process.env.REQUIRE_FISH_TESTS) {
       assert.fail("fish is required");
     }
     return false;
   }
-  if (shell === "powershell" && spawnSync("pwsh", ["--version"]).error) {
+  const pwsh = locate("pwsh");
+  if (shell === "powershell" && !pwsh) {
     if (process.env.REQUIRE_PWSH_TESTS) {
       assert.fail("PowerShell is required");
     }
@@ -46,6 +55,35 @@ export async function verifyRunTerminal(
   const root = mkdtempSync(join(tmpdir(), "inspect-terminal-test-"));
   const cwd = join(root, "cwd [demo] & %literal%!");
   mkdirSync(cwd);
+  // Bare `python`/`python3` decoys in the terminal's current directory and at
+  // the front of PATH record that they ran. The selected interpreter's own
+  // directory is removed from PATH: the launch must not need it there.
+  const marker = join(root, "UNSELECTED");
+  const decoyDir = join(root, "decoys");
+  mkdirSync(decoyDir);
+  for (const dir of [decoyDir, cwd]) {
+    for (const name of windows
+      ? ["python.cmd", "python3.cmd"]
+      : ["python", "python3"]) {
+      const decoy = join(dir, name);
+      writeFileSync(
+        decoy,
+        windows
+          ? `@echo unselected>"${marker}"\r\n@exit /b 23\r\n`
+          : `#!/bin/sh\nprintf unselected > "${marker}"\nexit 23\n`
+      );
+      if (!windows) {
+        chmodSync(decoy, 0o755);
+      }
+    }
+  }
+  const selectedDir = resolve(dirname(selected)).toLowerCase();
+  const terminalPath = [
+    decoyDir,
+    ...(process.env.PATH || "")
+      .split(delimiter)
+      .filter((entry) => entry && resolve(entry).toLowerCase() !== selectedDir),
+  ].join(delimiter);
   const fixture = join(root, "inspect_ai");
   mkdirSync(fixture);
   writeFileSync(join(fixture, "__init__.py"), "");
@@ -63,7 +101,7 @@ export async function verifyRunTerminal(
       "def main():",
       " result=os.environ['TRANSPORT_RESULT']",
       " with open(result+'.tmp', 'w', encoding='utf-8') as f:",
-      "  json.dump({'args':sys.argv[1:],'cwd':os.getcwd(),'activation':os.environ['TRANSPORT_ACTIVATED']},f)",
+      "  json.dump({'args':sys.argv[1:],'cwd':os.getcwd(),'python':sys.executable,'activation':os.environ['TRANSPORT_ACTIVATED']},f)",
       " os.replace(result+'.tmp',result)",
       " print('Inspect test output')",
     ].join("\n")
@@ -80,7 +118,7 @@ export async function verifyRunTerminal(
     "[console_scripts]\nscout = inspect_ai.__main__:main\n"
   );
   const rcfile = join(root, "startup.bash");
-  writeFileSync(rcfile, "exec fish --no-config -i\n");
+  writeFileSync(rcfile, `exec "${fish}" --no-config -i\n`);
   const result = join(root, "result.json");
   const original = Object.getOwnPropertyDescriptor(window, "createTerminal")!;
   const create = window.createTerminal;
@@ -110,7 +148,7 @@ export async function verifyRunTerminal(
       const terminal = create({
         ...options,
         ...(shell === "powershell"
-          ? { shellPath: "pwsh", shellArgs: ["-NoLogo", "-NoProfile"] }
+          ? { shellPath: pwsh, shellArgs: ["-NoLogo", "-NoProfile"] }
           : windows
             ? {}
             : { shellPath: "/bin/bash", shellArgs: ["--rcfile", rcfile] }),
@@ -118,10 +156,7 @@ export async function verifyRunTerminal(
           PYTHONPATH: root,
           TRANSPORT_RESULT: result,
           TRANSPORT_ACTIVATED: "terminal-activation",
-          PATH:
-            dirname(selected) +
-            (windows ? ";" : ":") +
-            (process.env.PATH || ""),
+          PATH: terminalPath,
         },
       });
       if (version.startsWith("1.93.")) {
@@ -183,12 +218,23 @@ export async function verifyRunTerminal(
         const actual = JSON.parse(readFileSync(result, "utf8")) as {
           args: string[];
           cwd: string;
+          python: string;
           activation: string;
         };
         assert.deepStrictEqual(actual.args, args);
         assert.strictEqual(
           actual.cwd.replace(/^\/private/, ""),
           cwd.replace(/^\/private/, "")
+        );
+        assert.strictEqual(
+          actual.python.replace(/^\/private/, "").toLowerCase(),
+          selected.replace(/^\/private/, "").toLowerCase(),
+          "the selected interpreter ran, not a PATH or cwd python"
+        );
+        assert.strictEqual(
+          existsSync(marker),
+          false,
+          "a bare python decoy must never execute"
         );
         assert.strictEqual(actual.activation, "terminal-activation");
         assert.strictEqual(existsSync(join(cwd, "INJECTED")), false);

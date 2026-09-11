@@ -23,7 +23,7 @@ import {
 import { findEnvPythonPath, pythonInterpreter } from "../python";
 import { activeWorkspaceFolder } from "../workspace";
 
-import { createRunTransport } from "./run-transport";
+import { createRunTransport, resolveLaunchVector } from "./run-transport";
 
 export interface ExecProfile {
   packageName: "inspect-ai" | "inspect-scout";
@@ -205,10 +205,14 @@ export const runCommand = async (
   cwd: string,
   python?: AbsolutePath
 ) => {
-  const selected = python ? [python.path] : pythonInterpreter().execCommand;
-  if (!selected?.length) {
-    throw new Error("No active Python interpreter available.");
-  }
+  // The terminal shell never searches for an executable: the launch vector is
+  // made absolute here (a bare default such as `python` is looked up on the
+  // extension host PATH, never in a workspace or terminal current directory)
+  // and the transport starts it through a fixed operating-system launcher.
+  const selected = resolveLaunchVector(
+    python ? [python.path] : (pythonInterpreter().execCommand ?? []),
+    cwd
+  );
   // Retain output and activation on repeated runs. A changed interpreter needs
   // a fresh activation; keep the old terminal's output available to the user.
   const selection = JSON.stringify(selected);
@@ -244,9 +248,11 @@ export const runCommand = async (
   };
 
   // Prefer shell integration (available in VS Code 1.93+): it fires after the
-  // shell's init sequence completes, so the Python env is activated and
-  // Python is on PATH before the launcher is sent. Task inputs never enter
-  // shell syntax; shell integration supplies command decorations only.
+  // shell's init sequence completes, so the Python environment activation
+  // (PATH, VIRTUAL_ENV, conda variables) is in place before the launcher is
+  // sent and is inherited by the selected interpreter. The launch itself does
+  // not depend on PATH. Task inputs never enter shell syntax; shell
+  // integration supplies command decorations only.
   //
   // On a reused terminal integration is usually already active; on a new
   // terminal we wait up to 10 s for it to activate. If it doesn't (shell
