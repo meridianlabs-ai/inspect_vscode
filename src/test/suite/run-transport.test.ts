@@ -214,12 +214,17 @@ suite("Run transport through real shells", () => {
         let launch = [interpreter];
         if (vector === "wrapper") {
           // e.g. a shim that forwards to the interpreter with extra arguments.
-          const wrapper = join(root, "wrapper $dir", windows ? "py.cmd" : "py");
-          mkdirSync(dirname(wrapper));
+          // cmd reads batch files in the OEM code page, so the Windows shim
+          // stays ASCII and finds the interpreter next to itself in the
+          // hostile venv directory.
+          const wrapper = windows
+            ? join(dirname(interpreter), "py wrapper.cmd")
+            : join(root, "wrapper $dir", "py");
+          mkdirSync(dirname(wrapper), { recursive: true });
           writeFileSync(
             wrapper,
             windows
-              ? `@if not "%~1"=="--wrapped" exit /b 9\r\n@"${interpreter.replace(/%/g, "%%")}" %2 %3\r\n`
+              ? `@if not "%~1"=="--wrapped" exit /b 9\r\n@"%~dp0python.exe" %2 %3\r\n`
               : `#!/bin/sh\n[ "$1" = --wrapped ] || exit 9\nshift\nexec ${shellQuote(interpreter)} "$@"\n`
           );
           if (!windows) {
