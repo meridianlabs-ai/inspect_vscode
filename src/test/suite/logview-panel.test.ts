@@ -665,7 +665,10 @@ suite("logview-panel Test Suite", () => {
           assert.strictEqual(inScope(own), true, own);
           assert.strictEqual(serverReads(own), "panel file", own);
         }
-        const sibling = panel.toString().replace("%20", "%2520");
+        // the sibling's own encoded URI (`...run%25201.eval`) decodes once to
+        // its literal name `run%201.eval`
+        const sibling = Uri.file(path.join(root, "run%201.eval")).toString();
+        assert.ok(sibling.endsWith("/run%25201.eval"));
         assert.strictEqual(serverReads(sibling), "OTHER file");
         assert.strictEqual(inScope(sibling), false);
       } finally {
