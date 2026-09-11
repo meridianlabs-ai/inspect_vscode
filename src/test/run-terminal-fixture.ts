@@ -72,6 +72,18 @@ export async function verifyRunTerminal() {
   const create = window.createTerminal;
   const terminals: ReturnType<typeof create>[] = [];
   const cleanups: { dispose: () => void }[] = [];
+  let output = "";
+  const outputListener = window.onDidStartTerminalShellExecution((event) => {
+    if (terminals.includes(event.terminal)) {
+      void (async () => {
+        for await (const data of event.execution.read()) {
+          output = (output + data).slice(-20000);
+        }
+      })().catch((error: unknown) => {
+        output += String(error);
+      });
+    }
+  });
   Object.defineProperty(window, "createTerminal", {
     configurable: true,
     value: (options: TerminalOptions) => {
@@ -135,7 +147,10 @@ export async function verifyRunTerminal() {
         while (!existsSync(result) && Date.now() < deadline) {
           await new Promise((resolve) => setTimeout(resolve, 100));
         }
-        assert.ok(existsSync(result), "terminal task should finish");
+        assert.ok(
+          existsSync(result),
+          `${profile.command} ${label}: terminal task should finish; output: ${output}`
+        );
         const actual = JSON.parse(readFileSync(result, "utf8")) as {
           args: string[];
           cwd: string;
@@ -157,6 +172,7 @@ export async function verifyRunTerminal() {
     );
   } finally {
     Object.defineProperty(window, "createTerminal", original);
+    outputListener.dispose();
     await Promise.all(
       terminals.map(
         (terminal) =>
