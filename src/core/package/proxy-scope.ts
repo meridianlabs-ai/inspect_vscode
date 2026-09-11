@@ -38,8 +38,8 @@ function parseRequest(request: HttpProxyRpcRequest): ParsedRequest {
   try {
     const path = request.path;
     // Callers validate the request first (`parseProxyRequest`), so the path is
-    // already an absolute "/api/..." path. Refuse rather than repair anything
-    // else: a relative path would otherwise be parsed as part of the host.
+    // already absolute. Refuse rather than repair anything else: a relative
+    // path would otherwise be parsed as part of the host.
     if (!path.startsWith("/")) {
       throw proxyError(request);
     }

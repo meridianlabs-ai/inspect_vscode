@@ -56,24 +56,19 @@ function proxySpy() {
 // Method spellings that fetch would silently normalize to DELETE.
 const kDeleteSpellings = ["DELETE", "delete", "Delete", "dElEtE"];
 
-// Structurally invalid requests. Each of these makes fetch reject (or worse,
-// parses as a different URL), so each must fail before any server contact.
+// Requests outside the proxy contract: not the shape the proxy promises, a
+// method the route policy cannot compare exactly, a path that could not be
+// appended to the extension-chosen origin, or a header the extension host
+// owns. Each must fail at the RPC boundary, before any policy or server contact.
 const malformed = (path: string) => [
   { method: "GET", path: path.replace(/^\//, "") }, // missing leading slash
-  { method: "GET", path, body: "x" }, // GET with body
-  { method: "HEAD", path, body: "x" }, // HEAD with body
-  { method: "GET X", path }, // invalid method token
+  { method: "GET X", path }, // not a supported method token
   { method: "PATCH", path }, // unsupported method
   { method: ["GET"], path }, // non-string method
-  { method: "GET", path: `${path}\\..` }, // backslash in path
-  { method: "GET", path: `${path}#frag` }, // fragment
-  { method: "GET", path: `${path} ` }, // whitespace
-  { method: "GET", path, headers: { test: "x\ny" } }, // CRLF value
-  { method: "GET", path, headers: { test: `bad${C1}value` } }, // control byte
-  { method: "GET", path, headers: { "bad name": "x" } }, // invalid name
-  { method: "GET", path, headers: { "Keep-Alive": "timeout=5" } }, // hop-by-hop
-  { method: "GET", path, headers: { Authorization: "token" } }, // reserved
+  { method: "GET", path, headers: { Authorization: "token" } }, // host-owned
+  { method: "GET", path, headers: { Host: "evil" } }, // host-owned
   { method: "GET", path, headers: ["test"] }, // non-object headers
+  { method: "GET", path, headers: { Accept: 1 } }, // non-string header value
   { method: "POST", path, body: {} }, // non-string body
   "not an object",
   null,
@@ -336,21 +331,14 @@ suite("parseProxyRequest", () => {
     }
   });
 
-  test("rejects malformed shapes, paths, bodies and headers", () => {
+  test("rejects malformed shapes, relative paths, non-string bodies and host-owned headers", () => {
     for (const value of [undefined, null, "GET /api/x", 1, [], () => {}]) {
       assert.throws(() => parseProxyRequest(value), /Invalid proxied request/);
     }
     for (const path of [
       "api/x",
-      "/x",
-      "//api/x",
-      "/api",
-      "/api/x#f",
-      "/api/x y",
-      "/api/x\\y",
-      `/api/x${C1}`,
-      `/api/x${String.fromCharCode(127)}`,
-      "/api/x\n",
+      "",
+      "127.0.0.1:1/api/x",
       "http://127.0.0.1/api/x",
       undefined,
       ["/api/x"],
@@ -361,15 +349,9 @@ suite("parseProxyRequest", () => {
         String(path)
       );
     }
-    for (const [method, body] of [
-      ["GET", "x"],
-      ["HEAD", ""],
-      ["POST", {}],
-      ["POST", 1],
-      ["PUT", ["x"]],
-    ]) {
+    for (const body of [{}, 1, ["x"], true]) {
       assert.throws(
-        () => parseProxyRequest({ method, path: "/api/x", body }),
+        () => parseProxyRequest({ method: "POST", path: "/api/x", body }),
         /Invalid proxied body/
       );
     }
@@ -378,28 +360,38 @@ suite("parseProxyRequest", () => {
       "Accept: x",
       ["Accept"],
       { Accept: 1 },
-      { "bad name": "x" },
-      { "": "x" },
-      { test: "x\ny" },
-      { test: "x\r" },
-      { test: `x${C1}y` },
-      { test: `x${String.fromCharCode(127)}` },
+      { Accept: null },
       { Authorization: "token" },
       { authorization: "token" },
       { Host: "evil" },
-      { Connection: "close" },
-      { "Keep-Alive": "timeout=5" },
-      { "Content-Length": "1" },
-      { "Transfer-Encoding": "chunked" },
-      { Upgrade: "h2c" },
-      { Expect: "100-continue" },
-      { TE: "trailers" },
-      { Trailer: "x" },
+      { host: "evil" },
     ]) {
       assert.throws(
         () => parseProxyRequest({ method: "GET", path: "/api/x", headers }),
         /Invalid proxied headers/,
         JSON.stringify(headers)
+      );
+    }
+  });
+
+  test("leaves transport rules to fetch instead of predicting them", () => {
+    // These are not part of the proxy contract. If fetch or undici refuses
+    // one, that single request fails with a JSON-RPC error (see the view
+    // server lifecycle tests); nothing here needs to guess in advance.
+    for (const request of [
+      { method: "GET", path: "/api/x", body: "x" },
+      { method: "HEAD", path: "/api/x", body: "" },
+      { method: "GET", path: "/api/x y#frag" },
+      { method: "GET", path: "/other" },
+      { method: "GET", path: "/api/x", headers: { "bad name": "x" } },
+      { method: "GET", path: "/api/x", headers: { test: "x\ny" } },
+      { method: "GET", path: "/api/x", headers: { test: `x${C1}y` } },
+      { method: "GET", path: "/api/x", headers: { "Keep-Alive": "timeout=5" } },
+      { method: "GET", path: "/api/x", headers: { "Content-Length": "1" } },
+    ]) {
+      assert.doesNotThrow(
+        () => parseProxyRequest(request),
+        JSON.stringify(request)
       );
     }
   });

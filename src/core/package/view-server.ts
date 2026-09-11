@@ -1,7 +1,6 @@
 import { ChildProcess, SpawnOptions } from "child_process";
 import { randomUUID } from "crypto";
 import { existsSync, realpathSync } from "fs";
-import { validateHeaderValue } from "http";
 import * as os from "os";
 import { isAbsolute, join, relative, sep } from "path";
 
@@ -171,7 +170,7 @@ export class PackageViewServer implements Disposable {
     request: HttpProxyRpcRequest
   ): Promise<HttpProxyRpcResponse> {
     // The panels validate before their scope checks; validate again here so
-    // no caller can hand unchecked webview data to the transport.
+    // no caller can hand an unchecked webview payload to the transport.
     request = parseProxyRequest(request);
 
     const { status, headers, data } = await this.serverFetch(
@@ -239,27 +238,24 @@ export class PackageViewServer implements Disposable {
 
   // Keep the process identity through the complete response body read. A response
   // from an instance that stopped or was replaced must never become authority.
+  //
+  // A failed fetch fails only this request. It is not treated as evidence that
+  // the child died: the child's own exit/error events (and the readiness
+  // timeout during startup) are what stop an instance, and the next request
+  // then starts a replacement. Stopping on any rejection would let one bad
+  // request (an invalid header, a body on GET, a transient socket error) kill
+  // the shared server and abort every other panel's in-flight request.
   private async request<T>(
     path: string,
     options: RequestInit,
     consume: (response: Response) => Promise<T>
   ): Promise<T> {
-    // Invalid caller input is not a failed server connection. The catch below
-    // treats a rejected fetch as a dead instance, so apply the Fetch API's and
-    // Node's own request rules here, before the lifecycle and transport path.
-    // This also covers the named RPC methods, whose webview-supplied arguments
-    // can become headers.
-    const headers = new Headers(options.headers);
-    headers.forEach((value, name) => validateHeaderValue(name, value));
-    if (!path.startsWith("/")) {
-      throw new Error(`Invalid ${this.packageBin_} view request path`);
-    }
-    new Request(`http://${kServerHost}${path}`, { ...options, headers });
     await this.ensureRunning();
     const instance = this.server_;
     if (!instance || !this.isRunning(instance)) {
       throw new Error(`${this.packageBin_} view is not running`);
     }
+    const headers = new Headers(options.headers);
     headers.set("Authorization", instance.token);
     let response: Response;
     try {
@@ -270,7 +266,16 @@ export class PackageViewServer implements Disposable {
         redirect: "error",
       });
     } catch (error) {
-      this.stop(instance);
+      if (!this.isRunning(instance)) {
+        throw new Error(`${this.packageBin_} view stopped during request`, {
+          cause: error,
+        });
+      }
+      this.outputChannel_.appendLine(
+        `${this.packageBin_} view request failed: ${options.method ?? "GET"} ${path}: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
       throw error;
     }
     const result = await consume(response);

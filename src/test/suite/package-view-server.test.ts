@@ -27,6 +27,14 @@ import {
   waitFor,
 } from "./view-server-mocks";
 
+function urlOf(url: string | URL | Request): string {
+  return typeof url === "string"
+    ? url
+    : url instanceof URL
+      ? url.href
+      : url.url;
+}
+
 class TestServer extends PackageViewServer {
   constructor(
     manager: MockPackageManager,
@@ -50,6 +58,9 @@ class TestServer extends PackageViewServer {
   }
   json() {
     return this.api_json("/api/dist");
+  }
+  json_at(path: string) {
+    return this.api_json(path);
   }
   bytes() {
     return this.api_bytes("/api/bytes");
@@ -137,15 +148,7 @@ suite("PackageViewServer lifecycle", () => {
     };
     Object.assign(processes, { spawnProcess: spawnMock });
     global.fetch = (url, options) => {
-      calls.push({
-        url:
-          typeof url === "string"
-            ? url
-            : url instanceof URL
-              ? url.href
-              : url.url,
-        options,
-      });
+      calls.push({ url: urlOf(url), options });
       return Promise.resolve(
         new Response('{"ok":true}', {
           headers: { "Content-Type": "application/json" },
@@ -174,12 +177,13 @@ suite("PackageViewServer lifecycle", () => {
     outputs[index]!.stdout!("Running on http://127.0.0.1\n");
   }
 
-  test("malformed proxy input leaves the shared child and in-flight requests alive", async () => {
+  test("a request that fetch rejects fails alone; the shared child and in-flight requests survive", async () => {
     const starting = server.start();
     await ready();
     await starting;
     // Behave like undici: structurally invalid input rejects instead of
-    // connecting. Anything else stays pending until the test releases it.
+    // connecting, one route fails at the socket, and anything else stays
+    // pending until the test releases it.
     let finish!: (response: Response) => void;
     let fetches = 0;
     global.fetch = (url, options) => {
@@ -194,6 +198,9 @@ suite("PackageViewServer lifecycle", () => {
           error instanceof Error ? error : new Error(String(error))
         );
       }
+      if (urlOf(url).includes("/api/reset")) {
+        return Promise.reject(new Error("read ECONNRESET"));
+      }
       return new Promise<Response>((resolve) => {
         finish = resolve;
       });
@@ -201,41 +208,45 @@ suite("PackageViewServer lifecycle", () => {
     const otherPanel = server.json();
     await waitFor(() => finish !== undefined);
     assert.strictEqual(fetches, 1);
+
+    // Outside the proxy contract: refused at the boundary, before transport.
     for (const request of [
       { method: "GET", path: "api/log-dir" },
-      { method: "GET", path: "/api/log-dir", body: "x" },
       { method: "GET X", path: "/api/log-dir" },
       { method: "delete", path: "/api/log-dir" },
-      {
-        method: "GET",
-        path: "/api/dist",
-        headers: { "Keep-Alive": "timeout=5" },
-      },
+      { method: "GET", path: "/api/dist", headers: { Authorization: "x" } },
+      { method: "POST", path: "/api/log-dir", body: {} },
+      null,
+    ]) {
+      await assert.rejects(
+        server.proxyRpcRequest(request as HttpProxyRpcRequest),
+        /Invalid proxied/
+      );
+    }
+    assert.strictEqual(fetches, 1);
+
+    // Inside the contract but refused by fetch/undici or by the socket: each
+    // fails with its own error, and nothing else is affected.
+    for (const request of [
+      { method: "GET", path: "/api/log-dir", body: "x" },
+      { method: "GET", path: "/api/log-dir", headers: { test: "x\ny" } },
+      { method: "GET", path: "/api/log-dir", headers: { "bad name": "x" } },
       {
         method: "GET",
         path: "/api/dist",
         headers: { test: `bad${String.fromCharCode(1)}value` },
       },
-      { method: "GET", path: "/api/log-dir", headers: { test: "x\ny" } },
-      {
-        method: "GET",
-        path: "/api/log-dir",
-        headers: { "content-length": "100" },
-      },
-      { method: "POST", path: "/api/log-dir", body: {} },
-      null,
-    ]) {
-      await assert.rejects(
-        server.proxyRpcRequest(request as HttpProxyRpcRequest)
-      );
-      assert.strictEqual(children[0]!.killed, false);
-      assert.strictEqual(children.length, 1);
+      { method: "GET", path: "/api/reset" },
+    ] as HttpProxyRpcRequest[]) {
+      await assert.rejects(server.proxyRpcRequest(request));
     }
-    // Validation happened before transport: only the in-flight request fetched.
-    assert.strictEqual(fetches, 1);
+    await assert.rejects(server.json_at("/api/reset"), /ECONNRESET/);
+    assert.match(outputChannel.getOutput(), /request failed: GET \/api\/reset/);
+    assert.strictEqual(children[0]!.killed, false);
+    assert.strictEqual(children.length, 1);
 
-    // A named RPC method whose webview-supplied argument becomes a header must
-    // fail the same way, through the real panel and JSON-RPC boundary.
+    // A named RPC method whose webview-supplied argument becomes a header
+    // fails the same way, through the real panel and JSON-RPC boundary.
     const receivers = new Set<(data: unknown) => void>();
     let posted!: (data: { error?: unknown }) => void;
     const host = {
@@ -267,15 +278,22 @@ suite("PackageViewServer lifecycle", () => {
         });
       assert.ok((await response).error);
       assert.strictEqual(children[0]!.killed, false);
-      assert.strictEqual(fetches, 1);
     } finally {
       panel.dispose();
     }
 
+    // The unrelated in-flight request completes against the same child, and
+    // the next request reuses that child and its token.
     finish(new Response("other panel completed"));
     assert.strictEqual((await otherPanel).data, "other panel completed");
+    const before = fetches;
+    const later = server.json();
+    await waitFor(() => fetches > before);
+    finish(new Response('{"ok":true}'));
+    await later;
     assert.strictEqual(children[0]!.killed, false);
     assert.strictEqual(children.length, 1);
+    assert.strictEqual(tokens.length, 1);
   });
 
   test("extension-owned DELETE requests still reach the server", async () => {
@@ -430,15 +448,58 @@ suite("PackageViewServer lifecycle", () => {
     await rejected;
   });
 
-  test("connection failure invalidates the instance and retries with a new token", async () => {
+  test("a connection failure fails only its request; real process death still gets a replacement", async () => {
     global.fetch = () => Promise.reject(new Error("connection refused"));
     const rejected = assert.rejects(server.json(), /connection refused/);
     await ready();
     await rejected;
-    const retry = server.start();
+    assert.strictEqual(children.length, 1);
+    assert.strictEqual(children[0]!.killed, false);
+
+    // The instance is kept: the next request goes to the same child and token.
+    global.fetch = (url, options) => {
+      calls.push({ url: urlOf(url), options });
+      return Promise.resolve(new Response('{"ok":true}'));
+    };
+    await server.json();
+    assert.strictEqual(children.length, 1);
+    assert.strictEqual(
+      new Headers(calls[0]!.options?.headers).get("Authorization"),
+      tokens[0]
+    );
+
+    // Actual death is still detected from the child's own exit, not from a
+    // failed fetch, and the next request starts a replacement.
+    children[0]!.simulateSignal("SIGKILL");
+    const replaced = server.json();
     await ready(1);
-    await retry;
+    await replaced;
+    assert.strictEqual(children.length, 2);
     assert.notStrictEqual(tokens[0], tokens[1]);
+    assert.strictEqual(
+      new Headers(calls[1]!.options?.headers).get("Authorization"),
+      tokens[1]
+    );
+  });
+
+  test("a fetch aborted by the instance stopping reports the stop, not the abort", async () => {
+    global.fetch = (_url, options) => {
+      // The child dies while the request is on the wire; its abort signal
+      // fires and fetch rejects with the abort reason.
+      children[0]!.simulateSignal("SIGKILL");
+      const reason: unknown = options?.signal?.reason;
+      return Promise.reject(
+        reason instanceof Error ? reason : new Error("aborted")
+      );
+    };
+    const rejected = assert.rejects(server.json(), /stopped during request/);
+    await ready();
+    await rejected;
+    const retry = server.json();
+    await ready(1);
+    global.fetch = () => Promise.resolve(new Response('{"ok":true}'));
+    await retry;
+    assert.strictEqual(children.length, 2);
   });
 
   test("real server restarts after SIGKILL without contacting an impostor on its old port", async function () {
