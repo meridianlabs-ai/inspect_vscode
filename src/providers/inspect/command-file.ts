@@ -5,13 +5,47 @@ import {
   lstatSync,
   openSync,
   readSync,
+  realpathSync,
   unlinkSync,
 } from "node:fs";
 
 const kMaxBytes = 64 * 1024;
 
+/** Pin a real directory and reject stable links or replacements before effects. */
+export class CommandDirectory {
+  readonly path: string;
+  private readonly identity: { dev: number; ino: number };
+
+  constructor(directory: string) {
+    const state = lstatSync(directory);
+    if (!state.isDirectory() || state.isSymbolicLink()) {
+      throw new Error("Unsafe Inspect command directory.");
+    }
+    this.path = realpathSync(directory);
+    this.identity = state;
+    this.assertUnchanged();
+  }
+
+  assertUnchanged() {
+    const current = lstatSync(this.path);
+    if (
+      !current.isDirectory() ||
+      current.isSymbolicLink() ||
+      current.dev !== this.identity.dev ||
+      current.ino !== this.identity.ino
+    ) {
+      throw new Error("Inspect command directory was replaced.");
+    }
+  }
+}
+
 /** Read bounded regular-file data, using no-follow flags where supported. */
-export function readCommandFile(file: string): unknown {
+export function readCommandFile(
+  file: string,
+  validate: (value: unknown) => unknown,
+  assertDirectory: () => void = () => {}
+): unknown {
+  assertDirectory();
   const before = lstatSync(file);
   if (!before.isFile() || before.nlink !== 1 || before.size > kMaxBytes) {
     throw new Error(
@@ -51,6 +85,9 @@ export function readCommandFile(file: string): unknown {
     const value: unknown = JSON.parse(
       buffer.subarray(0, length).toString("utf8")
     );
+    // Do not delete arbitrary JSON merely because it parsed successfully.
+    validate(value);
+    assertDirectory();
     const current = lstatSync(file);
     if (
       !current.isFile() ||

@@ -4,6 +4,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  renameSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -13,7 +14,10 @@ import { join } from "node:path";
 
 import { Uri } from "vscode";
 
-import { readCommandFile } from "../../providers/inspect/command-file";
+import {
+  CommandDirectory,
+  readCommandFile,
+} from "../../providers/inspect/command-file";
 import {
   handleCommandRequest,
   parseCommandRequest,
@@ -152,24 +156,58 @@ suite("Command-file IPC", () => {
       const b = join(dir, "b");
       writeFileSync(a, JSON.stringify([valid]));
       writeFileSync(b, JSON.stringify([valid]));
-      assert.deepStrictEqual(readCommandFile(a), [valid]);
+      assert.deepStrictEqual(readCommandFile(a, parseCommandRequest), [valid]);
       assert.throws(() => readFileSync(a));
-      assert.deepStrictEqual(readCommandFile(b), [valid]);
+      assert.deepStrictEqual(readCommandFile(b, parseCommandRequest), [valid]);
+    });
+
+    test("does not consume valid JSON that is not a valid command batch", () => {
+      const file = join(dir, "not-a-request");
+      for (const contents of [
+        '{"important":"data"}',
+        "[1,2,3]",
+        '[{"command":"inspect.runTask","args":[]}]',
+      ]) {
+        writeFileSync(file, contents);
+        assert.throws(() => readCommandFile(file, parseCommandRequest));
+        assert.strictEqual(readFileSync(file, "utf8"), contents);
+      }
+    });
+
+    test("refuses a replaced directory before consuming a request", () => {
+      const commands = join(dir, "commands");
+      mkdirSync(commands);
+      const directory = new CommandDirectory(commands);
+      renameSync(commands, join(dir, "original"));
+      mkdirSync(commands);
+      const file = join(commands, "keep");
+      const contents = JSON.stringify([valid]);
+      writeFileSync(file, contents);
+      assert.throws(
+        () =>
+          readCommandFile(file, parseCommandRequest, () =>
+            directory.assertUnchanged()
+          ),
+        /directory was replaced/
+      );
+      assert.strictEqual(readFileSync(file, "utf8"), contents);
     });
 
     test("partial writes remain available for a later bounded retry", () => {
       const file = join(dir, "partial");
       writeFileSync(file, "[");
-      assert.throws(() => readCommandFile(file));
+      assert.throws(() => readCommandFile(file, parseCommandRequest));
       writeFileSync(file, JSON.stringify([valid]));
-      assert.deepStrictEqual(readCommandFile(file), [valid]);
+      assert.deepStrictEqual(readCommandFile(file, parseCommandRequest), [
+        valid,
+      ]);
     });
 
     test("rejects malformed and oversized files without dispatch", () => {
       const file = join(dir, "invalid");
       for (const contents of ["", "not json", "[" + " ".repeat(65536) + "]"]) {
         writeFileSync(file, contents);
-        assert.throws(() => readCommandFile(file));
+        assert.throws(() => readCommandFile(file, parseCommandRequest));
       }
     });
 
@@ -179,15 +217,15 @@ suite("Command-file IPC", () => {
       const symlink = join(dir, "symlink");
       writeFileSync(target, JSON.stringify([valid]));
       linkSync(target, hard);
-      assert.throws(() => readCommandFile(hard));
+      assert.throws(() => readCommandFile(hard, parseCommandRequest));
       rmSync(hard);
       const folder = join(dir, "folder");
       mkdirSync(folder);
-      assert.throws(() => readCommandFile(folder));
+      assert.throws(() => readCommandFile(folder, parseCommandRequest));
       // Windows symlink creation requires Developer Mode or elevated rights.
       if (process.platform !== "win32") {
         symlinkSync(target, symlink);
-        assert.throws(() => readCommandFile(symlink));
+        assert.throws(() => readCommandFile(symlink, parseCommandRequest));
       }
       assert.strictEqual(readFileSync(target, "utf8"), JSON.stringify([valid]));
     });

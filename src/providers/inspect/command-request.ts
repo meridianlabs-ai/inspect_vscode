@@ -4,6 +4,8 @@ import { validateLogUri } from "../protocol-handler";
 
 export const kMaxCommands = 16;
 
+export class CommandRequestError extends Error {}
+
 /** The file channel is untrusted, including when its writer is the same OS user. */
 export function parseCommandRequest(value: unknown): Uri[] {
   if (
@@ -11,11 +13,11 @@ export function parseCommandRequest(value: unknown): Uri[] {
     value.length === 0 ||
     value.length > kMaxCommands
   ) {
-    throw new Error("Expected a batch of 1–16 log requests.");
+    throw new CommandRequestError("Expected a batch of 1–16 log requests.");
   }
   return value.map((entry: unknown) => {
     if (typeof entry !== "object" || entry === null || Array.isArray(entry)) {
-      throw new Error("Invalid command entry.");
+      throw new CommandRequestError("Invalid command entry.");
     }
     const request = entry as Record<string, unknown>;
     if (
@@ -25,13 +27,13 @@ export function parseCommandRequest(value: unknown): Uri[] {
       request.args.length !== 1 ||
       typeof request.args[0] !== "string"
     ) {
-      throw new Error(
+      throw new CommandRequestError(
         "Only inspect.openLogViewer with one log URI is supported. Use the VS Code command palette for other actions, including attaching to containers."
       );
     }
     const target = request.args[0];
     if (target.length > 8192 || !/^(file|https?|s3):\/\//.test(target)) {
-      throw new Error("Invalid log location.");
+      throw new CommandRequestError("Invalid log location.");
     }
     const uri = Uri.parse(target, true);
     // Do not allow decoded control characters, backslashes, fragments, or
@@ -44,7 +46,7 @@ export function parseCommandRequest(value: unknown): Uri[] {
       (uri.scheme !== "file" && !uri.authority) ||
       validateLogUri(uri) !== null
     ) {
-      throw new Error("Invalid log URI or sample selection.");
+      throw new CommandRequestError("Invalid log URI or sample selection.");
     }
     const params = new URLSearchParams(uri.query);
     const keys = [...params.keys()];
@@ -53,7 +55,9 @@ export function parseCommandRequest(value: unknown): Uri[] {
       [...params.values()].some(hasControls) ||
       new Set(keys).size !== keys.length
     ) {
-      throw new Error("Unsupported or duplicate log query parameter.");
+      throw new CommandRequestError(
+        "Unsupported or duplicate log query parameter."
+      );
     }
     return uri;
   });

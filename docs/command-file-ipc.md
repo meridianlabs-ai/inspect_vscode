@@ -26,15 +26,20 @@ Opening a log can read local content or fetch a remote resource using the active
 Python environment's credentials. Confirmation therefore applies to local and
 remote requests alike, and does not permanently trust a writer or directory.
 
-Files are limited to 64 KiB. Reads reject non-regular files and hard links, check
+Files are limited to 64 KiB. The command directory itself must not be a symlink.
+Its canonical path and identity are captured at activation and checked again
+before stale cleanup, reads and consumption, so stable directory replacements
+are rejected. These pathname checks are not atomic directory-relative operations.
+Reads reject non-regular files and hard links, check
 file identity and size, and use no-follow/nonblocking open flags where supported
 by Node on the host platform. On Windows those no-follow/nonblocking flags are
 not available: pathname checks and descriptor identity checks reject stable links
 and prevent using mismatched content, but cannot prevent opening a reparse target
 in a pathname race before validation. Ancestor-directory replacement is also not
 confined by a directory handle. These are additional reasons not to claim an
-authenticated or fully confined file channel. Only a successfully read request is consumed; other
-pending requests are retained. Creation and change events are serialized through
+authenticated or fully confined file channel. During event processing, a request
+is consumed only after both JSON parsing and full command/URI validation succeed;
+other pending requests and unrelated JSON are retained. Creation and change events are serialized through
 a queue capped at 64 paths. An initial read is followed by at most four retries
 at 100 ms intervals; files that remain invalid are left in place, and a later change can
 retry them. At activation, up to 64 stale entries are enumerated and files/links removed
@@ -71,8 +76,8 @@ The extension host and Python process must share the existing platform-specific
 Inspect data directory. That routing remains unchanged for remote extension
 hosts, devcontainers, and WSL. URI and filesystem checks execute on that host;
 remote-host behavior and Windows link/race handling still need platform evidence.
-Windows and Linux CI exercise the extension watcher and parser, but are not a
-paired Python-producer test. In particular, the inspected Python `to_uri` helper
+The tests exercise real platform watchers and the parser, including a readiness
+probe before event assertions, but are not a paired Python-producer test. In particular, the inspected Python `to_uri` helper
 has its own Windows path serialization problem that needs a producer-side fix.
 
 ## Writer authentication: unresolved

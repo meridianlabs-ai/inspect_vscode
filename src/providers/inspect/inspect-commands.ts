@@ -16,8 +16,13 @@ import { log } from "../../core/log";
 import { kPythonPackageName } from "../../inspect/props";
 import { WorkspaceStateManager } from "../workspace/workspace-state-provider";
 
-import { readCommandFile } from "./command-file";
-import { CommandRequestActions, handleCommandRequest } from "./command-request";
+import { CommandDirectory, readCommandFile } from "./command-file";
+import {
+  CommandRequestActions,
+  CommandRequestError,
+  handleCommandRequest,
+  parseCommandRequest,
+} from "./command-request";
 
 export function activateInspectCommands(
   stateManager: WorkspaceStateManager,
@@ -56,12 +61,16 @@ export function isDirectCommandFile(
 
 export class InspectCommandDispatcher implements Disposable {
   constructor(
-    private readonly commandsDir_: string,
+    commandsDir: string,
     private readonly actions_: CommandRequestActions,
     private readonly notifyRejected_: (message: string) => void = (message) => {
       void window.showWarningMessage(message);
     }
   ) {
+    // Canonicalize aliases (including Windows short names) before both watching
+    // and comparing event paths. Keep the observed directory identity too.
+    this.directory_ = new CommandDirectory(commandsDir);
+    this.commandsDir_ = this.directory_.path;
     // Do not execute requests left by a previous session. Bound enumeration and
     // cleanup too: a writer can put arbitrarily many entries in this directory.
     const directory = opendirSync(this.commandsDir_);
@@ -71,6 +80,7 @@ export class InspectCommandDispatcher implements Disposable {
         if (!entry) break;
         if (entry.isFile() || entry.isSymbolicLink()) {
           try {
+            this.directory_.assertUnchanged();
             unlinkSync(join(this.commandsDir_, entry.name));
           } catch {
             this.diagnostic("Unable to remove a stale command file.");
@@ -95,8 +105,11 @@ export class InspectCommandDispatcher implements Disposable {
   }
 
   private enqueue(uri: Uri) {
-    if (this.disposed_ || !isDirectCommandFile(this.commandsDir_, uri.fsPath))
+    if (this.disposed_) return;
+    if (!isDirectCommandFile(this.commandsDir_, uri.fsPath)) {
+      this.diagnostic("Ignored an event outside the command directory.");
       return;
+    }
     if (this.pending_.size >= 64) {
       this.diagnostic("Too many pending command files.");
       return;
@@ -120,10 +133,16 @@ export class InspectCommandDispatcher implements Disposable {
           }
           if (this.disposed_) break;
           try {
-            value = readCommandFile(file);
+            value = readCommandFile(file, parseCommandRequest, () =>
+              this.directory_.assertUnchanged()
+            );
             received = true;
             break;
           } catch (error) {
+            if (error instanceof CommandRequestError) {
+              this.diagnostic(error.message);
+              break;
+            }
             if ((error as NodeJS.ErrnoException).code === "ENOENT") break;
             if (attempt === 4) {
               this.diagnostic(
@@ -176,6 +195,8 @@ export class InspectCommandDispatcher implements Disposable {
     this.commandsWatcher_.dispose();
   }
 
+  private readonly commandsDir_: string;
+  private readonly directory_: CommandDirectory;
   private readonly commandsWatcher_: FileSystemWatcher;
   private readonly subscriptions_: Disposable[];
   private readonly pending_ = new Set<string>();
