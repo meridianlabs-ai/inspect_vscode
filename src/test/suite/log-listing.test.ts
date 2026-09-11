@@ -859,14 +859,16 @@ suite("LogListing Test Suite", () => {
           "team/x.eval"
         );
       }
-      assert.strictEqual(
-        Uri.joinPath(Uri.parse("file:///tmp/my%20logs"), name).toString(),
-        "file:///tmp/my%20logs/team/%5Cx.eval"
-      );
       // A plain path goes through Uri.file, which on a Windows host folds
       // '\\' to '/' regardless of the platform argument, so the plain-path
-      // form is only meaningful on a POSIX host.
+      // form is only meaningful on a POSIX host. Uri.joinPath likewise
+      // follows the real host (it joins file: paths with the host's path
+      // module), so the exact joined URIs are only checked there.
       if (os.platform() !== "win32") {
+        assert.strictEqual(
+          Uri.joinPath(Uri.parse("file:///tmp/my%20logs"), name).toString(),
+          "file:///tmp/my%20logs/team/%5Cx.eval"
+        );
         for (const platform of ["darwin", "linux"] as NodeJS.Platform[]) {
           assert.strictEqual(
             relativeLogPath(
