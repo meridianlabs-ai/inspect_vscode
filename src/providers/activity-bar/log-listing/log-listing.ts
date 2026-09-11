@@ -63,6 +63,13 @@ export interface Logs {
  * the relative part contains a '..' escape; otherwise fall back to the
  * containment-checked getRelativeUri. Locations outside the log dir return null
  * so the caller can drop them rather than surface an out-of-boundary entry.
+ *
+ * Names with '.' or empty segments ('team/./x.eval', 'team//x.eval',
+ * '/a.eval', 'x.eval/') are dropped as well. Tree item ids and the URI a node
+ * opens come from Uri.joinPath, which normalizes those segments away, so such
+ * a name would share an id with — and open — a different entry (for an S3 key
+ * a different object). They are not the log directory's own listing form, so
+ * nothing legitimate is lost.
  */
 export function relativeLogPath(
   logDir: string,
@@ -71,21 +78,37 @@ export function relativeLogPath(
   const dirWithSlash = logDir.endsWith("/") ? logDir : `${logDir}/`;
   if (location.startsWith(dirWithSlash)) {
     const relative = location.slice(dirWithSlash.length);
-    return relative.split(/[\\/]/).includes("..") ? null : relative;
+    return hasIrregularSegments(relative) ? null : relative;
   }
   try {
     if (isUri(location) || path.isAbsolute(location)) {
       // Absolute/URI locations: contained iff getRelativeUri says so (null
-      // drops anything outside the dir, including '..' escapes).
-      return getRelativeUri(resolveToUri(logDir), resolveToUri(location));
+      // drops anything outside the dir, including '..' escapes). getRelativeUri
+      // normalizes before comparing, so check the raw path's segments first —
+      // a normalized relative would silently name a different entry.
+      const locationUri = resolveToUri(location);
+      if (hasIrregularSegments(locationUri.path.replace(/^\//, ""))) {
+        return null;
+      }
+      return getRelativeUri(resolveToUri(logDir), locationUri);
     }
   } catch {
     // unparseable dir or location — treat as outside the log dir
     return null;
   }
   // Otherwise the server returned a name already relative to the log dir; keep
-  // it unless it uses '..' to climb out.
-  return location.split(/[\\/]/).includes("..") ? null : location;
+  // it unless it uses '..' to climb out or has '.'/empty segments.
+  return hasIrregularSegments(location) ? null : location;
+}
+
+/**
+ * Whether a log-dir-relative name contains a '..' (escape), '.' or empty
+ * segment — the segments Uri.joinPath resolves away (see relativeLogPath).
+ */
+function hasIrregularSegments(relative: string): boolean {
+  return relative
+    .split(/[\\/]/)
+    .some((segment) => segment === "" || segment === "." || segment === "..");
 }
 
 export class LogListing {
@@ -188,8 +211,9 @@ export class LogListing {
             normalizeWindowsUri(file.name)
           );
           // Drop listing entries that resolve outside the log directory
-          // (e.g. remote-storage names containing '..' traversal) rather than
-          // surfacing an out-of-boundary node in the tree.
+          // (e.g. remote-storage names containing '..' traversal) or whose
+          // '.'/empty segments would collide with another entry's tree id,
+          // rather than surfacing a misleading node in the tree.
           if (relative === null) {
             dropped++;
             continue;
@@ -199,7 +223,7 @@ export class LogListing {
         }
         if (dropped > 0) {
           log.warn(
-            `Dropped ${dropped} log listing item(s) that resolved outside ${log_dir}.`
+            `Dropped ${dropped} log listing item(s) that resolved outside ${log_dir} or had '.'/empty path segments.`
           );
         }
         const tree = buildLogTree(items);

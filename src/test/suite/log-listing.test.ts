@@ -3,7 +3,14 @@
  */
 import * as assert from "assert";
 
-import { relativeLogPath } from "../../providers/activity-bar/log-listing/log-listing";
+import { Uri } from "vscode";
+
+import { ListingMRU } from "../../core/listing-mru";
+import {
+  LogListing,
+  LogNode as RealLogNode,
+  relativeLogPath,
+} from "../../providers/activity-bar/log-listing/log-listing";
 
 /**
  * Mock LogItem for testing
@@ -719,6 +726,62 @@ suite("LogListing Test Suite", () => {
         null
       );
     });
+
+    test("returns null for '.' or empty segments under the dir prefix", () => {
+      for (const name of [
+        "team/./x.eval",
+        "team//x.eval",
+        "./b.eval",
+        "/a.eval",
+        "x.eval/",
+        "team/.",
+      ]) {
+        assert.strictEqual(
+          relativeLogPath("s3://bucket/logs", `s3://bucket/logs/${name}`),
+          null,
+          name
+        );
+      }
+    });
+
+    test("returns null for an already-relative '.' or empty segment", () => {
+      for (const name of ["team/./x.eval", "team//x.eval", "./b.eval"]) {
+        assert.strictEqual(relativeLogPath("s3://bucket/logs", name), null);
+      }
+    });
+
+    test("returns null for '.'/empty segments on the containment fallback", () => {
+      // A location that misses the string-prefix fast path (different
+      // encoding) still must not be normalized into another entry's name.
+      assert.strictEqual(
+        relativeLogPath(
+          "file:///Users/me/project/scans",
+          "/Users/me/project/scans/./scan_id=abc"
+        ),
+        null
+      );
+      assert.strictEqual(
+        relativeLogPath(
+          "file:///Users/me/project/scans",
+          "file:///Users/me/project/scans//scan_id=abc"
+        ),
+        null
+      );
+    });
+
+    test("keeps ordinary names, including dots inside a segment", () => {
+      assert.strictEqual(
+        relativeLogPath(
+          "s3://bucket/logs",
+          "s3://bucket/logs/team.v2/2024-01-01T12-00-00+00-00_task.eval"
+        ),
+        "team.v2/2024-01-01T12-00-00+00-00_task.eval"
+      );
+      assert.strictEqual(
+        relativeLogPath("s3://bucket/logs", "s3://bucket/logs/.hidden/x.eval"),
+        ".hidden/x.eval"
+      );
+    });
   });
 
   suite("MRU (Most Recently Used) Tracking", () => {
@@ -749,6 +812,112 @@ suite("LogListing Test Suite", () => {
 
       remove("/logs/project2");
       assert.strictEqual(mruList.length, 1);
+    });
+  });
+
+  suite("LogListing tree ids", () => {
+    const logDir = Uri.parse("s3://bucket/logs");
+    const mru = {
+      add: () => Promise.resolve(),
+      remove: () => Promise.resolve(),
+    } as unknown as ListingMRU;
+
+    function item(name: string, mtime = 1) {
+      return { name, mtime, display_name: name, item_id: name };
+    }
+
+    function collectUris(listing: LogListing, nodes: RealLogNode[]): string[] {
+      const uris: string[] = [];
+      for (const node of nodes) {
+        uris.push(listing.uriForNode(node).toString());
+        if (node.type === "dir") {
+          uris.push(...collectUris(listing, node.children));
+        }
+      }
+      return uris;
+    }
+
+    test("Uri.joinPath folds '.'/empty segments into another entry (premise)", () => {
+      const canonical = Uri.joinPath(logDir, "team/x.eval").toString();
+      assert.strictEqual(
+        Uri.joinPath(logDir, "team/./x.eval").toString(),
+        canonical
+      );
+      assert.strictEqual(
+        Uri.joinPath(logDir, "team//x.eval").toString(),
+        canonical
+      );
+      assert.strictEqual(
+        Uri.joinPath(logDir, "team/.").toString(),
+        Uri.joinPath(logDir, "team").toString()
+      );
+      assert.strictEqual(
+        Uri.joinPath(logDir, ".").toString(),
+        logDir.toString()
+      );
+    });
+
+    test("every node gets a unique id and names the listed object", async () => {
+      const listing = new LogListing(logDir, mru, () =>
+        Promise.resolve({
+          log_dir: "s3://bucket/logs",
+          items: [
+            item("s3://bucket/logs/team/x.eval", 3),
+            item("s3://bucket/logs/team/./x.eval", 2),
+            item("s3://bucket/logs/team//x.eval", 1),
+            item("s3://bucket/logs/team/./evil.eval"),
+            item("s3://bucket/logs//a.eval"),
+            item("s3://bucket/logs/./b.eval"),
+            item("s3://bucket/logs/team/y.eval"),
+            item("s3://bucket/logs/top.eval"),
+          ],
+        })
+      );
+
+      const root = await listing.ls();
+      const uris = collectUris(listing, root);
+      assert.deepStrictEqual([...uris].sort(), [
+        "s3://bucket/logs/team",
+        "s3://bucket/logs/team/x.eval",
+        "s3://bucket/logs/team/y.eval",
+        "s3://bucket/logs/top.eval",
+      ]);
+      assert.strictEqual(new Set(uris).size, uris.length, "duplicate ids");
+      // No node is ever clamped to the log dir itself.
+      assert.ok(!uris.includes(logDir.toString()));
+
+      const team = root.find((n) => n.type === "dir" && n.name === "team");
+      assert.ok(team && team.type === "dir");
+      const children = await listing.ls(team);
+      assert.deepStrictEqual(children.map((c) => c.name).sort(), [
+        "team/x.eval",
+        "team/y.eval",
+      ]);
+      // The surviving x.eval is the exact key that was listed.
+      const x = children.find((c) => c.name === "team/x.eval");
+      assert.ok(x && x.type === "file");
+      assert.strictEqual(x.mtime, 3);
+    });
+
+    test("leaves an ordinary listing untouched", async () => {
+      const listing = new LogListing(logDir, mru, () =>
+        Promise.resolve({
+          log_dir: "s3://bucket/logs",
+          items: [
+            item("s3://bucket/logs/team.v2/x.eval"),
+            item("s3://bucket/logs/.hidden/y.eval"),
+            item("s3://bucket/logs/z.eval"),
+          ],
+        })
+      );
+      const uris = collectUris(listing, await listing.ls()).sort();
+      assert.deepStrictEqual(uris, [
+        "s3://bucket/logs/.hidden",
+        "s3://bucket/logs/.hidden/y.eval",
+        "s3://bucket/logs/team.v2",
+        "s3://bucket/logs/team.v2/x.eval",
+        "s3://bucket/logs/z.eval",
+      ]);
     });
   });
 });
