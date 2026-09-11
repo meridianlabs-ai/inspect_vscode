@@ -33,8 +33,9 @@ pnpm check            # lint + format:check + typecheck + test (CI equivalent)
 
 ## Security Reviews
 
-- Judge security findings against the threat model in [SECURITY.md](SECURITY.md): VS Code Workspace Trust is the boundary, workspace contents and the selected environment are trusted, and log contents, model output, URL-handler URIs and network responses are not
+- Judge security findings against the threat model in [SECURITY.md](SECURITY.md): VS Code Workspace Trust is the boundary, workspace contents and the selected environment are trusted, and log contents, model output, messages from the log and scan webviews, URL-handler URIs, terminal output and network responses are not
 - A finding whose attacker already controls a trusted workspace is a robustness or correctness bug, not a vulnerability
+- The view-server token stays in the extension host; webviews reach the server only through the scoped proxy in `src/core/package/proxy-scope.ts`
 
 ## Before Committing Changes
 
