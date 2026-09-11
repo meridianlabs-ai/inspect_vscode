@@ -64,9 +64,29 @@ export function locationInScope(
 ): boolean {
   try {
     const decoded = options.decode ? decodeURIComponent(location) : location;
-    const target = locationUri(decoded, options.base);
-    return roots.some((root) => {
-      if (root.toString() === target.toString()) return true;
+    // Windows drive letters are case-insensitive, but do not fold arbitrary
+    // path components (or POSIX filenames that happen to resemble drives).
+    const comparisonUri = (uri: Uri) =>
+      process.platform === "win32" && uri.scheme === "file"
+        ? uri.with({
+            path: uri.path.replace(/^\/[a-zA-Z]:/, (drive) =>
+              drive.toLowerCase()
+            ),
+          })
+        : uri;
+    const target = comparisonUri(locationUri(decoded, options.base));
+    return roots.some((authorityRoot) => {
+      const root = comparisonUri(authorityRoot);
+      // URI serialization lowercases drive-looking paths even on POSIX.
+      // Compare the actual components instead of losing filename identity.
+      if (
+        root.scheme === target.scheme &&
+        root.authority === target.authority &&
+        root.path === target.path &&
+        root.query === target.query &&
+        root.fragment === target.fragment
+      )
+        return true;
       if (options.exact || getRelativeUri(root, target) === null) return false;
       // POSIX filesystems keep backslashes in names. The shared URI helper
       // also accepts Windows separators, so check the POSIX interpretation

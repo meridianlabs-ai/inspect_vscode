@@ -46,6 +46,19 @@ const enc = encodeURIComponent;
 const b64 = (s: string) => Buffer.from(s).toString("base64url");
 
 suite("Webview boundary RPC integration", () => {
+  test("drive-letter comparison follows the host platform without folding path names", () => {
+    const root = Uri.from({ scheme: "file", path: "/C:/panel" });
+    assert.strictEqual(
+      locationInScope([root], "/c:/panel/run.eval"),
+      process.platform === "win32"
+    );
+    assert.strictEqual(
+      locationInScope([root], "/c:/panel", { exact: true }),
+      process.platform === "win32"
+    );
+    assert.ok(!locationInScope([root], "/c:/Panel/run.eval"));
+    assert.ok(!locationInScope([root], "/c:/outside/run.eval"));
+  });
   test("relative local locations retain current-directory and dot-segment support", () => {
     const root = Uri.file(join(tmpdir(), "panel"));
     for (const location of [".", "./", "nested/..", "./inside.eval"])

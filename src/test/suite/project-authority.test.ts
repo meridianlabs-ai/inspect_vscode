@@ -42,6 +42,11 @@ suite("Effective project authority", () => {
         locationInScope(authority.transcripts, location);
       assert.ok(scans(child), root);
       assert.ok(transcripts(child), root);
+      if (!remote && process.platform === "win32") {
+        assert.ok(scans("c:/external/data/run"), root);
+        assert.ok(transcripts("c:\\external\\data\\run"), root);
+        assert.ok(!transcripts("c:/outside/run"), root);
+      }
       assert.ok(!scans(outside), root);
       assert.ok(!transcripts(outside), root);
       assert.doesNotThrow(() =>
