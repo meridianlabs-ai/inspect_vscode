@@ -8,7 +8,6 @@ import { Uri } from "vscode";
 import {
   assertLogProxyInScope,
   assertScanProxyInScope,
-  bindLogProxyDefaultLocation,
 } from "../../core/package/proxy-scope";
 import type { HttpProxyRpcRequest } from "../../core/package/view-server";
 import { logPathInScopeAllowingEncoded } from "../../providers/logview/logview-panel";
@@ -43,37 +42,13 @@ suite("Proxy Scope Test Suite", () => {
       ok("/api/scout/searches?type=events&count=10");
     });
 
-    test("refuses a listing or manifest with no log_dir (the server would use its default dir)", () => {
-      // An absent log_dir makes the server list/resolve its own configured
-      // default directory, which no panel scope vouches for. Panels bind the
-      // parameter first (see bindLogProxyDefaultLocation); a bare request
-      // reaching the check is refused.
-      rejects("/api/logs");
-      rejects("/api/log-files");
-      rejects("/api/eval-set");
-      rejects("/api/flow");
-      rejects("/api/eval-set?dir=sub");
-      rejects("/api/flow?dir=sub");
-      // ...whereas an empty header list is a no-op and events carry no path.
+    test("allows a listing with no explicit location (server default)", () => {
+      // The viewer requests these during config load; a missing location uses
+      // the server's own default, not an attacker path.
+      ok("/api/logs");
+      ok("/api/log-files");
       ok("/api/log-headers");
       ok("/api/events?last_eval_time=123");
-    });
-
-    test("refuses a bare listing under a single-file scope too", () => {
-      const file = Uri.parse("file:///w/logs/run.eval");
-      const fileScope = (loc: string) =>
-        logPathInScopeAllowingEncoded("file", file, loc);
-      assert.throws(() => assertLogProxyInScope(req("/api/logs"), fileScope));
-      assert.throws(() =>
-        assertLogProxyInScope(req("/api/log-files"), fileScope)
-      );
-      // Bound to the panel's own file, the listing is in scope (the server
-      // answers with a single-file listing, as eval_logs does for such a panel).
-      const bound = bindLogProxyDefaultLocation(
-        req("/api/logs"),
-        file.toString()
-      );
-      assert.doesNotThrow(() => assertLogProxyInScope(bound, fileScope));
     });
 
     test("allows in-scope file/dir locations", () => {
@@ -203,87 +178,6 @@ suite("Proxy Scope Test Suite", () => {
       rejects("/api/../secret");
       rejects("/not-api/logs");
       rejects("//evil.example/api/log-dir");
-    });
-  });
-
-  suite("bindLogProxyDefaultLocation", () => {
-    const location = logDir.toString(); // "file:///w/logs"
-    const bind = (path: string, method: Method = "GET") =>
-      bindLogProxyDefaultLocation(req(path, method), location);
-    const boundDir = (path: string) => {
-      const url = new URL("http://127.0.0.1" + path);
-      return url.searchParams.getAll("log_dir");
-    };
-    const rejectsBound = (path: string) =>
-      assert.throws(() => assertLogProxyInScope(bind(path), inScope));
-
-    test("binds a bare listing to the panel location and it passes the scope check", () => {
-      for (const route of ["/api/logs", "/api/log-files"]) {
-        const bound = bind(route);
-        assert.deepStrictEqual(boundDir(bound.path), [location]);
-        assert.ok(bound.path.startsWith(`${route}?`));
-        assert.doesNotThrow(() => assertLogProxyInScope(bound, inScope));
-      }
-    });
-
-    test("binds the eval-set / flow manifests, keeping their subdirectory", () => {
-      for (const route of ["/api/eval-set", "/api/flow"]) {
-        assert.deepStrictEqual(boundDir(bind(route).path), [location]);
-        const withSub = bind(`${route}?dir=set-a`);
-        const url = new URL("http://127.0.0.1" + withSub.path);
-        assert.strictEqual(url.searchParams.get("dir"), "set-a");
-        assert.deepStrictEqual(url.searchParams.getAll("log_dir"), [location]);
-        assert.doesNotThrow(() => assertLogProxyInScope(withSub, inScope));
-      }
-    });
-
-    test("leaves a supplied log_dir alone, so the scope check still judges it", () => {
-      const inDir = `/api/logs?log_dir=${enc("file:///w/logs")}`;
-      assert.strictEqual(bind(inDir).path, inDir);
-      const outDir = `/api/log-files?log_dir=${enc("file:///etc")}`;
-      assert.strictEqual(bind(outDir).path, outDir);
-      rejectsBound(outDir);
-      // an empty value is "supplied", and stays refused
-      assert.strictEqual(bind("/api/logs?log_dir=").path, "/api/logs?log_dir=");
-      rejectsBound("/api/logs?log_dir=");
-    });
-
-    test("leaves every other route untouched", () => {
-      for (const path of [
-        "/api/log-dir",
-        "/api/log-headers",
-        `/api/log-bytes/${enc("file:///w/logs/run.eval")}?start=0&end=9`,
-        `/api/pending-samples?log=${enc("file:///w/logs/run.eval")}`,
-        "/api/logs/", // the {log:path} route, not the listing
-        "/api/terminal",
-      ]) {
-        assert.strictEqual(bind(path).path, path);
-      }
-    });
-
-    test("rebuilds the path so a fragment cannot swallow the bound parameter", () => {
-      const bound = bind("/api/logs#frag");
-      assert.deepStrictEqual(boundDir(bound.path), [location]);
-      assert.ok(!bound.path.includes("#"));
-      assert.doesNotThrow(() => assertLogProxyInScope(bound, inScope));
-    });
-
-    test("preserves the method, headers and body", () => {
-      const request: HttpProxyRpcRequest = {
-        method: "GET",
-        path: "/api/log-files",
-        headers: { "If-None-Match": 'W/"1-2"' },
-      };
-      const bound = bindLogProxyDefaultLocation(request, location);
-      assert.strictEqual(bound.method, "GET");
-      assert.deepStrictEqual(bound.headers, { "If-None-Match": 'W/"1-2"' });
-      assert.strictEqual(bound.body, undefined);
-    });
-
-    test("binds a single-file panel to its own file", () => {
-      const file = "file:///w/logs/run.eval";
-      const bound = bindLogProxyDefaultLocation(req("/api/log-files"), file);
-      assert.deepStrictEqual(boundDir(bound.path), [file]);
     });
   });
 

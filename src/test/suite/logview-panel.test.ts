@@ -1,4 +1,7 @@
 import * as assert from "assert";
+import * as fs from "fs";
+import * as os from "os";
+import * as path from "path";
 
 import { ExtensionContext, Uri } from "vscode";
 
@@ -138,9 +141,20 @@ suite("logview-panel Test Suite", () => {
         logPathInScopeAllowingEncoded(
           "dir",
           dir,
-          "file:///w/logs/..%252F..%252Fetc%252Fpasswd"
+          "file:///w/logs/..%2F..%2Fetc%2Fpasswd"
         ),
         false
+      );
+      // ...whereas encoding it twice names the file literally called
+      // `..%2F..%2Fetc%2Fpasswd` inside the directory: the server decodes once
+      // and opens the remaining `%2F` characters as part of the name.
+      assert.strictEqual(
+        logPathInScopeAllowingEncoded(
+          "dir",
+          dir,
+          "file:///w/logs/..%252F..%252Fetc%252Fpasswd"
+        ),
+        true
       );
       // a file panel never accepts anything but its own file
       const file = Uri.file("/w/logs/run.eval");
@@ -212,15 +226,130 @@ suite("logview-panel Test Suite", () => {
       );
     });
 
-    test("rejects malformed percent-encoding rather than guessing", () => {
+    test("keeps malformed escapes literal like the server, refuses invalid UTF-8", () => {
       const dir = Uri.file("/w/logs");
+      // `urllib.parse.unquote` leaves an escape it cannot decode in place, so
+      // `%zz.eval` is the file literally named that, inside the directory.
+      assert.strictEqual(
+        logPathInScopeAllowingEncoded("dir", dir, "/w/logs/%zz.eval"),
+        true
+      );
+      // a valid escape run whose bytes are not UTF-8 would name a U+FFFD file
       assert.strictEqual(
         logPathInScopeAllowingEncoded("dir", dir, "/w/logs/%E0%A4%A"),
         false
       );
       assert.strictEqual(
-        logPathInScopeAllowingEncoded("dir", dir, "/w/logs/%zz.eval"),
+        logPathInScopeAllowingEncoded("dir", dir, "/w/logs/%C3.eval"),
         false
+      );
+    });
+
+    test("decodes exactly once: a literal-percent sibling is a different file", () => {
+      // The server percent-decodes a location once (route decoding reverses
+      // the transport's encodeURIComponent; normalize_uri/unquote does the
+      // rest) and then opens the result literally. Anything still encoded in
+      // that result is part of the file name, so `run%201.eval` is not the
+      // panel's `run 1.eval`.
+      const panel = Uri.file("/w/logs/run 1.eval");
+      // the panel's own file, in every spelling the viewer produces
+      for (const own of [
+        panel.toString(), // file:///w/logs/run%201.eval (startup state)
+        panel.toString(true), // file:///w/logs/run 1.eval (listing names)
+        "/w/logs/run%201.eval", // scheme-stripped transcriptDir
+        "/w/logs/run 1.eval",
+      ]) {
+        assert.strictEqual(
+          logPathInScopeAllowingEncoded("file", panel, own),
+          true,
+          own
+        );
+      }
+      // the sibling literally named `run%201.eval`, spelled so that one decode
+      // yields its name
+      for (const sibling of [
+        "file:///w/logs/run%25201.eval",
+        "/w/logs/run%25201.eval",
+      ]) {
+        assert.strictEqual(
+          logPathInScopeAllowingEncoded("file", panel, sibling),
+          false,
+          sibling
+        );
+      }
+      // the same requests judged by a directory panel: both files are inside
+      const dir = Uri.file("/w/logs");
+      assert.strictEqual(
+        logPathInScopeAllowingEncoded(
+          "dir",
+          dir,
+          "file:///w/logs/run%25201.eval"
+        ),
+        true
+      );
+      // a literal `%2e%2e` directory name is not traversal (the server opens
+      // the directory literally named that), while a decoded `..` still is
+      assert.strictEqual(
+        logPathInScopeAllowingEncoded(
+          "dir",
+          dir,
+          "file:///w/logs/%252e%252e/x.eval"
+        ),
+        true
+      );
+      assert.strictEqual(
+        logPathInScopeAllowingEncoded(
+          "dir",
+          dir,
+          "file:///w/logs/%2e%2e/x.eval"
+        ),
+        false
+      );
+    });
+
+    test("accepts a literal-percent file name in its own correctly encoded spelling", () => {
+      // A panel on the file literally named `literal%20.eval`: its encoded URI
+      // is what the server resolves to that exact file, so it is accepted; the
+      // once-encoded spelling would open `literal .eval` instead.
+      const literal = Uri.file("/w/logs/literal%20.eval");
+      assert.strictEqual(
+        logPathInScopeAllowingEncoded(
+          "file",
+          literal,
+          "file:///w/logs/literal%2520.eval"
+        ),
+        true
+      );
+      assert.strictEqual(
+        literal.toString(),
+        "file:///w/logs/literal%2520.eval"
+      );
+      assert.strictEqual(
+        logPathInScopeAllowingEncoded("file", literal, literal.toString()),
+        true
+      );
+      assert.strictEqual(
+        logPathInScopeAllowingEncoded(
+          "file",
+          literal,
+          "file:///w/logs/literal%20.eval"
+        ),
+        false
+      );
+      // A panel on `100%done.eval`: the raw form from evalLogsSolo / server
+      // listings has a malformed escape, which the server keeps literal.
+      const percent = Uri.file("/w/logs/100%done.eval");
+      assert.strictEqual(
+        percent.toString(true),
+        "file:///w/logs/100%done.eval"
+      );
+      assert.strictEqual(
+        logPathInScopeAllowingEncoded("file", percent, percent.toString(true)),
+        true
+      );
+      assert.strictEqual(
+        logPathInScopeAllowingEncoded("file", percent, percent.toString()),
+        true
       );
     });
   });
@@ -305,7 +434,8 @@ suite("logview-panel Test Suite", () => {
         for (const target of [
           "/w/logs/..%2F..%2Fetc%2Fpasswd",
           "/w/logs/%2e%2e/%2e%2e/home/victim/.ssh/id_rsa",
-          "file:///w/logs/..%252F..%252Fetc%252Fpasswd",
+          "file:///w/logs/..%2F..%2Fetc%2Fpasswd",
+          "file:///w/logs/%2e%2e/%2e%2e/etc/passwd",
           "/etc/passwd",
         ]) {
           for (const [method, params] of pathMethods(target)) {
@@ -383,51 +513,167 @@ suite("logview-panel Test Suite", () => {
       }
     });
 
-    test("http_request binds a bare listing to the panel's own location", async () => {
+    test("file panel on a name with a space refuses its literal-percent sibling on every method", async () => {
+      const file = Uri.file("/w/logs/run 1.eval");
+      const { panel, calls, call } = createPanel("file", file);
+      try {
+        // `file:///w/logs/run%25201.eval` decodes once to the existing sibling
+        // `run%201.eval`; nothing may reach the server for it.
+        for (const target of [
+          "file:///w/logs/run%25201.eval",
+          "/w/logs/run%25201.eval",
+        ]) {
+          for (const [method, params] of pathMethods(target)) {
+            const response = await call(method, params);
+            assert.ok(
+              response.error,
+              `${method} must refuse ${target}, got ${JSON.stringify(response)}`
+            );
+            assert.match(response.error.message, /outside the scope/);
+          }
+        }
+        assert.deepStrictEqual(calls, []);
+        // every spelling of the panel's own file is accepted and forwarded raw
+        const own = [
+          file.toString(),
+          file.toString(true),
+          "/w/logs/run%201.eval",
+          "/w/logs/run 1.eval",
+        ];
+        for (const target of own) {
+          for (const [method, params] of pathMethods(target)) {
+            const response = await call(method, params);
+            assert.strictEqual(
+              response.error,
+              undefined,
+              `${method} must accept ${target}, got ${JSON.stringify(response)}`
+            );
+            const last: Call = calls[calls.length - 1]!;
+            const forwarded: unknown =
+              method === kMethodEvalLogHeaders
+                ? (last.args[0] as string[])[0]
+                : last.args[0];
+            assert.strictEqual(forwarded, target, `${method} forwards raw`);
+          }
+        }
+        assert.strictEqual(calls.length, own.length * pathMethods("").length);
+      } finally {
+        panel.dispose();
+      }
+    });
+
+    test("file panel on a literal-percent name accepts its own encoded spellings", async () => {
+      const literal = Uri.file("/w/logs/literal%20.eval");
+      const literalPanel = createPanel("file", literal);
+      const percent = Uri.file("/w/logs/100%done.eval");
+      const percentPanel = createPanel("file", percent);
+      try {
+        let response = await literalPanel.call(kMethodEvalLogBytes, [
+          literal.toString(),
+          0,
+          1,
+        ]);
+        assert.strictEqual(response.error, undefined);
+        assert.strictEqual(
+          literalPanel.calls[0]!.args[0],
+          "file:///w/logs/literal%2520.eval"
+        );
+        // once-encoded, the server would open `literal .eval`
+        response = await literalPanel.call(kMethodEvalLogBytes, [
+          "file:///w/logs/literal%20.eval",
+          0,
+          1,
+        ]);
+        assert.ok(response.error);
+        for (const target of [percent.toString(), percent.toString(true)]) {
+          response = await percentPanel.call(kMethodEvalLogBytes, [
+            target,
+            0,
+            1,
+          ]);
+          assert.strictEqual(response.error, undefined, target);
+          assert.strictEqual(
+            percentPanel.calls[percentPanel.calls.length - 1]!.args[0],
+            target
+          );
+        }
+        assert.strictEqual(literalPanel.calls.length, 1);
+        assert.strictEqual(percentPanel.calls.length, 2);
+      } finally {
+        literalPanel.panel.dispose();
+        percentPanel.panel.dispose();
+      }
+    });
+
+    test("the accepted spellings open the panel's file, the refused one its sibling", () => {
+      // Distinct fixture files, read the way the view server reads a named
+      // location: the route decoding reverses the transport's encoding, then
+      // one urllib-style unquote, then the local filesystem opens the result
+      // literally (`file://` stripped, remaining `%` characters kept).
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), "logview-scope-"));
+      try {
+        fs.writeFileSync(path.join(root, "run 1.eval"), "panel file");
+        fs.writeFileSync(path.join(root, "run%201.eval"), "OTHER file");
+        const unquoteOnce = (value: string) =>
+          value.replace(/%([0-9a-f]{2})/gi, (_, hex: string) =>
+            String.fromCharCode(parseInt(hex, 16))
+          );
+        const serverReads = (raw: string) => {
+          const location = unquoteOnce(raw);
+          const file = location.startsWith("file://")
+            ? location.slice("file://".length)
+            : location;
+          return fs.readFileSync(file, "utf8");
+        };
+        const panel = Uri.file(path.join(root, "run 1.eval"));
+        const inScope = (raw: string) =>
+          logPathInScopeAllowingEncoded("file", panel, raw);
+        for (const own of [
+          panel.toString(),
+          panel.toString(true),
+          panel.toString().replace(/^file:\/\//, ""),
+          panel.fsPath,
+        ]) {
+          assert.strictEqual(inScope(own), true, own);
+          assert.strictEqual(serverReads(own), "panel file", own);
+        }
+        const sibling = panel.toString().replace("%20", "%2520");
+        assert.strictEqual(serverReads(sibling), "OTHER file");
+        assert.strictEqual(inScope(sibling), false);
+      } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+      }
+    });
+
+    test("http_request judges proxied locations the same way", async () => {
       const dir = Uri.file("/w/logs");
       const dirPanel = createPanel("dir", dir);
-      const file = Uri.file("/w/logs/run.eval");
+      const file = Uri.file("/w/logs/run 1.eval");
       const filePanel = createPanel("file", file);
       const proxied = (path: string) => ({ method: "GET", path });
-      const forwardedPath = (calls: Call[]) => {
-        const request = calls[calls.length - 1]!.args[0] as { path: string };
-        return request.path;
-      };
-      const logDirOf = (path: string) =>
-        new URL("http://127.0.0.1" + path).searchParams.getAll("log_dir");
       try {
+        // a bare listing is forwarded unchanged (the server lists its default)
         for (const route of ["/api/logs", "/api/log-files"]) {
-          // dir panel: its own directory replaces the server default
-          let response = await dirPanel.call(kMethodHttpRequest, [
+          const response = await dirPanel.call(kMethodHttpRequest, [
             proxied(route),
           ]);
           assert.strictEqual(response.error, undefined, route);
-          assert.deepStrictEqual(logDirOf(forwardedPath(dirPanel.calls)), [
-            dir.toString(),
-          ]);
-          // file panel: only its own file may be listed
-          response = await filePanel.call(kMethodHttpRequest, [proxied(route)]);
-          assert.strictEqual(response.error, undefined, route);
-          assert.deepStrictEqual(logDirOf(forwardedPath(filePanel.calls)), [
-            file.toString(),
-          ]);
+          assert.deepStrictEqual(
+            dirPanel.calls[dirPanel.calls.length - 1]!.args[0],
+            proxied(route)
+          );
         }
-        // a supplied directory is judged, not replaced
-        const other = `/api/logs?log_dir=${encodeURIComponent("file:///w/other")}`;
-        assert.ok(
-          (await dirPanel.call(kMethodHttpRequest, [proxied(other)])).error
-        );
+        // a supplied directory outside the panel is refused
         assert.ok(
           (
-            await filePanel.call(kMethodHttpRequest, [
+            await dirPanel.call(kMethodHttpRequest, [
               proxied(
-                `/api/logs?log_dir=${encodeURIComponent(dir.toString())}`
+                `/api/logs?log_dir=${encodeURIComponent("file:///w/other")}`
               ),
             ])
-          ).error,
-          "a file panel may not list even its parent directory"
+          ).error
         );
-        // and the encoded-traversal bypass is closed on the proxy as well
+        // the encoded-traversal bypass is closed on the proxy as well
         assert.ok(
           (
             await dirPanel.call(kMethodHttpRequest, [
@@ -437,8 +683,24 @@ suite("logview-panel Test Suite", () => {
             ])
           ).error
         );
+        // and so is the literal-percent sibling of a single-file panel
+        assert.ok(
+          (
+            await filePanel.call(kMethodHttpRequest, [
+              proxied(
+                `/api/log-bytes/${encodeURIComponent("file:///w/logs/run%25201.eval")}?start=0&end=9`
+              ),
+            ])
+          ).error
+        );
+        const ownBytes = `/api/log-bytes/${encodeURIComponent(file.toString())}?start=0&end=9`;
+        const response = await filePanel.call(kMethodHttpRequest, [
+          proxied(ownBytes),
+        ]);
+        assert.strictEqual(response.error, undefined);
+        assert.deepStrictEqual(filePanel.calls[0]!.args[0], proxied(ownBytes));
         assert.strictEqual(dirPanel.calls.length, 2);
-        assert.strictEqual(filePanel.calls.length, 2);
+        assert.strictEqual(filePanel.calls.length, 1);
       } finally {
         dirPanel.panel.dispose();
         filePanel.panel.dispose();

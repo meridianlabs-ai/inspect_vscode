@@ -22,6 +22,42 @@ export function resolveToUri(pathOrUri: string): Uri {
   }
 }
 
+/**
+ * Percent-decode a location once, the way the Inspect view server does
+ * (`urllib.parse.unquote`): every well-formed `%XX` escape becomes its byte, a
+ * malformed escape (`%zz`, or a `%` followed by fewer than two hex digits) is
+ * kept literally, and the bytes are read as UTF-8. Returns null when the
+ * decoded bytes are not valid UTF-8; Python substitutes U+FFFD there, which
+ * names no real location, so callers refuse rather than guess.
+ */
+export function percentDecodeOnce(value: string): string | null {
+  if (!value.includes("%")) {
+    return value;
+  }
+  const decoder = new TextDecoder("utf-8", { fatal: true });
+  try {
+    return value.replace(/(?:%[0-9A-Fa-f]{2})+/g, (run) =>
+      decoder.decode(Buffer.from(run.replace(/%/g, ""), "hex"))
+    );
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Parse a location string literally, as the filesystem will see it: a `%` in a
+ * URI is the character `%` of a file name, not the start of an escape.
+ * `Uri.parse` would decode `%XX` sequences, making `run%201.eval` and
+ * `run 1.eval` the same path; escaping every `%` first makes that decode a
+ * no-op. Bare paths are resolved as {@link resolveToUri} resolves them
+ * (`Uri.file` already keeps `%` literal).
+ */
+export function parseLocationLiterally(location: string): Uri {
+  return isUri(location)
+    ? Uri.parse(location.replace(/%/g, "%25"))
+    : resolveToUri(location);
+}
+
 export function dirname(uri: Uri): Uri {
   if (uri.scheme === "file") {
     // Handle file URIs

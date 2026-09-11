@@ -8,7 +8,9 @@ import {
   getRelativeUri,
   isUncPath,
   normalizeWindowsUri,
+  parseLocationLiterally,
   parseTerminalLinkUri,
+  percentDecodeOnce,
   prettyUriPath,
   resolveToUri,
 } from "../../core/uri";
@@ -71,6 +73,92 @@ suite("URI Utilities Test Suite", () => {
       const uri = resolveToUri("https://example.com/path#section");
       assert.strictEqual(uri.scheme, "https");
       assert.strictEqual(uri.fragment, "section");
+    });
+  });
+
+  suite("percentDecodeOnce", () => {
+    test("decodes well-formed escapes once, as urllib.parse.unquote does", () => {
+      assert.strictEqual(
+        percentDecodeOnce("/w/my%20run/x.eval"),
+        "/w/my run/x.eval"
+      );
+      assert.strictEqual(percentDecodeOnce("..%2F..%2Fetc"), "../../etc");
+      assert.strictEqual(percentDecodeOnce("%2e%2E"), "..");
+      // one decode only: `%2520` is the three characters `%20`
+      assert.strictEqual(percentDecodeOnce("run%25201.eval"), "run%201.eval");
+      // multi-byte UTF-8 across adjacent escapes
+      assert.strictEqual(percentDecodeOnce("caf%C3%A9.eval"), "café.eval");
+      assert.strictEqual(percentDecodeOnce("caf\u00e9%20x"), "café x");
+    });
+
+    test("passes values without escapes through unchanged", () => {
+      assert.strictEqual(
+        percentDecodeOnce("/w/logs/run 1.eval"),
+        "/w/logs/run 1.eval"
+      );
+      assert.strictEqual(percentDecodeOnce(""), "");
+    });
+
+    test("keeps malformed escapes literal instead of throwing", () => {
+      assert.strictEqual(percentDecodeOnce("100%done.eval"), "100%done.eval");
+      assert.strictEqual(percentDecodeOnce("%zz.eval"), "%zz.eval");
+      assert.strictEqual(percentDecodeOnce("50%"), "50%");
+      assert.strictEqual(percentDecodeOnce("a%2"), "a%2");
+      // mixed: the well-formed escape decodes, the malformed one stays
+      assert.strictEqual(percentDecodeOnce("100%done%20x"), "100%done x");
+    });
+
+    test("returns null for escapes that do not decode to UTF-8", () => {
+      assert.strictEqual(percentDecodeOnce("%E0%A4%A"), null);
+      assert.strictEqual(percentDecodeOnce("%C3.eval"), null);
+      assert.strictEqual(percentDecodeOnce("%FF"), null);
+    });
+  });
+
+  suite("parseLocationLiterally", () => {
+    test("keeps a percent character in a URI as part of the path", () => {
+      assert.strictEqual(
+        parseLocationLiterally("file:///w/logs/run%201.eval").path,
+        "/w/logs/run%201.eval"
+      );
+      assert.strictEqual(
+        Uri.parse("file:///w/logs/run%201.eval").path,
+        "/w/logs/run 1.eval",
+        "Uri.parse decodes, which is what this helper avoids"
+      );
+      assert.strictEqual(
+        parseLocationLiterally("s3://bucket/a%20b/x.eval").path,
+        "/a%20b/x.eval"
+      );
+      assert.strictEqual(
+        parseLocationLiterally("file:///w/logs/100%done.eval").path,
+        "/w/logs/100%done.eval"
+      );
+    });
+
+    test("keeps other characters and the scheme/authority", () => {
+      const uri = parseLocationLiterally("file:///w/logs/run 1.eval");
+      assert.strictEqual(uri.scheme, "file");
+      assert.strictEqual(uri.authority, "");
+      assert.strictEqual(uri.path, "/w/logs/run 1.eval");
+      assert.strictEqual(
+        uri.toString(),
+        Uri.file("/w/logs/run 1.eval").toString()
+      );
+      const s3 = parseLocationLiterally("s3://bucket/logs");
+      assert.strictEqual(s3.authority, "bucket");
+      assert.strictEqual(s3.path, "/logs");
+    });
+
+    test("resolves bare paths like resolveToUri (already literal)", () => {
+      assert.strictEqual(
+        parseLocationLiterally("/w/logs/100%done.eval").toString(),
+        resolveToUri("/w/logs/100%done.eval").toString()
+      );
+      assert.strictEqual(
+        parseLocationLiterally("/w/logs/run%201.eval").path,
+        "/w/logs/run%201.eval"
+      );
     });
   });
 
