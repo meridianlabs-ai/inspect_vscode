@@ -23,7 +23,10 @@ import {
 } from "../../core/jsonrpc";
 import { log } from "../../core/log";
 import { parseProxyRequest } from "../../core/package/proxy-request";
-import { assertLogProxyInScope } from "../../core/package/proxy-scope";
+import {
+  assertLogProxyInScope,
+  bindLogProxyDefaultLocation,
+} from "../../core/package/proxy-scope";
 import { AbsolutePath } from "../../core/path";
 import { getRelativeUri, resolveToUri } from "../../core/uri";
 import {
@@ -38,11 +41,13 @@ import { InspectViewServer } from "../inspect/inspect-view-server";
 import { LogviewState } from "./logview-state";
 
 /**
- * Whether a webview-supplied file path/URL is within the scope this log-view
+ * Whether a file path/URL, taken literally, is within the scope this log-view
  * panel was opened for. A `file` panel may only touch its own log file; a `dir`
- * panel may only touch descendants of its log directory. Used to gate the
- * file-content RPC methods so injected webview script cannot read or write
- * paths outside what the panel is actually viewing.
+ * panel may only touch descendants of its log directory.
+ *
+ * This is the raw containment check. Webview-supplied locations must go
+ * through {@link logPathInScopeAllowingEncoded} instead, because the view
+ * server percent-decodes every location it receives before opening it.
  */
 export function logPathInScope(
   type: "file" | "dir",
@@ -63,15 +68,21 @@ export function logPathInScope(
 }
 
 /**
- * Scope check for a scheme-stripped, percent-encoded path — the form the viewer
- * passes as `transcriptDir` (stripFileScheme of the log file). The plain
- * {@link logPathInScope} runs such a value through `Uri.file`, which treats
- * `%XX` literally, so it both wrongly rejects a legitimate path containing a
- * space (`%20`) and wrongly *accepts* `%2e%2e` traversal that the server would
- * decode to `..` and escape with. The server percent-decodes the value, so the
- * check must too: validate the decoded form (which matches encoded paths and
- * lets getRelativeUri reject the revealed `..`). The raw value is still what's
- * forwarded to the server.
+ * Scope check for a webview-supplied location, judged the way the view server
+ * will interpret it. The server percent-decodes every location once more
+ * after the route's own URL decoding (`normalize_uri` on the `{log:path}`
+ * routes and `/api/log-headers`, `urllib.parse.unquote` on the pending-sample
+ * and log-message routes), so `/w/logs/..%2F..%2Fetc%2Fpasswd` is one odd
+ * file name to a literal check but `/w/logs/../../etc/passwd` to the server.
+ * The plain {@link logPathInScope} runs a scheme-less value through
+ * `Uri.file`, which keeps `%XX` literal, so it would accept that traversal and
+ * would also reject a legitimate `%20`-encoded path such as the scheme-stripped
+ * `transcriptDir` the viewer sends. Validate the decoded form instead: it
+ * matches encoded paths and lets getRelativeUri reject the revealed `..`. This
+ * is what every path-bearing RPC method and the http_request proxy use; the raw
+ * value is still what is forwarded to the server. Malformed percent-encoding
+ * (which the server would pass through literally) is refused rather than
+ * guessed at.
  */
 export function logPathInScopeAllowingEncoded(
   type: "file" | "dir",
@@ -109,22 +120,10 @@ export class LogviewPanel extends Disposable {
     // actually viewing. Every file-content method below is gated by this guard:
     // a `file` panel may only touch its own log file; a `dir` panel may only
     // touch descendants of its log directory. Requests outside that scope are
-    // rejected before the path ever reaches the server.
+    // rejected before the path ever reaches the server. The check judges the
+    // location as the server will decode it (see logPathInScopeAllowingEncoded)
+    // and returns the raw value unchanged, which is what the server is sent.
     const requireScope = (target: unknown): string => {
-      if (typeof target !== "string" || !logPathInScope(type, uri, target)) {
-        throw new Error(
-          `Refusing to access "${String(
-            target
-          )}": outside the scope of this log view.`
-        );
-      }
-      return target;
-    };
-
-    // post_search/get_search_result receive `transcriptDir` as a scheme-stripped,
-    // still-percent-encoded path, so use the encoding-tolerant scope check (the
-    // raw value is returned unchanged — that is what the server uses).
-    const requireScopeAllowingEncoded = (target: unknown): string => {
       if (
         typeof target !== "string" ||
         !logPathInScopeAllowingEncoded(type, uri, target)
@@ -207,13 +206,13 @@ export class LogviewPanel extends Disposable {
         server_.listSearches(params[0] as string, params[1] as number),
       [kMethodPostSearch]: (params: unknown[]) =>
         server_.postSearch(
-          requireScopeAllowingEncoded(params[0]),
+          requireScope(params[0]),
           params[1] as string,
           params[2]
         ),
       [kMethodGetSearchResult]: (params: unknown[]) =>
         server_.getSearchResult(
-          requireScopeAllowingEncoded(params[0]),
+          requireScope(params[0]),
           params[1] as string,
           params[2] as string,
           params[3] as { events?: string; messages?: string } | undefined
@@ -224,8 +223,14 @@ export class LogviewPanel extends Disposable {
         // server percent-decodes the locations it receives (normalize_uri), so
         // use the encoding-tolerant check to scope the decoded form.
         // Validate the untrusted payload (exact method token, well-formed path,
-        // headers and body) before any policy check reads it.
-        const request = parseProxyRequest(params[0]);
+        // headers and body) before any policy check reads it. A listing that
+        // names no directory is bound to this panel's own location first, so
+        // the server's default log directory is never listed on the panel's
+        // behalf (the scope check refuses a listing that is still bare).
+        const request = bindLogProxyDefaultLocation(
+          parseProxyRequest(params[0]),
+          uri.toString()
+        );
         try {
           assertLogProxyInScope(request, (target) =>
             logPathInScopeAllowingEncoded(type, uri, target)

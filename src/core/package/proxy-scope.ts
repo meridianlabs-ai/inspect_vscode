@@ -22,6 +22,7 @@ import type { HttpProxyRpcRequest } from "./view-server";
 type InScope = (location: string) => boolean;
 
 interface ParsedRequest {
+  url: URL;
   pathname: string;
   params: URLSearchParams;
   /** Path split on "/", each segment percent-decoded (index 0 is ""). */
@@ -50,6 +51,7 @@ function parseRequest(request: HttpProxyRpcRequest): ParsedRequest {
         index === 0 ? segment : decodeURIComponent(segment)
       );
     return {
+      url,
       pathname: url.pathname,
       params: url.searchParams,
       segments,
@@ -63,7 +65,11 @@ function parseRequest(request: HttpProxyRpcRequest): ParsedRequest {
 
 function checker(request: HttpProxyRpcRequest, inScope: InScope) {
   return (location: string | null | undefined): void => {
-    if (typeof location !== "string" || !inScope(location)) {
+    // An empty location is never a request for something in the panel scope;
+    // the server treats it as a real value (some routes as "use the default
+    // dir"), so refuse it here rather than leave it to the predicate's
+    // resolution of "" against the extension host's working directory.
+    if (typeof location !== "string" || location === "" || !inScope(location)) {
       throw proxyError(request);
     }
   };
@@ -128,9 +134,55 @@ const kLogSegmentRoutes = [
   "/api/log-message/",
 ];
 
+// Query-parameter routes on which an ABSENT `log_dir` makes the server fall
+// back to its own configured default directory (`inspect view start`'s log
+// dir: the workspace `./logs` or INSPECT_LOG_DIR). That directory is chosen by
+// the server, not by the panel, so no panel scope vouches for it.
+const kLogDefaultDirRoutes = new Set([
+  "/api/logs",
+  "/api/log-files",
+  "/api/eval-set",
+  "/api/flow",
+]);
+
+/**
+ * Bind a proxied Inspect **log** view request that omits its `log_dir` to the
+ * panel's own location, so the server never resolves its default directory on
+ * the panel's behalf.
+ *
+ * The viewer's directory-mode bootstrap probe is a bare `GET /api/logs`, which
+ * the server answers with a listing of its default directory. A `file` panel
+ * may only see its one log and a `dir` panel opened on some other directory
+ * may not see this one, so the panel fills in what the probe was really asking
+ * for: a `dir` panel lists its own directory, and a `file` panel names its log
+ * file, which the server lists as a single-file listing on both routes (the
+ * same answer the named `eval_logs` method gives such a panel). `/api/eval-set`
+ * and `/api/flow` resolve their manifest under the same default, so they are
+ * bound the same way. A request that already carries a `log_dir` is returned
+ * unchanged; {@link assertLogProxyInScope} checks it rather than rewriting it.
+ *
+ * `location` is the panel's log file or directory as a URI string, the form
+ * the named methods send. The path is rebuilt from its parsed form so a
+ * fragment can never swallow the appended parameter (fetch drops fragments).
+ */
+export function bindLogProxyDefaultLocation(
+  request: HttpProxyRpcRequest,
+  location: string
+): HttpProxyRpcRequest {
+  const { url, pathname, params } = parseRequest(request);
+  if (!kLogDefaultDirRoutes.has(pathname) || params.has("log_dir")) {
+    return request;
+  }
+  url.searchParams.append("log_dir", location);
+  return { ...request, path: url.pathname + url.search };
+}
+
 /**
  * Throw unless the proxied Inspect **log** view request stays within the panel
- * scope. `inScope` is the panel's `logPathInScope` bound to its file/dir scope.
+ * scope. `inScope` is the panel's `logPathInScopeAllowingEncoded` bound to its
+ * file/dir scope. Callers bind a bare `log_dir` to the panel location first
+ * ({@link bindLogProxyDefaultLocation}); this check refuses one that is still
+ * absent.
  */
 export function assertLogProxyInScope(
   request: HttpProxyRpcRequest,
@@ -148,15 +200,21 @@ export function assertLogProxyInScope(
     return;
   }
 
-  // Endpoints whose location is a query parameter. An ABSENT location means the
-  // server lists/uses its own configured default (not an attacker-chosen path),
-  // which the viewer requests during config load — allow it. Every supplied
-  // value is checked, including empty ones (the server treats "" as a real
-  // location, not the default) and repeats (FastAPI resolves a repeated scalar
-  // parameter to the LAST value, so validating only the first would be a
-  // bypass).
+  // Endpoints whose location is a query parameter. Every supplied value is
+  // checked, including empty ones (the server treats "" as a real location or
+  // as the default, never as "nothing") and repeats (FastAPI resolves a
+  // repeated scalar parameter to the LAST value, so validating only the first
+  // would be a bypass). An ABSENT `log_dir` on the listing routes is refused:
+  // the server would list its own default directory, which the panel scope
+  // does not vouch for (a single-file panel would see every log in it). The
+  // panel binds the parameter to its own location before this check, so a
+  // bare request arriving here skipped that step.
   if (pathname === "/api/logs" || pathname === "/api/log-files") {
-    params.getAll("log_dir").forEach(check);
+    const dirs = params.getAll("log_dir");
+    if (dirs.length === 0) {
+      throw proxyError(request);
+    }
+    dirs.forEach(check);
     return;
   }
   if (
@@ -179,11 +237,15 @@ export function assertLogProxyInScope(
   }
   // eval-set / flow resolve a directory from log_dir (+ an optional `dir`
   // subdirectory joined onto it); confine every effective directory the
-  // server could resolve from the supplied values.
+  // server could resolve from the supplied values. Without a log_dir the
+  // server would join `dir` onto its default directory, so refuse that too.
   if (pathname === "/api/eval-set" || pathname === "/api/flow") {
     const bases = params.getAll("log_dir");
     const subs = params.getAll("dir");
-    if (bases.length > 0 && subs.length > 0) {
+    if (bases.length === 0) {
+      throw proxyError(request);
+    }
+    if (subs.length > 0) {
       for (const base of bases) {
         for (const sub of subs) {
           check(joinLocation(base, sub));
@@ -191,7 +253,6 @@ export function assertLogProxyInScope(
       }
     } else {
       bases.forEach(check);
-      subs.forEach(check);
     }
     return;
   }
