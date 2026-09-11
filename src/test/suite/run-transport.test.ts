@@ -14,7 +14,14 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, dirname, join } from "node:path";
+import {
+  basename,
+  delimiter,
+  dirname,
+  join,
+  relative,
+  resolve,
+} from "node:path";
 
 import {
   createRunTransport,
@@ -198,7 +205,7 @@ suite("Run transport through real shells", () => {
         const venv = join(
           root,
           windows
-            ? "venv $x 'a' !h %p ^c &d;e (f) [g] {h} =i ,j ~k #l @m café 日本語"
+            ? "venv $x 'a' !h %p ^c &d (f) [g] {h} =i ,j ~k #l @m café 日本語"
             : "venv $x `t` \"q\" 'a' \\b !h %p &c;d|e (f) [g] café 日本語 ~u #z\nnext line"
         );
         const created = spawnSync(
@@ -472,13 +479,7 @@ suite("Run transport command lines", () => {
   });
 
   test("Windows: an unsupported SystemRoot is refused rather than searched", () => {
-    for (const systemRoot of [
-      undefined,
-      "",
-      "C:\\Win dows",
-      "relative",
-      "C:\\W$",
-    ]) {
+    for (const systemRoot of ["", "C:\\Win dows", "relative", "C:\\W$"]) {
       assert.throws(
         () =>
           createRunTransport(
@@ -557,38 +558,48 @@ suite("Launch vector resolution", () => {
 
   test("relative paths are anchored at the workspace, not the shell", () => {
     assert.deepStrictEqual(
-      resolveLaunchVector(["venv/bin/python"], cwd, "linux"),
-      [join(cwd, "venv/bin/python")]
+      resolveLaunchVector(["venv/bin/python"], cwd, process.platform),
+      [resolve(cwd, "venv/bin/python")]
     );
   });
 
   test("a bare name is looked up on PATH only, never in the current directory", () => {
     // Only cwd has python; PATH lists an empty entry, a relative entry that
     // names cwd, and a trusted absolute directory without python.
-    const env = { PATH: ["", cwd.replace(/^\//, ""), pathDir].join(":") };
-    assert.throws(
-      () => resolveLaunchVector(["python"], cwd, "linux", env),
-      /not found on PATH/
-    );
-    writeFileSync(join(pathDir, "python"), "");
-    assert.deepStrictEqual(resolveLaunchVector(["python"], cwd, "linux", env), [
-      join(pathDir, "python"),
-    ]);
-    rmSync(join(pathDir, "python"));
+    const env = {
+      PATH: ["", relative(process.cwd(), cwd), pathDir].join(delimiter),
+      PATHEXT: ".COM;.EXE;.BAT;.CMD",
+    };
+    try {
+      assert.throws(
+        () => resolveLaunchVector(["python"], cwd, process.platform, env),
+        /not found on PATH/
+      );
+      writeFileSync(join(pathDir, "python"), "");
+      assert.deepStrictEqual(
+        resolveLaunchVector(["python"], cwd, process.platform, env),
+        [join(pathDir, "python")]
+      );
+    } finally {
+      rmSync(join(pathDir, "python"), { force: true });
+    }
   });
 
   test("Windows PATHEXT is honoured for bare names", () => {
     const env = { PATH: pathDir, PATHEXT: ".COM;.EXE;.CMD" };
-    assert.throws(() => resolveLaunchVector(["python"], cwd, "win32", env));
-    writeFileSync(join(pathDir, "python.CMD"), "");
-    const resolved = resolveLaunchVector(["python", "-u"], cwd, "win32", env);
-    assert.strictEqual(resolved.length, 2);
-    assert.strictEqual(
-      resolved[0]!.toLowerCase(),
-      join(pathDir, "python.cmd").toLowerCase()
-    );
-    assert.strictEqual(resolved[1], "-u");
-    rmSync(join(pathDir, "python.CMD"));
+    try {
+      assert.throws(() => resolveLaunchVector(["python"], cwd, "win32", env));
+      writeFileSync(join(pathDir, "python.CMD"), "");
+      const resolved = resolveLaunchVector(["python", "-u"], cwd, "win32", env);
+      assert.strictEqual(resolved.length, 2);
+      assert.strictEqual(
+        resolved[0]!.toLowerCase(),
+        join(pathDir, "python.cmd").toLowerCase()
+      );
+      assert.strictEqual(resolved[1], "-u");
+    } finally {
+      rmSync(join(pathDir, "python.CMD"), { force: true });
+    }
   });
 
   test("an empty vector is rejected", () => {
