@@ -1,4 +1,5 @@
 import * as assert from "assert";
+import { spawnSync } from "child_process";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
@@ -362,6 +363,83 @@ suite("logview-panel Test Suite", () => {
         true
       );
     });
+
+    test("keeps U+FEFF: a BOM-named sibling is a different file or directory", () => {
+      // `%EF%BB%BF` decodes to U+FEFF, which `unquote` keeps as an ordinary
+      // file-name character. A decoder that dropped it as a byte-order mark
+      // would judge `logs/%EF%BB%BFrun.eval` as the panel's `logs/run.eval`
+      // while the server opened the distinct file `logs/\uFEFFrun.eval`.
+      const file = Uri.file("/w/logs/run.eval");
+      for (const sibling of [
+        "/w/logs/%EF%BB%BFrun.eval",
+        "file:///w/logs/%EF%BB%BFrun.eval",
+        "/w/logs/\ufeffrun.eval",
+        "file:///w/logs/\ufeffrun.eval",
+      ]) {
+        assert.strictEqual(
+          logPathInScopeAllowingEncoded("file", file, sibling),
+          false,
+          sibling
+        );
+      }
+      // for a directory panel the mark names a sibling directory
+      const dir = Uri.file("/w/logs");
+      for (const outside of [
+        "/w/%EF%BB%BFlogs/private.eval",
+        "file:///w/%EF%BB%BFlogs/private.eval",
+        "/w/\ufefflogs/private.eval",
+      ]) {
+        assert.strictEqual(
+          logPathInScopeAllowingEncoded("dir", dir, outside),
+          false,
+          outside
+        );
+      }
+      // while a BOM-named file inside the directory is a descendant
+      assert.strictEqual(
+        logPathInScopeAllowingEncoded("dir", dir, "/w/logs/%EF%BB%BFrun.eval"),
+        true
+      );
+      // and a panel legitimately opened on a BOM-named file or directory
+      // accepts its own spellings, encoded as its URI encodes them or raw
+      const bomFile = Uri.file("/w/logs/\ufeffrun.eval");
+      assert.strictEqual(
+        bomFile.toString(),
+        "file:///w/logs/%EF%BB%BFrun.eval"
+      );
+      for (const own of [
+        bomFile.toString(),
+        bomFile.toString(true),
+        "/w/logs/%EF%BB%BFrun.eval",
+        "/w/logs/\ufeffrun.eval",
+      ]) {
+        assert.strictEqual(
+          logPathInScopeAllowingEncoded("file", bomFile, own),
+          true,
+          own
+        );
+      }
+      assert.strictEqual(
+        logPathInScopeAllowingEncoded("file", bomFile, "/w/logs/run.eval"),
+        false
+      );
+      const bomDir = Uri.file("/w/\ufefflogs");
+      for (const inside of [
+        "/w/%EF%BB%BFlogs/private.eval",
+        "file:///w/%EF%BB%BFlogs/private.eval",
+        "/w/\ufefflogs/private.eval",
+      ]) {
+        assert.strictEqual(
+          logPathInScopeAllowingEncoded("dir", bomDir, inside),
+          true,
+          inside
+        );
+      }
+      assert.strictEqual(
+        logPathInScopeAllowingEncoded("dir", bomDir, "/w/logs/private.eval"),
+        false
+      );
+    });
   });
 
   suite("LogviewPanel RPC scope guard", () => {
@@ -633,6 +711,94 @@ suite("logview-panel Test Suite", () => {
       }
     });
 
+    test("file and dir panels refuse a BOM-named sibling on every named method", async () => {
+      const filePanel = createPanel("file", Uri.file("/w/logs/run.eval"));
+      const dirPanel = createPanel("dir", Uri.file("/w/logs"));
+      try {
+        // `%EF%BB%BF` is U+FEFF to the server: a different file next to the
+        // panel's, or a different directory next to the panel's directory
+        const cases: Array<[typeof filePanel, string]> = [
+          [filePanel, "/w/logs/%EF%BB%BFrun.eval"],
+          [filePanel, "file:///w/logs/%EF%BB%BFrun.eval"],
+          [dirPanel, "/w/%EF%BB%BFlogs/private.eval"],
+          [dirPanel, "file:///w/%EF%BB%BFlogs/private.eval"],
+        ];
+        for (const [{ call }, target] of cases) {
+          for (const [method, params] of pathMethods(target)) {
+            const response = await call(method, params);
+            assert.ok(
+              response.error,
+              `${method} must refuse ${target}, got ${JSON.stringify(response)}`
+            );
+            assert.match(response.error.message, /outside the scope/);
+          }
+        }
+        assert.deepStrictEqual(filePanel.calls, []);
+        assert.deepStrictEqual(dirPanel.calls, []);
+      } finally {
+        filePanel.panel.dispose();
+        dirPanel.panel.dispose();
+      }
+    });
+
+    test("panels on a BOM-named file or directory accept their own spellings", async () => {
+      const bomFile = Uri.file("/w/logs/\ufeffrun.eval");
+      const filePanel = createPanel("file", bomFile);
+      const bomDir = Uri.file("/w/\ufefflogs");
+      const dirPanel = createPanel("dir", bomDir);
+      try {
+        const cases: Array<[typeof filePanel, string]> = [
+          [filePanel, bomFile.toString()], // file:///w/logs/%EF%BB%BFrun.eval
+          [filePanel, bomFile.toString(true)],
+          [filePanel, "/w/logs/%EF%BB%BFrun.eval"],
+          [filePanel, "/w/logs/\ufeffrun.eval"],
+          [dirPanel, "file:///w/%EF%BB%BFlogs/private.eval"],
+          [dirPanel, "/w/%EF%BB%BFlogs/private.eval"],
+          [dirPanel, "/w/\ufefflogs/sub/private.eval"],
+        ];
+        for (const [{ call, calls }, target] of cases) {
+          for (const [method, params] of pathMethods(target)) {
+            const response = await call(method, params);
+            assert.strictEqual(
+              response.error,
+              undefined,
+              `${method} must accept ${target}, got ${JSON.stringify(response)}`
+            );
+            const last: Call = calls[calls.length - 1]!;
+            const forwarded: unknown =
+              method === kMethodEvalLogHeaders
+                ? (last.args[0] as string[])[0]
+                : last.args[0];
+            assert.strictEqual(forwarded, target, `${method} forwards raw`);
+          }
+        }
+        assert.strictEqual(filePanel.calls.length, 4 * pathMethods("").length);
+        assert.strictEqual(dirPanel.calls.length, 3 * pathMethods("").length);
+        // the unmarked neighbours are outside each panel's scope
+        assert.ok(
+          (
+            await filePanel.call(kMethodEvalLogBytes, [
+              "/w/logs/run.eval",
+              0,
+              1,
+            ])
+          ).error
+        );
+        assert.ok(
+          (
+            await dirPanel.call(kMethodEvalLogBytes, [
+              "/w/logs/private.eval",
+              0,
+              1,
+            ])
+          ).error
+        );
+      } finally {
+        filePanel.panel.dispose();
+        dirPanel.panel.dispose();
+      }
+    });
+
     test("the accepted spellings open the panel's file, the refused one its sibling", () => {
       // Distinct fixture files, read the way the view server reads a named
       // location: the route decoding reverses the transport's encoding, then
@@ -671,6 +837,166 @@ suite("logview-panel Test Suite", () => {
         assert.ok(sibling.endsWith("/run%25201.eval"));
         assert.strictEqual(serverReads(sibling), "OTHER file");
         assert.strictEqual(inScope(sibling), false);
+      } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+      }
+    });
+
+    test("Python unquote opens the BOM-named sibling the guard refuses", function () {
+      // Same shape as the previous test, but the read is performed by Python's
+      // `urllib.parse.unquote` (what the view server's `normalize_uri` calls)
+      // on real fixture files, so multibyte behaviour is established against
+      // the actual consumer rather than a JavaScript approximation.
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), "logview-bom-"));
+      try {
+        fs.writeFileSync(path.join(root, "run.eval"), "panel file");
+        fs.writeFileSync(
+          path.join(root, "\ufeffrun.eval"),
+          "OUTSIDE SINGLE FILE"
+        );
+        fs.mkdirSync(path.join(root, "logs"));
+        fs.writeFileSync(path.join(root, "logs", "in.eval"), "inside dir");
+        fs.mkdirSync(path.join(root, "\ufefflogs"));
+        fs.writeFileSync(
+          path.join(root, "\ufefflogs", "private.eval"),
+          "OUTSIDE DIRECTORY"
+        );
+        const file = Uri.file(path.join(root, "run.eval"));
+        const dir = Uri.file(path.join(root, "logs"));
+        // the bare and file:// forms of each location, as a webview would
+        // send them; `%EF%BB%BF` is inserted into an otherwise encoded URI
+        const bare = (p: string) => p;
+        const uri = (p: string) => Uri.file(p).toString();
+        const bomFile = path.join(root, "\ufeffrun.eval");
+        const bomDirFile = path.join(root, "\ufefflogs", "private.eval");
+        const encodedBom = (p: string) => p.replace(/\ufeff/g, "%EF%BB%BF");
+        const cases: Array<{
+          type: "file" | "dir";
+          scope: Uri;
+          target: string;
+          reads: string;
+          inScope: boolean;
+        }> = [
+          // the panel's own file in both forms is accepted and is what Python reads
+          {
+            type: "file",
+            scope: file,
+            target: bare(file.fsPath),
+            reads: "panel file",
+            inScope: true,
+          },
+          {
+            type: "file",
+            scope: file,
+            target: uri(file.fsPath),
+            reads: "panel file",
+            inScope: true,
+          },
+          // the BOM-named sibling, encoded in a bare path and in a file URI,
+          // is a different file to Python and must be refused
+          {
+            type: "file",
+            scope: file,
+            target: encodedBom(bare(bomFile)),
+            reads: "OUTSIDE SINGLE FILE",
+            inScope: false,
+          },
+          {
+            type: "file",
+            scope: file,
+            target: uri(bomFile),
+            reads: "OUTSIDE SINGLE FILE",
+            inScope: false,
+          },
+          // likewise a file in the BOM-named sibling directory
+          {
+            type: "dir",
+            scope: dir,
+            target: bare(path.join(root, "logs", "in.eval")),
+            reads: "inside dir",
+            inScope: true,
+          },
+          {
+            type: "dir",
+            scope: dir,
+            target: encodedBom(bare(bomDirFile)),
+            reads: "OUTSIDE DIRECTORY",
+            inScope: false,
+          },
+          {
+            type: "dir",
+            scope: dir,
+            target: uri(bomDirFile),
+            reads: "OUTSIDE DIRECTORY",
+            inScope: false,
+          },
+          // and a panel legitimately on the BOM-named file accepts its URI
+          {
+            type: "file",
+            scope: Uri.file(bomFile),
+            target: uri(bomFile),
+            reads: "OUTSIDE SINGLE FILE",
+            inScope: true,
+          },
+          {
+            type: "file",
+            scope: Uri.file(bomFile),
+            target: encodedBom(bare(bomFile)),
+            reads: "OUTSIDE SINGLE FILE",
+            inScope: true,
+          },
+          {
+            type: "dir",
+            scope: Uri.file(path.join(root, "\ufefflogs")),
+            target: uri(bomDirFile),
+            reads: "OUTSIDE DIRECTORY",
+            inScope: true,
+          },
+        ];
+        assert.ok(uri(bomFile).endsWith("/%EF%BB%BFrun.eval"), uri(bomFile));
+        const python = spawnSync(
+          process.platform === "win32" ? "python" : "python3",
+          [
+            "-c",
+            [
+              "import json, sys, urllib.parse",
+              "out = []",
+              "for raw in json.load(sys.stdin):",
+              "    location = urllib.parse.unquote(raw)",
+              "    if location.startswith('file://'):",
+              "        location = location[len('file://'):]",
+              "    with open(location, encoding='utf-8') as f:",
+              "        out.append(f.read())",
+              "print(json.dumps(out))",
+            ].join("\n"),
+          ],
+          {
+            input: JSON.stringify(cases.map((c) => c.target)),
+            encoding: "utf8",
+            timeout: 30000,
+          }
+        );
+        if (
+          python.error &&
+          "code" in python.error &&
+          python.error.code === "ENOENT"
+        ) {
+          this.skip();
+        }
+        assert.strictEqual(python.status, 0, python.stderr);
+        const contents = JSON.parse(python.stdout) as string[];
+        cases.forEach((c, i) => {
+          assert.strictEqual(
+            contents[i],
+            c.reads,
+            `Python read of ${c.target}`
+          );
+          assert.strictEqual(
+            logPathInScopeAllowingEncoded(c.type, c.scope, c.target),
+            c.inScope,
+            `${c.type} ${c.scope.toString()} judging ${c.target}`
+          );
+        });
       } finally {
         fs.rmSync(root, { recursive: true, force: true });
       }
@@ -720,6 +1046,25 @@ suite("logview-panel Test Suite", () => {
             await filePanel.call(kMethodHttpRequest, [
               proxied(
                 `/api/log-bytes/${encodeURIComponent("file:///w/logs/run%25201.eval")}?start=0&end=9`
+              ),
+            ])
+          ).error
+        );
+        // and the BOM-named siblings (U+FEFF is a file-name character)
+        assert.ok(
+          (
+            await filePanel.call(kMethodHttpRequest, [
+              proxied(
+                `/api/log-bytes/${encodeURIComponent("file:///w/logs/%EF%BB%BFrun%201.eval")}?start=0&end=9`
+              ),
+            ])
+          ).error
+        );
+        assert.ok(
+          (
+            await dirPanel.call(kMethodHttpRequest, [
+              proxied(
+                `/api/log-bytes/${encodeURIComponent("/w/%EF%BB%BFlogs/private.eval")}?start=0&end=9`
               ),
             ])
           ).error

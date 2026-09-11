@@ -29,12 +29,18 @@ export function resolveToUri(pathOrUri: string): Uri {
  * kept literally, and the bytes are read as UTF-8. Returns null when the
  * decoded bytes are not valid UTF-8; Python substitutes U+FFFD there, which
  * names no real location, so callers refuse rather than guess.
+ *
+ * `ignoreBOM` keeps a decoded U+FEFF (`%EF%BB%BF`) as the file-name character
+ * it is. By default TextDecoder drops that byte sequence at the start of each
+ * decode, and each `%XX` run is decoded separately, so `logs/%EF%BB%BFrun.eval`
+ * would come back as `logs/run.eval` while `unquote` names the distinct file
+ * `logs/\uFEFFrun.eval`.
  */
 export function percentDecodeOnce(value: string): string | null {
   if (!value.includes("%")) {
     return value;
   }
-  const decoder = new TextDecoder("utf-8", { fatal: true });
+  const decoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
   try {
     return value.replace(/(?:%[0-9A-Fa-f]{2})+/g, (run) =>
       decoder.decode(Buffer.from(run.replace(/%/g, ""), "hex"))
