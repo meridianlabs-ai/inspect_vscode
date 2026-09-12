@@ -1,3 +1,4 @@
+import * as os from "os";
 import path from "path";
 
 import { format, isThisYear, isToday } from "date-fns";
@@ -14,12 +15,7 @@ import vscode, {
 
 import { ListingMRU } from "../../../core/listing-mru";
 import { log } from "../../../core/log";
-import {
-  getRelativeUri,
-  isUri,
-  normalizeWindowsUri,
-  resolveToUri,
-} from "../../../core/uri";
+import { isUri, normalizeWindowsUri, resolveToUri } from "../../../core/uri";
 
 export type LogNode =
   | ({
@@ -63,29 +59,144 @@ export interface Logs {
  * the relative part contains a '..' escape; otherwise fall back to the
  * containment-checked getRelativeUri. Locations outside the log dir return null
  * so the caller can drop them rather than surface an out-of-boundary entry.
+ *
+ * Names with '.' or empty segments ('team/./x.eval', 'team//x.eval',
+ * '/a.eval', 'x.eval/') are dropped as well. Tree item ids and the URI a node
+ * opens come from Uri.joinPath, which normalizes those segments away, so such
+ * a name would share an id with — and open — a different entry (for an S3 key
+ * a different object). They are not the log directory's own listing form, so
+ * nothing legitimate is lost.
+ *
+ * That check follows Uri.joinPath's own segment rules: '/' always separates,
+ * and '\' separates only for a file location on Windows (win32 joining). For
+ * S3 keys and POSIX file names a backslash is an ordinary character that
+ * joinPath preserves, so 'team/\x.eval' stays a distinct, valid entry there.
+ * The '..' rejection is deliberately stricter and treats '\' as a separator
+ * everywhere, matching getRelativeUri's containment check. Absolute locations
+ * that miss the string prefix go through listingRelativePath, which applies
+ * the same rules, so a literal backslash survives that route unchanged too.
  */
 export function relativeLogPath(
   logDir: string,
-  location: string
+  location: string,
+  platform: NodeJS.Platform = os.platform()
 ): string | null {
   const dirWithSlash = logDir.endsWith("/") ? logDir : `${logDir}/`;
   if (location.startsWith(dirWithSlash)) {
     const relative = location.slice(dirWithSlash.length);
-    return relative.split(/[\\/]/).includes("..") ? null : relative;
+    return hasIrregularSegments(relative, isFileLocation(logDir), platform)
+      ? null
+      : relative;
   }
   try {
     if (isUri(location) || path.isAbsolute(location)) {
-      // Absolute/URI locations: contained iff getRelativeUri says so (null
-      // drops anything outside the dir, including '..' escapes).
-      return getRelativeUri(resolveToUri(logDir), resolveToUri(location));
+      // Absolute/URI locations (a plain path against a file: dir, or spelled
+      // with different percent-encoding): contained iff listingRelativePath
+      // says so. It returns the location's own segments, so a name it accepts
+      // is the exact object that was listed; anything outside the dir,
+      // including '..' escapes, comes back null and is dropped.
+      return listingRelativePath(
+        resolveToUri(logDir),
+        resolveToUri(location),
+        platform
+      );
     }
   } catch {
     // unparseable dir or location — treat as outside the log dir
     return null;
   }
   // Otherwise the server returned a name already relative to the log dir; keep
-  // it unless it uses '..' to climb out.
-  return location.split(/[\\/]/).includes("..") ? null : location;
+  // it unless it uses '..' to climb out or has '.'/empty segments.
+  return hasIrregularSegments(location, isFileLocation(logDir), platform)
+    ? null
+    : location;
+}
+
+/**
+ * Whether a log dir names a file location (a plain path or a file: URI) rather
+ * than a remote store, for choosing the path separators Uri.joinPath applies.
+ */
+function isFileLocation(logDir: string): boolean {
+  return !isUri(logDir) || /^file:/i.test(logDir);
+}
+
+/**
+ * Whether a log-dir-relative name contains a '..' (escape), '.' or empty
+ * segment — the segments Uri.joinPath resolves away (see relativeLogPath).
+ *
+ * '..' is checked on both separators regardless of scheme: it is the traversal
+ * defense and stays as strict as getRelativeUri. '.'/empty segments are only
+ * what joinPath would actually fold, so '\' counts as a separator there only
+ * for a file location on Windows; elsewhere it is a literal character.
+ */
+function hasIrregularSegments(
+  relative: string,
+  fileLocation: boolean,
+  platform: NodeJS.Platform
+): boolean {
+  if (relative.split(/[\\/]/).includes("..")) {
+    return true;
+  }
+  const separators = fileLocation && platform === "win32" ? /[\\/]/ : "/";
+  return relative
+    .split(separators)
+    .some((segment) => segment === "" || segment === ".");
+}
+
+/**
+ * Listing-local containment: the log-dir-relative name of `target`, or null
+ * if it is not a strict descendant of `logDir`.
+ *
+ * This is the containment rule for tree nodes and their URIs, and it uses the
+ * same separators as Uri.joinPath (see hasIrregularSegments): '/' always, and
+ * '\' only for a file location on Windows. The shared getRelativeUri folds
+ * every '\' to '/' before normalizing, which is right for the panels that
+ * check Windows file paths but wrong for the identity of an S3 key or a POSIX
+ * file name — under that folding a directory literally named '\.' compares
+ * equal to the log dir itself and a name like 'team/\x.eval' is renamed to
+ * 'team/x.eval', another object. Here the target's raw segments are kept and
+ * compared against the normalized log dir path, so a name is accepted only
+ * when it is already in canonical form for its scheme/platform and is then
+ * returned exactly as listed.
+ *
+ * Traversal protection is unchanged: scheme and authority must match, the
+ * target must sit under the log dir's '/'-terminated path, and the '..'
+ * rejection in hasIrregularSegments applies on either separator for every
+ * scheme.
+ */
+export function listingRelativePath(
+  logDir: Uri,
+  target: Uri,
+  platform: NodeJS.Platform = os.platform()
+): string | null {
+  if (logDir.scheme !== target.scheme) {
+    return null;
+  }
+  if (logDir.authority !== target.authority) {
+    return null;
+  }
+  const fileLocation = logDir.scheme === "file";
+  const windowsFile = fileLocation && platform === "win32";
+  // Uri.joinPath resolves both separators for a Windows file location and
+  // Uri.file spells the result with '/', so compare in that spelling there.
+  const fold = (p: string) => (windowsFile ? p.replace(/\\/g, "/") : p);
+  const parentPath = path.posix.normalize(fold(logDir.path));
+  const parentBase = parentPath.endsWith("/")
+    ? parentPath.slice(0, -1)
+    : parentPath;
+  const prefix = `${parentBase}/`;
+  const targetPath = fold(target.path);
+  if (!targetPath.startsWith(prefix)) {
+    return null;
+  }
+  const relative = targetPath.slice(prefix.length);
+  // A '.'/empty/'..' segment in the relative part means the target is not in
+  // canonical form: it is either an escape or an alias of another entry
+  // (Uri.joinPath would fold it), so it cannot be a node of its own.
+  if (hasIrregularSegments(relative, fileLocation, platform)) {
+    return null;
+  }
+  return relative;
 }
 
 export class LogListing {
@@ -132,9 +243,12 @@ export class LogListing {
     // Node names are containment-checked on ingest (see listLogs), so this
     // should always hold; verify defensively and never hand back a URI that
     // escapes the log directory (clamp to the log dir if it somehow does).
+    // The check uses the listing's own separator rules so that a directory
+    // whose literal name folds to '.' (e.g. '\.' in an S3 key) is not
+    // mistaken for the log dir and clamped onto its id.
     if (
       uri.toString() !== this.logDir_.toString() &&
-      getRelativeUri(this.logDir_, uri) === null
+      listingRelativePath(this.logDir_, uri) === null
     ) {
       log.error(
         `Log node "${node.name}" resolved outside the log directory; refusing.`
@@ -188,8 +302,9 @@ export class LogListing {
             normalizeWindowsUri(file.name)
           );
           // Drop listing entries that resolve outside the log directory
-          // (e.g. remote-storage names containing '..' traversal) rather than
-          // surfacing an out-of-boundary node in the tree.
+          // (e.g. remote-storage names containing '..' traversal) or whose
+          // '.'/empty segments would collide with another entry's tree id,
+          // rather than surfacing a misleading node in the tree.
           if (relative === null) {
             dropped++;
             continue;
@@ -199,7 +314,7 @@ export class LogListing {
         }
         if (dropped > 0) {
           log.warn(
-            `Dropped ${dropped} log listing item(s) that resolved outside ${log_dir}.`
+            `Dropped ${dropped} log listing item(s) that resolved outside ${log_dir} or had '.'/empty path segments.`
           );
         }
         const tree = buildLogTree(items);

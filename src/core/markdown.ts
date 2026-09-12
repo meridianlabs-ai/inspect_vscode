@@ -13,9 +13,15 @@
 /**
  * Escape markdown metacharacters so a value renders as literal text: no links
  * or images (hover beacons), headings, emphasis, tables, or inline code.
+ *
+ * `:` is escaped too: the renderer's GFM autolinker turns a bare
+ * `scheme://host/path` into a link even with `isTrusted` false, and it strips
+ * backslash escapes from the resulting href, so escaping the `.` in the host
+ * is not enough (and a host need not contain one — `http://3232235777/`).
+ * `www.` and e-mail autolinks require an unescaped `.` and stay inert.
  */
 export function escapeMarkdown(value: string): string {
-  return value.replace(/[\\`*_{}[\]()#+\-.!<>|~]/g, "\\$&");
+  return value.replace(/[\\`*_{}[\]()#+\-.!<>|~:]/g, "\\$&");
 }
 
 /**

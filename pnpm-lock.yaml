@@ -114,6 +114,9 @@ importers:
       global:
         specifier: ^4.4.0
         version: 4.4.0
+      marked:
+        specifier: 14.0.0
+        version: 14.0.0
       mocha:
         specifier: ^12.0.0
         version: 12.0.0
@@ -2074,6 +2077,11 @@ packages:
 
   markdown-it@14.2.0:
     resolution: {integrity: sha512-1TGiQiJVRQ3NPmZH6sx5Cfnmg6GQm9jvC1ch4TK511NjSJvjzKLzn5pPfZRNZkRPZP0HqCioSndqH8v2nRaWVQ==}
+    hasBin: true
+
+  marked@14.0.0:
+    resolution: {integrity: sha512-uIj4+faQ+MgHgwUW1l2PsPglZLOLOT1uErt06dAPtx2kjteLAkbsd/0FiYg/MGS+i7ZKLb7w2WClxHkzOOuryQ==}
+    engines: {node: '>= 18'}
     hasBin: true
 
   math-intrinsics@1.1.0:
@@ -5358,6 +5366,8 @@ snapshots:
       mdurl: 2.0.0
       punycode.js: 2.3.1
       uc.micro: 2.1.0
+
+  marked@14.0.0: {}
 
   math-intrinsics@1.1.0: {}
 
