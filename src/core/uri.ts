@@ -132,8 +132,25 @@ export function getRelativeUri(parentUri: Uri, childUri: Uri): string | null {
   // `.../logs/..\..\x` would otherwise pass the '/'-only segment check and then
   // escape the directory on Windows. Fold '\' to '/' before normalizing so the
   // containment check matches the downstream interpretation. See CWE-29.
-  const parentPath = path.posix.normalize(parentUri.path.replace(/\\/g, "/"));
-  const childPath = path.posix.normalize(childUri.path.replace(/\\/g, "/"));
+  // On Windows a drive letter is case-insensitive, and the two ways a file Uri
+  // is built spell it differently: `Uri.file("C:\\w\\logs")` keeps the path
+  // `/C:/w/logs`, while `Uri.parse` of that Uri's own `toString()` yields
+  // `/c:/w/logs` (toString lower-cases the drive). The same directory must
+  // contain itself whichever way it arrived, so fold the drive letter there.
+  // Only there: on POSIX `/c:` is an ordinary, case-sensitive directory name.
+  const foldDrive = (p: string): string =>
+    os.platform() === "win32" && parentUri.scheme === "file"
+      ? p.replace(
+          /^\/([a-zA-Z]):/,
+          (_, drive: string) => `/${drive.toLowerCase()}:`
+        )
+      : p;
+  const parentPath = foldDrive(
+    path.posix.normalize(parentUri.path.replace(/\\/g, "/"))
+  );
+  const childPath = foldDrive(
+    path.posix.normalize(childUri.path.replace(/\\/g, "/"))
+  );
 
   const parentBase = parentPath.endsWith("/")
     ? parentPath.slice(0, -1)

@@ -445,6 +445,47 @@ suite("URI Utilities Test Suite", () => {
       const child = Uri.parse("s3://bucket-a/logs/../secrets/x.eval");
       assert.strictEqual(getRelativeUri(parent, child), null);
     });
+
+    test("folds the drive letter's case on Windows only", function () {
+      // Uri.file keeps the caller's drive-letter case in `.path` while
+      // Uri.toString() lower-cases it, so the same Windows directory arrives
+      // as both `/C:/w/logs` and `/c:/w/logs`.
+      const upper = Uri.parse("file:///C:/w/logs");
+      const lower = Uri.parse("file:///c:/w/logs/x.eval");
+      if (os.platform() === "win32") {
+        assert.strictEqual(getRelativeUri(upper, lower), "x.eval");
+        assert.strictEqual(
+          getRelativeUri(Uri.parse("file:///c:/w/logs"), upper),
+          null,
+          "a directory still does not contain itself"
+        );
+        // only the drive letter is folded: the rest of the path is compared
+        // as spelled, so a differing directory case is refused (fail closed)
+        assert.strictEqual(
+          getRelativeUri(upper, Uri.parse("file:///c:/W/logs/x.eval")),
+          null
+        );
+        // and a non-drive path is left alone
+        assert.strictEqual(
+          getRelativeUri(
+            Uri.parse("file:///Cx/logs"),
+            Uri.parse("file:///cx/logs/x.eval")
+          ),
+          null
+        );
+      } else {
+        // `/c:` is an ordinary, case-sensitive directory name on POSIX
+        assert.strictEqual(getRelativeUri(upper, lower), null);
+      }
+      // the s3 scheme is never folded
+      assert.strictEqual(
+        getRelativeUri(
+          Uri.parse("s3://bucket/C:/logs"),
+          Uri.parse("s3://bucket/c:/logs/x.eval")
+        ),
+        null
+      );
+    });
   });
 
   suite("parseTerminalLinkUri", () => {
