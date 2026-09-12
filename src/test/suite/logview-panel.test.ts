@@ -814,9 +814,14 @@ suite("logview-panel Test Suite", () => {
           );
         const serverReads = (raw: string) => {
           const location = unquoteOnce(raw);
-          const file = location.startsWith("file://")
+          let file = location.startsWith("file://")
             ? location.slice("file://".length)
             : location;
+          // normalize_uri drops the "/" before a Windows drive letter
+          // (`/c:/...` → `c:/...`), which `file:///c%3A/...` leaves behind.
+          if (/^\/[a-zA-Z]:/.test(file)) {
+            file = file.slice(1);
+          }
           return fs.readFileSync(file, "utf8");
         };
         const panel = Uri.file(path.join(root, "run 1.eval"));
@@ -954,9 +959,13 @@ suite("logview-panel Test Suite", () => {
           },
         ];
         assert.ok(uri(bomFile).endsWith("/%EF%BB%BFrun.eval"), uri(bomFile));
+        // `-X utf8` keeps stdin/stdout UTF-8 on Windows; the drive-letter
+        // step mirrors normalize_uri, which turns `file:///c:/x` into `c:/x`.
         const python = spawnSync(
           process.platform === "win32" ? "python" : "python3",
           [
+            "-X",
+            "utf8",
             "-c",
             [
               "import json, sys, urllib.parse",
@@ -965,6 +974,8 @@ suite("logview-panel Test Suite", () => {
               "    location = urllib.parse.unquote(raw)",
               "    if location.startswith('file://'):",
               "        location = location[len('file://'):]",
+              "        if len(location) > 3 and location[0] == '/' and location[2] == ':':",
+              "            location = location[1:]",
               "    with open(location, encoding='utf-8') as f:",
               "        out.append(f.read())",
               "print(json.dumps(out))",

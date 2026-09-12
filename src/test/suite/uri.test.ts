@@ -186,9 +186,13 @@ suite("URI Utilities Test Suite", () => {
         "%C3.eval",
         "%FF",
       ];
+      // `-X utf8` so stdin/stdout are UTF-8 on Windows too (the corpus has a
+      // literal `é`, which a cp1252 stdin would read as two other characters).
       const python = spawnSync(
         process.platform === "win32" ? "python" : "python3",
         [
+          "-X",
+          "utf8",
           "-c",
           "import json, sys, urllib.parse\n" +
             "print(json.dumps([urllib.parse.unquote(v) for v in json.load(sys.stdin)]))",
