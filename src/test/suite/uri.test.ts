@@ -1,4 +1,5 @@
 import * as assert from "assert";
+import { spawnSync } from "child_process";
 import * as os from "os";
 
 import { Uri } from "vscode";
@@ -8,7 +9,9 @@ import {
   getRelativeUri,
   isUncPath,
   normalizeWindowsUri,
+  parseLocationLiterally,
   parseTerminalLinkUri,
+  percentDecodeOnce,
   prettyUriPath,
   resolveToUri,
 } from "../../core/uri";
@@ -71,6 +74,202 @@ suite("URI Utilities Test Suite", () => {
       const uri = resolveToUri("https://example.com/path#section");
       assert.strictEqual(uri.scheme, "https");
       assert.strictEqual(uri.fragment, "section");
+    });
+  });
+
+  suite("percentDecodeOnce", () => {
+    test("decodes well-formed escapes once, as urllib.parse.unquote does", () => {
+      assert.strictEqual(
+        percentDecodeOnce("/w/my%20run/x.eval"),
+        "/w/my run/x.eval"
+      );
+      assert.strictEqual(percentDecodeOnce("..%2F..%2Fetc"), "../../etc");
+      assert.strictEqual(percentDecodeOnce("%2e%2E"), "..");
+      // one decode only: `%2520` is the three characters `%20`
+      assert.strictEqual(percentDecodeOnce("run%25201.eval"), "run%201.eval");
+      // multi-byte UTF-8 across adjacent escapes
+      assert.strictEqual(percentDecodeOnce("caf%C3%A9.eval"), "café.eval");
+      assert.strictEqual(percentDecodeOnce("caf\u00e9%20x"), "café x");
+    });
+
+    test("passes values without escapes through unchanged", () => {
+      assert.strictEqual(
+        percentDecodeOnce("/w/logs/run 1.eval"),
+        "/w/logs/run 1.eval"
+      );
+      assert.strictEqual(percentDecodeOnce(""), "");
+    });
+
+    test("keeps malformed escapes literal instead of throwing", () => {
+      assert.strictEqual(percentDecodeOnce("100%done.eval"), "100%done.eval");
+      assert.strictEqual(percentDecodeOnce("%zz.eval"), "%zz.eval");
+      assert.strictEqual(percentDecodeOnce("50%"), "50%");
+      assert.strictEqual(percentDecodeOnce("a%2"), "a%2");
+      // mixed: the well-formed escape decodes, the malformed one stays
+      assert.strictEqual(percentDecodeOnce("100%done%20x"), "100%done x");
+    });
+
+    test("returns null for escapes that do not decode to UTF-8", () => {
+      assert.strictEqual(percentDecodeOnce("%E0%A4%A"), null);
+      assert.strictEqual(percentDecodeOnce("%C3.eval"), null);
+      assert.strictEqual(percentDecodeOnce("%FF"), null);
+    });
+
+    test("keeps U+FEFF as a file-name character, as unquote does", () => {
+      // `%EF%BB%BF` is the UTF-8 form of U+FEFF. TextDecoder drops it as a
+      // byte-order mark at the start of a decode unless told otherwise, and
+      // every `%XX` run is its own decode, so the character would vanish from
+      // the middle of a path too. Python keeps it, so the guard must as well.
+      assert.strictEqual(
+        percentDecodeOnce("/w/logs/%EF%BB%BFrun.eval"),
+        "/w/logs/\ufeffrun.eval"
+      );
+      assert.strictEqual(
+        percentDecodeOnce("file:///w/logs/%EF%BB%BFrun.eval"),
+        "file:///w/logs/\ufeffrun.eval"
+      );
+      assert.strictEqual(
+        percentDecodeOnce("/w/%EF%BB%BFlogs/private.eval"),
+        "/w/\ufefflogs/private.eval"
+      );
+      assert.strictEqual(percentDecodeOnce("%EF%BB%BF"), "\ufeff");
+      // also when the mark follows other bytes in the same run, or a
+      // malformed escape splits the run
+      assert.strictEqual(
+        percentDecodeOnce("caf%C3%A9%EF%BB%BF.eval"),
+        "caf\u00e9\ufeff.eval"
+      );
+      assert.strictEqual(percentDecodeOnce("%EF%BB%BF%20x"), "\ufeff x");
+      assert.strictEqual(
+        percentDecodeOnce("50%%EF%BB%BFdone.eval"),
+        "50%\ufeffdone.eval"
+      );
+      // a raw U+FEFF passes through untouched either way
+      assert.strictEqual(
+        percentDecodeOnce("/w/logs/\ufeffrun%201.eval"),
+        "/w/logs/\ufeffrun 1.eval"
+      );
+      assert.strictEqual(
+        percentDecodeOnce("/w/logs/\ufeffrun.eval"),
+        "/w/logs/\ufeffrun.eval"
+      );
+    });
+
+    test("agrees with urllib.parse.unquote on a differential corpus", function () {
+      // The predicate exists to judge a location the way the view server's
+      // `normalize_uri`/`unquote` will read it, so check that directly against
+      // the Python function rather than a JavaScript approximation of it.
+      // Where the decoded bytes are not UTF-8 the two differ by design: Python
+      // substitutes U+FFFD, this function returns null and the caller refuses.
+      const corpus = [
+        "/w/logs/run.eval",
+        "/w/my%20run/x.eval",
+        "..%2F..%2Fetc",
+        "%2e%2E",
+        "run%25201.eval",
+        "caf%C3%A9.eval",
+        "caf\u00e9%20x",
+        "100%done.eval",
+        "%zz.eval",
+        "50%",
+        "a%2",
+        "100%done%20x",
+        "/w/logs/%EF%BB%BFrun.eval",
+        "file:///w/logs/%EF%BB%BFrun.eval",
+        "/w/%EF%BB%BFlogs/private.eval",
+        "%EF%BB%BF",
+        "caf%C3%A9%EF%BB%BF.eval",
+        "%EF%BB%BF%20x",
+        "50%%EF%BB%BFdone.eval",
+        "/w/logs/\ufeffrun%201.eval",
+        "%E0%A4%A",
+        "%C3.eval",
+        "%FF",
+      ];
+      // `-X utf8` so stdin/stdout are UTF-8 on Windows too (the corpus has a
+      // literal `é`, which a cp1252 stdin would read as two other characters).
+      const python = spawnSync(
+        process.platform === "win32" ? "python" : "python3",
+        [
+          "-X",
+          "utf8",
+          "-c",
+          "import json, sys, urllib.parse\n" +
+            "print(json.dumps([urllib.parse.unquote(v) for v in json.load(sys.stdin)]))",
+        ],
+        { input: JSON.stringify(corpus), encoding: "utf8", timeout: 30000 }
+      );
+      if (
+        python.error &&
+        "code" in python.error &&
+        python.error.code === "ENOENT"
+      ) {
+        this.skip();
+      }
+      assert.strictEqual(python.status, 0, python.stderr);
+      const unquoted = JSON.parse(python.stdout) as string[];
+      assert.strictEqual(unquoted.length, corpus.length);
+      corpus.forEach((value, i) => {
+        const decoded = percentDecodeOnce(value);
+        if (decoded === null) {
+          assert.ok(
+            unquoted[i]!.includes("\ufffd"),
+            `${value}: Python must have substituted U+FFFD, got ${JSON.stringify(unquoted[i])}`
+          );
+        } else {
+          assert.strictEqual(decoded, unquoted[i], value);
+        }
+      });
+      // and the corpus exercised both branches
+      assert.ok(corpus.some((v) => percentDecodeOnce(v) === null));
+      assert.ok(unquoted.some((v) => v.includes("\ufeff")));
+    });
+  });
+
+  suite("parseLocationLiterally", () => {
+    test("keeps a percent character in a URI as part of the path", () => {
+      assert.strictEqual(
+        parseLocationLiterally("file:///w/logs/run%201.eval").path,
+        "/w/logs/run%201.eval"
+      );
+      assert.strictEqual(
+        Uri.parse("file:///w/logs/run%201.eval").path,
+        "/w/logs/run 1.eval",
+        "Uri.parse decodes, which is what this helper avoids"
+      );
+      assert.strictEqual(
+        parseLocationLiterally("s3://bucket/a%20b/x.eval").path,
+        "/a%20b/x.eval"
+      );
+      assert.strictEqual(
+        parseLocationLiterally("file:///w/logs/100%done.eval").path,
+        "/w/logs/100%done.eval"
+      );
+    });
+
+    test("keeps other characters and the scheme/authority", () => {
+      const uri = parseLocationLiterally("file:///w/logs/run 1.eval");
+      assert.strictEqual(uri.scheme, "file");
+      assert.strictEqual(uri.authority, "");
+      assert.strictEqual(uri.path, "/w/logs/run 1.eval");
+      assert.strictEqual(
+        uri.toString(),
+        Uri.file("/w/logs/run 1.eval").toString()
+      );
+      const s3 = parseLocationLiterally("s3://bucket/logs");
+      assert.strictEqual(s3.authority, "bucket");
+      assert.strictEqual(s3.path, "/logs");
+    });
+
+    test("resolves bare paths like resolveToUri (already literal)", () => {
+      assert.strictEqual(
+        parseLocationLiterally("/w/logs/100%done.eval").toString(),
+        resolveToUri("/w/logs/100%done.eval").toString()
+      );
+      assert.strictEqual(
+        parseLocationLiterally("/w/logs/run%201.eval").path,
+        "/w/logs/run%201.eval"
+      );
     });
   });
 
@@ -245,6 +444,47 @@ suite("URI Utilities Test Suite", () => {
       const parent = Uri.parse("s3://bucket-a/logs");
       const child = Uri.parse("s3://bucket-a/logs/../secrets/x.eval");
       assert.strictEqual(getRelativeUri(parent, child), null);
+    });
+
+    test("folds the drive letter's case on Windows only", function () {
+      // Uri.file keeps the caller's drive-letter case in `.path` while
+      // Uri.toString() lower-cases it, so the same Windows directory arrives
+      // as both `/C:/w/logs` and `/c:/w/logs`.
+      const upper = Uri.parse("file:///C:/w/logs");
+      const lower = Uri.parse("file:///c:/w/logs/x.eval");
+      if (os.platform() === "win32") {
+        assert.strictEqual(getRelativeUri(upper, lower), "x.eval");
+        assert.strictEqual(
+          getRelativeUri(Uri.parse("file:///c:/w/logs"), upper),
+          null,
+          "a directory still does not contain itself"
+        );
+        // only the drive letter is folded: the rest of the path is compared
+        // as spelled, so a differing directory case is refused (fail closed)
+        assert.strictEqual(
+          getRelativeUri(upper, Uri.parse("file:///c:/W/logs/x.eval")),
+          null
+        );
+        // and a non-drive path is left alone
+        assert.strictEqual(
+          getRelativeUri(
+            Uri.parse("file:///Cx/logs"),
+            Uri.parse("file:///cx/logs/x.eval")
+          ),
+          null
+        );
+      } else {
+        // `/c:` is an ordinary, case-sensitive directory name on POSIX
+        assert.strictEqual(getRelativeUri(upper, lower), null);
+      }
+      // the s3 scheme is never folded
+      assert.strictEqual(
+        getRelativeUri(
+          Uri.parse("s3://bucket/C:/logs"),
+          Uri.parse("s3://bucket/c:/logs/x.eval")
+        ),
+        null
+      );
     });
   });
 

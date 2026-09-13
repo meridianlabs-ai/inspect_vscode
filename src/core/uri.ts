@@ -22,6 +22,48 @@ export function resolveToUri(pathOrUri: string): Uri {
   }
 }
 
+/**
+ * Percent-decode a location once, the way the Inspect view server does
+ * (`urllib.parse.unquote`): every well-formed `%XX` escape becomes its byte, a
+ * malformed escape (`%zz`, or a `%` followed by fewer than two hex digits) is
+ * kept literally, and the bytes are read as UTF-8. Returns null when the
+ * decoded bytes are not valid UTF-8; Python substitutes U+FFFD there, which
+ * names no real location, so callers refuse rather than guess.
+ *
+ * `ignoreBOM` keeps a decoded U+FEFF (`%EF%BB%BF`) as the file-name character
+ * it is. By default TextDecoder drops that byte sequence at the start of each
+ * decode, and each `%XX` run is decoded separately, so `logs/%EF%BB%BFrun.eval`
+ * would come back as `logs/run.eval` while `unquote` names the distinct file
+ * `logs/\uFEFFrun.eval`.
+ */
+export function percentDecodeOnce(value: string): string | null {
+  if (!value.includes("%")) {
+    return value;
+  }
+  const decoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
+  try {
+    return value.replace(/(?:%[0-9A-Fa-f]{2})+/g, (run) =>
+      decoder.decode(Buffer.from(run.replace(/%/g, ""), "hex"))
+    );
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Parse a location string literally, as the filesystem will see it: a `%` in a
+ * URI is the character `%` of a file name, not the start of an escape.
+ * `Uri.parse` would decode `%XX` sequences, making `run%201.eval` and
+ * `run 1.eval` the same path; escaping every `%` first makes that decode a
+ * no-op. Bare paths are resolved as {@link resolveToUri} resolves them
+ * (`Uri.file` already keeps `%` literal).
+ */
+export function parseLocationLiterally(location: string): Uri {
+  return isUri(location)
+    ? Uri.parse(location.replace(/%/g, "%25"))
+    : resolveToUri(location);
+}
+
 export function dirname(uri: Uri): Uri {
   if (uri.scheme === "file") {
     // Handle file URIs
@@ -90,8 +132,25 @@ export function getRelativeUri(parentUri: Uri, childUri: Uri): string | null {
   // `.../logs/..\..\x` would otherwise pass the '/'-only segment check and then
   // escape the directory on Windows. Fold '\' to '/' before normalizing so the
   // containment check matches the downstream interpretation. See CWE-29.
-  const parentPath = path.posix.normalize(parentUri.path.replace(/\\/g, "/"));
-  const childPath = path.posix.normalize(childUri.path.replace(/\\/g, "/"));
+  // On Windows a drive letter is case-insensitive, and the two ways a file Uri
+  // is built spell it differently: `Uri.file("C:\\w\\logs")` keeps the path
+  // `/C:/w/logs`, while `Uri.parse` of that Uri's own `toString()` yields
+  // `/c:/w/logs` (toString lower-cases the drive). The same directory must
+  // contain itself whichever way it arrived, so fold the drive letter there.
+  // Only there: on POSIX `/c:` is an ordinary, case-sensitive directory name.
+  const foldDrive = (p: string): string =>
+    os.platform() === "win32" && parentUri.scheme === "file"
+      ? p.replace(
+          /^\/([a-zA-Z]):/,
+          (_, drive: string) => `/${drive.toLowerCase()}:`
+        )
+      : p;
+  const parentPath = foldDrive(
+    path.posix.normalize(parentUri.path.replace(/\\/g, "/"))
+  );
+  const childPath = foldDrive(
+    path.posix.normalize(childUri.path.replace(/\\/g, "/"))
+  );
 
   const parentBase = parentPath.endsWith("/")
     ? parentPath.slice(0, -1)

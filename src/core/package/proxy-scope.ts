@@ -63,7 +63,11 @@ function parseRequest(request: HttpProxyRpcRequest): ParsedRequest {
 
 function checker(request: HttpProxyRpcRequest, inScope: InScope) {
   return (location: string | null | undefined): void => {
-    if (typeof location !== "string" || !inScope(location)) {
+    // An empty location is never a request for something in the panel scope;
+    // the server treats it as a real value (some routes as "use the default
+    // dir"), so refuse it here rather than leave it to the predicate's
+    // resolution of "" against the extension host's working directory.
+    if (typeof location !== "string" || location === "" || !inScope(location)) {
       throw proxyError(request);
     }
   };
@@ -130,7 +134,8 @@ const kLogSegmentRoutes = [
 
 /**
  * Throw unless the proxied Inspect **log** view request stays within the panel
- * scope. `inScope` is the panel's `logPathInScope` bound to its file/dir scope.
+ * scope. `inScope` is the panel's `logPathInScopeAllowingEncoded` bound to its
+ * file/dir scope.
  */
 export function assertLogProxyInScope(
   request: HttpProxyRpcRequest,

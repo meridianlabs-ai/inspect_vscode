@@ -25,7 +25,11 @@ import { log } from "../../core/log";
 import { parseProxyRequest } from "../../core/package/proxy-request";
 import { assertLogProxyInScope } from "../../core/package/proxy-scope";
 import { AbsolutePath } from "../../core/path";
-import { getRelativeUri, resolveToUri } from "../../core/uri";
+import {
+  getRelativeUri,
+  parseLocationLiterally,
+  percentDecodeOnce,
+} from "../../core/uri";
 import {
   getWebviewPanelHtml,
   handleWebviewPanelOpenMessages,
@@ -38,51 +42,70 @@ import { InspectViewServer } from "../inspect/inspect-view-server";
 import { LogviewState } from "./logview-state";
 
 /**
- * Whether a webview-supplied file path/URL is within the scope this log-view
- * panel was opened for. A `file` panel may only touch its own log file; a `dir`
- * panel may only touch descendants of its log directory. Used to gate the
- * file-content RPC methods so injected webview script cannot read or write
- * paths outside what the panel is actually viewing.
+ * Whether a location, taken as the view server will open it, is within the
+ * scope this log-view panel was opened for. A `file` panel may only touch its
+ * own log file; a `dir` panel may only touch its log directory and its
+ * descendants.
+ *
+ * `target` is the fully decoded location (a `file://`/`s3://` URI or a bare
+ * path) and is compared literally: a `%` in it is a character of a file name,
+ * so `file:///w/logs/run%201.eval` names the file `run%201.eval`, not the
+ * panel's `run 1.eval`. Webview-supplied locations arrive one encoding step
+ * earlier and must go through {@link logPathInScopeAllowingEncoded}.
  */
 export function logPathInScope(
   type: "file" | "dir",
   panelUri: Uri,
   target: string
 ): boolean {
-  const panelUriStr = panelUri.toString();
+  // An empty location is never a request for something in the panel scope;
+  // resolving it would name the extension host's working directory.
+  if (target === "") {
+    return false;
+  }
   let targetUri: Uri;
   try {
-    targetUri = resolveToUri(target);
+    targetUri = parseLocationLiterally(target);
   } catch {
     return false;
   }
-  if (target === panelUriStr || targetUri.toString() === panelUriStr) {
+  if (targetUri.toString() === panelUri.toString()) {
     return true;
   }
   return type === "dir" && getRelativeUri(panelUri, targetUri) !== null;
 }
 
 /**
- * Scope check for a scheme-stripped, percent-encoded path — the form the viewer
- * passes as `transcriptDir` (stripFileScheme of the log file). The plain
- * {@link logPathInScope} runs such a value through `Uri.file`, which treats
- * `%XX` literally, so it both wrongly rejects a legitimate path containing a
- * space (`%20`) and wrongly *accepts* `%2e%2e` traversal that the server would
- * decode to `..` and escape with. The server percent-decodes the value, so the
- * check must too: validate the decoded form (which matches encoded paths and
- * lets getRelativeUri reject the revealed `..`). The raw value is still what's
- * forwarded to the server.
+ * Scope check for a webview-supplied location, judged the way the view server
+ * will interpret it. Every path-bearing RPC method and the http_request proxy
+ * use this; the raw value is still what is forwarded to the server.
+ *
+ * The server percent-decodes each location exactly once more after the
+ * route's own URL decoding (`normalize_uri` on the `{log:path}` routes and
+ * `/api/log-headers`, `urllib.parse.unquote` on the pending-sample and
+ * log-message routes) and then opens the result literally, without treating
+ * the URI's remaining `%XX` sequences as escapes. So this check does the same:
+ * decode once with the server's rules ({@link percentDecodeOnce}: malformed
+ * escapes such as the `%do` of `100%done.eval` stay literal) and hand the
+ * result to {@link logPathInScope}, which compares it literally.
+ *
+ * Decoding once matters in both directions. `/w/logs/..%2F..%2Fetc%2Fpasswd`
+ * is one odd file name to a literal check but `/w/logs/../../etc/passwd` to
+ * the server, so the decoded form is what getRelativeUri must judge; and the
+ * viewer's scheme-stripped `transcriptDir` keeps its `%20`, which a literal
+ * check would wrongly refuse. Decoding twice (as `Uri.parse` would on the
+ * decoded URI) is a bypass the other way: for a panel on `run 1.eval`,
+ * `file:///w/logs/run%25201.eval` decodes once to the distinct existing file
+ * `run%201.eval`, and only a literal comparison of that result refuses it.
  */
 export function logPathInScopeAllowingEncoded(
   type: "file" | "dir",
   panelUri: Uri,
   target: string
 ): boolean {
-  let decoded: string;
-  try {
-    decoded = decodeURIComponent(target);
-  } catch {
-    // malformed percent-encoding
+  const decoded = percentDecodeOnce(target);
+  if (decoded === null) {
+    // not valid UTF-8 once decoded: the server would open a U+FFFD name
     return false;
   }
   return logPathInScope(type, panelUri, decoded);
@@ -109,22 +132,10 @@ export class LogviewPanel extends Disposable {
     // actually viewing. Every file-content method below is gated by this guard:
     // a `file` panel may only touch its own log file; a `dir` panel may only
     // touch descendants of its log directory. Requests outside that scope are
-    // rejected before the path ever reaches the server.
+    // rejected before the path ever reaches the server. The check judges the
+    // location as the server will decode it (see logPathInScopeAllowingEncoded)
+    // and returns the raw value unchanged, which is what the server is sent.
     const requireScope = (target: unknown): string => {
-      if (typeof target !== "string" || !logPathInScope(type, uri, target)) {
-        throw new Error(
-          `Refusing to access "${String(
-            target
-          )}": outside the scope of this log view.`
-        );
-      }
-      return target;
-    };
-
-    // post_search/get_search_result receive `transcriptDir` as a scheme-stripped,
-    // still-percent-encoded path, so use the encoding-tolerant scope check (the
-    // raw value is returned unchanged — that is what the server uses).
-    const requireScopeAllowingEncoded = (target: unknown): string => {
       if (
         typeof target !== "string" ||
         !logPathInScopeAllowingEncoded(type, uri, target)
@@ -207,13 +218,13 @@ export class LogviewPanel extends Disposable {
         server_.listSearches(params[0] as string, params[1] as number),
       [kMethodPostSearch]: (params: unknown[]) =>
         server_.postSearch(
-          requireScopeAllowingEncoded(params[0]),
+          requireScope(params[0]),
           params[1] as string,
           params[2]
         ),
       [kMethodGetSearchResult]: (params: unknown[]) =>
         server_.getSearchResult(
-          requireScopeAllowingEncoded(params[0]),
+          requireScope(params[0]),
           params[1] as string,
           params[2] as string,
           params[3] as { events?: string; messages?: string } | undefined
