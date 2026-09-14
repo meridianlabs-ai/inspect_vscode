@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.9.19](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.9.18...v0.9.19) (2026-09-13)
+
+
+### Bug Fixes
+
+* confine the http_request proxy to the panel scope ([#174](https://github.com/meridianlabs-ai/inspect_vscode/issues/174)) ([58c80c2](https://github.com/meridianlabs-ai/inspect_vscode/commit/58c80c2a2936c7eebd1ce0d8287e24d4607da5d8))
+* create task files exclusively within the selected workspace ([#187](https://github.com/meridianlabs-ai/inspect_vscode/issues/187)) ([42f8bfa](https://github.com/meridianlabs-ai/inspect_vscode/commit/42f8bfa4b2da2f0b7d40eb6cbaee18d05497db66))
+* decode log RPC locations once and compare them literally, as the view server opens them ([#191](https://github.com/meridianlabs-ai/inspect_vscode/issues/191)) ([a718695](https://github.com/meridianlabs-ai/inspect_vscode/commit/a71869553446321dcb993e35b6feaa2186c7efd9))
+* harden URI handling, webview scope, .env writer, and tooltips ([#173](https://github.com/meridianlabs-ai/inspect_vscode/issues/173)) ([d719171](https://github.com/meridianlabs-ai/inspect_vscode/commit/d719171e4acee362f42694f98a62f14b9185117b))
+* keep untrusted text inert in notifications and tooltips and drop malformed listing names ([#190](https://github.com/meridianlabs-ai/inspect_vscode/issues/190)) ([cefc8b9](https://github.com/meridianlabs-ai/inspect_vscode/commit/cefc8b91486f32b10c04061403c9e05fc56880ca))
+* prevent quadratic task scanning in CodeLens and workspace discovery ([#181](https://github.com/meridianlabs-ai/inspect_vscode/issues/181)) ([1c7e299](https://github.com/meridianlabs-ai/inspect_vscode/commit/1c7e299bf2345768da79263bb58006c0ed5371d7))
+* recover view servers after termination and startup failure ([#183](https://github.com/meridianlabs-ai/inspect_vscode/issues/183)) ([d078f4f](https://github.com/meridianlabs-ai/inspect_vscode/commit/d078f4f4eb9dcdfa88f72d2f20b2f7145060afe7))
+* reject mis-cased DELETE proxy methods and keep the view server running when a request fails ([#189](https://github.com/meridianlabs-ai/inspect_vscode/issues/189)) ([d17d9f5](https://github.com/meridianlabs-ai/inspect_vscode/commit/d17d9f57cbc04e4724c80844cebb9147922d187b))
+* run the selected environment's inspect/scout with correct shell quoting ([#182](https://github.com/meridianlabs-ai/inspect_vscode/issues/182)) ([ec3c04a](https://github.com/meridianlabs-ai/inspect_vscode/commit/ec3c04af2146c1b54bb123586c550acf2de948b5))
+* skip the eval header lookup for folder nodes in the log listing tooltip ([#180](https://github.com/meridianlabs-ai/inspect_vscode/issues/180)) ([6a345b5](https://github.com/meridianlabs-ai/inspect_vscode/commit/6a345b5045ceb0b19e44315ac7b3537c8ab98882))
+
 ## [0.9.18](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.9.17...v0.9.18) (2026-08-27)
 
 
