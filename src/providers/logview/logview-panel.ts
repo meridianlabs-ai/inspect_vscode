@@ -111,8 +111,8 @@ export function logPathInScopeAllowingEncoded(
   return logPathInScope(type, panelUri, decoded);
 }
 
-// jsonForScript now lives in core/webview.ts (shared with the scan view). It
-// is re-exported here so existing importers/tests keep working.
+// jsonForScript lives in core/webview-render.ts (shared with the scan view).
+// It is re-exported here so existing importers/tests keep working.
 export { jsonForScript };
 
 export class LogviewPanel extends Disposable {
