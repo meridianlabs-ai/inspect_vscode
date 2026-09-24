@@ -375,6 +375,25 @@ size 1217`;
       );
     });
 
+    test("adds the nonce to script-src-elem when the viewer splits it out", () => {
+      assert.strictEqual(
+        buildWebviewCsp(
+          {
+            version: 1,
+            directives: {
+              "default-src": ["'none'"],
+              "script-src": ["'self'"],
+              "script-src-elem": ["'self'", "'sha256-abc='"],
+              "worker-src": ["'self'"],
+            },
+          },
+          "https://cdn.test",
+          "NONCE"
+        ),
+        "default-src 'none'; script-src 'self' https://cdn.test 'nonce-NONCE'; script-src-elem 'self' https://cdn.test 'sha256-abc=' 'nonce-NONCE'; worker-src 'self' https://cdn.test blob:"
+      );
+    });
+
     test("never widens the viewer's policy beyond the translation", () => {
       const csp = buildWebviewCsp(kPolicy, kCspSource, "NONCE");
       assert.ok(!csp.includes("'unsafe-eval'"));

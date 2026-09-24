@@ -33,6 +33,8 @@ const kNonce = /^[A-Za-z0-9+/_=-]+$/;
 
 // The translation augments script-src and worker-src, and a policy without
 // default-src would leave everything it doesn't list unrestricted.
+const kNonceDirectives = ["script-src", "script-src-elem"];
+
 const kRequiredDirectives = ["default-src", "script-src", "worker-src"];
 
 /**
@@ -85,8 +87,9 @@ export function parseViewerCsp(text: string): ViewerCspFile {
  * (`vscode-webview://`) is not where assets are served from:
  *
  * - every directive that lists `'self'` also gets `cspSource`;
- * - `script-src` gets `'nonce-<nonce>'`, which the extension stamps on every
- *   `<script>` in the viewer's index.html;
+ * - `script-src` (and `script-src-elem`, if the viewer splits it out) gets
+ *   `'nonce-<nonce>'`, which the extension stamps on every `<script>` in the
+ *   viewer's index.html;
  * - `worker-src` gets `blob:`, for the viewer's fallback of starting a
  *   cross-origin worker script from a Blob URL.
  *
@@ -123,7 +126,7 @@ export function buildWebviewCsp(
           hostSources.filter((s) => !sources.includes(s)).forEach(add);
         }
       }
-      if (name === "script-src") {
+      if (kNonceDirectives.includes(name)) {
         add(`'nonce-${nonce}'`);
       } else if (name === "worker-src") {
         add("blob:");
