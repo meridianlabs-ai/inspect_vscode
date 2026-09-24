@@ -3,9 +3,21 @@
 // outside VS Code, and `getWebviewPanelHtml` (./webview) is the thin wrapper
 // that supplies the VS Code pieces.
 
+import {
+  buildWebviewCsp,
+  kViewerCspFileName,
+  stripCspMeta,
+  ViewerCspLoad,
+} from "./webview-csp";
+
 export interface RenderWebviewHtmlOptions {
   /** Text of the viewer dist's `index.html`. */
   indexHtml: string;
+  /**
+   * The dist's policy file (`loadViewerCsp`). A valid file replaces the legacy
+   * policy; an invalid one renders an error page instead of the viewer.
+   */
+  policy: ViewerCspLoad;
   /** Source expression(s) that assets are served from (`webview.cspSource`). */
   cspSource: string;
   /** Nonce stamped on every `<script>` in `indexHtml` and listed in the policy. */
@@ -52,11 +64,13 @@ export function legacyWebviewCsp(cspSource: string, nonce: string): string {
 
 /**
  * Render the webview page for a viewer dist's `index.html`: tags the html
- * element, injects the version meta and CSP, stamps script nonces, inserts
- * `extraHead` and rewrites asset references through `resourceUri`.
+ * element, replaces any CSP meta with the webview's policy, injects the version
+ * meta, stamps script nonces, inserts `extraHead` and rewrites asset references
+ * through `resourceUri`.
  */
 export function renderWebviewHtml(options: RenderWebviewHtmlOptions): string {
   const {
+    policy,
     cspSource,
     nonce,
     resourceUri,
@@ -84,6 +98,28 @@ Please update to a newer version of ${packageName} to view this content.
 </html>`;
   }
 
+  // The CSP meta is inserted after this exact tag.
+  const headTag = "<head>\n";
+
+  let csp: string;
+  switch (policy.status) {
+    case "absent":
+      csp = legacyWebviewCsp(cspSource, nonce);
+      break;
+    case "valid":
+      // Fail closed: without the insertion point the page would carry no
+      // policy at all once the viewer's own CSP meta is stripped.
+      if (!indexHtml.includes(headTag)) {
+        return getMessagePanelHtml(
+          `${packageName} view could not be loaded because its index.html has no <head> element to carry the Content-Security-Policy.`
+        );
+      }
+      csp = buildWebviewCsp(policy.policy, cspSource, nonce);
+      break;
+    case "invalid":
+      return getMessagePanelHtml(invalidCspMessage(packageName, policy));
+  }
+
   // Determine whether this is the old unbundled version of the html or the new
   // bundled version
   const isUnbundled = indexHtml.match(/"\.(\/App\.mjs)"/g);
@@ -97,14 +133,12 @@ Please update to a newer version of ${packageName} to view this content.
   indexHtml = indexHtml.replace("<html ", '<html class="vscode" ');
 
   // add content security policy
+  indexHtml = stripCspMeta(indexHtml);
   indexHtml = indexHtml.replace(
-    "<head>\n",
+    headTag,
     `<head>
           <meta name="inspect-extension:version" content="${extensionVersion}">
-    <meta http-equiv="Content-Security-Policy" content="${legacyWebviewCsp(
-      cspSource,
-      nonce
-    )}">
+    <meta http-equiv="Content-Security-Policy" content="${csp}">
     ${overrideCssHtml}
     <!--inspect-extra-head-->
 
@@ -170,6 +204,13 @@ Please update to a newer version of ${packageName} to view this content.
   }
 
   return indexHtml;
+}
+
+function invalidCspMessage(
+  packageName: string,
+  policy: Extract<ViewerCspLoad, { status: "invalid" }>
+): string {
+  return `${packageName} view could not be loaded because its ${kViewerCspFileName} is invalid: ${policy.reason}.\n\nFile: ${policy.path}\n\nReinstall or upgrade ${packageName} in the active Python interpreter, then try again.`;
 }
 
 /**

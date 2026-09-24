@@ -4,9 +4,11 @@ import { Disposable, env, MessageItem, Uri, window, workspace } from "vscode";
 
 import { HostWebviewPanel } from "../hooks";
 
+import { log } from "./log";
 import { getNonce } from "./nonce";
 import { AbsolutePath, workspacePath } from "./path";
 import { getRelativeUri } from "./uri";
+import { loadViewerCsp } from "./webview-csp";
 import { getMessagePanelHtml, renderWebviewHtml } from "./webview-render";
 
 export { getMessagePanelHtml, jsonForScript } from "./webview-render";
@@ -45,8 +47,14 @@ export function getWebviewPanelHtml(
   }
 
   const viewDirUri = Uri.file(viewDir.path);
+  const indexHtml = readFileSync(viewDir.child("index.html").path, "utf-8");
+  const policy = loadViewerCsp(viewDir.path);
+  if (policy.status === "invalid") {
+    log.error(`Invalid view policy file ${policy.path}: ${policy.reason}`);
+  }
   return renderWebviewHtml({
-    indexHtml: readFileSync(viewDir.child("index.html").path, "utf-8"),
+    indexHtml,
+    policy,
     cspSource: panel.webview.cspSource,
     nonce: getNonce(),
     resourceUri: (path: string) =>
