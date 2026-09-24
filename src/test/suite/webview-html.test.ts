@@ -600,6 +600,35 @@ size 1217`;
       });
     }
 
+    test("renders an error page for an invalid cspSource or nonce", () => {
+      const render = (cspSource: string, nonce: string) =>
+        renderWebviewHtml({
+          indexHtml: kBundledIndex,
+          policy: { status: "valid", policy: kPolicy },
+          cspSource,
+          nonce,
+          resourceUri: (p) => p,
+          extensionVersion: "1.0.0",
+          packageName: "Inspect AI",
+        });
+      const badSource = render('https://cdn.test"><script>', "NONCE");
+      assert.ok(
+        badSource.includes(
+          "Inspect AI view could not be loaded: Invalid webview cspSource:"
+        ),
+        badSource
+      );
+      assert.ok(!badSource.includes("window.inline"));
+      const badNonce = render(kCspSource, "bad nonce");
+      assert.ok(
+        badNonce.includes(
+          "Inspect AI view could not be loaded: Invalid CSP nonce."
+        ),
+        badNonce
+      );
+      assert.ok(!badNonce.includes("window.inline"));
+    });
+
     test("stripCspMeta leaves other meta tags alone", () => {
       const html =
         '<head><meta charset="utf-8"><meta http-equiv=\'Content-Security-Policy\' content="x"><meta name="robots" content="noindex"></head>';

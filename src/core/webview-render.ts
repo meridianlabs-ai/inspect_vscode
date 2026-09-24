@@ -118,7 +118,15 @@ Please update to a newer version of ${packageName} to view this content.
           `${packageName} view could not be loaded because the insertion point for its Content-Security-Policy (the <head> start tag) was not found in its index.html.`
         );
       }
-      csp = buildWebviewCsp(policy.policy, cspSource, nonce);
+      try {
+        csp = buildWebviewCsp(policy.policy, cspSource, nonce);
+      } catch (error) {
+        // Callers set webview.html from this without a catch.
+        const reason = error instanceof Error ? error.message : String(error);
+        return getMessagePanelHtml(
+          `${packageName} view could not be loaded: ${reason}.`
+        );
+      }
       break;
     case "invalid":
       return getMessagePanelHtml(invalidCspMessage(packageName, policy));
