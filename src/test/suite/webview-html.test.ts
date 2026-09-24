@@ -493,10 +493,10 @@ size 1217`;
       }
     });
 
-    test("refuses a policy-carrying index.html it can't insert the policy into", () => {
+    test("refuses a policy-carrying index.html with no <head> start tag", () => {
       const result = renderWebviewHtml({
         indexHtml:
-          '<!DOCTYPE html><html lang="en"><head><meta http-equiv="Content-Security-Policy" content="default-src \'self\'"><script src="./a.js"></script></head></html>',
+          '<!DOCTYPE html><html lang="en"><meta http-equiv="Content-Security-Policy" content="default-src \'self\'"><script src="./a.js"></script></html>',
         policy: { status: "valid", policy: kPolicy },
         cspSource: kCspSource,
         nonce: "NONCE",
@@ -504,9 +504,46 @@ size 1217`;
         extensionVersion: "1.0.0",
         packageName: "Inspect AI",
       });
-      assert.ok(result.includes("Inspect AI view could not be loaded"), result);
+      assert.ok(
+        result.includes(
+          "Inspect AI view could not be loaded because the insertion point for its Content-Security-Policy (the &lt;head&gt; start tag) was not found in its index.html."
+        ),
+        result
+      );
       assert.ok(!result.includes("a.js"));
     });
+
+    const headCases: [string, string][] = [
+      [
+        "CRLF line endings",
+        '<!DOCTYPE html>\r\n<html lang="en">\r\n<head>\r\n<script src="./a.js"></script>\r\n</head>\r\n</html>',
+      ],
+      [
+        "a <head> tag with attributes",
+        '<!DOCTYPE html><html lang="en"><head data-x="1"><script src="./a.js"></script></head></html>',
+      ],
+    ];
+    for (const [name, indexHtml] of headCases) {
+      test(`inserts the policy into an index.html with ${name}`, () => {
+        const result = renderWebviewHtml({
+          indexHtml,
+          policy: { status: "valid", policy: kPolicy },
+          cspSource: kCspSource,
+          nonce: "NONCE",
+          resourceUri: (p) => `${kCspSource}/${p}`,
+          extensionVersion: "1.0.0",
+        });
+        assert.deepStrictEqual(cspMetas(result), [kExpectedCsp]);
+        assert.ok(result.includes('content="1.0.0"'));
+        assert.ok(
+          /<head[^>]*>\s*<meta name="inspect-extension:version"/.test(result),
+          "Policy goes right after the <head> start tag"
+        );
+        assert.ok(
+          result.includes(`<script nonce="NONCE" src="${kCspSource}/./a.js">`)
+        );
+      });
+    }
 
     test("stripCspMeta leaves other meta tags alone", () => {
       const html =

@@ -10,6 +10,8 @@ import {
   ViewerCspLoad,
 } from "./webview-csp";
 
+const kHeadStartTag = /<head(?:\s[^>]*)?>\r?\n?/i;
+
 export interface RenderWebviewHtmlOptions {
   /** Text of the viewer dist's `index.html`. */
   indexHtml: string;
@@ -98,8 +100,9 @@ Please update to a newer version of ${packageName} to view this content.
 </html>`;
   }
 
-  // The CSP meta is inserted after this exact tag.
-  const headTag = "<head>\n";
+  // Where the version meta and CSP are inserted. Legacy viewers keep the exact
+  // match they always had; policy-file viewers accept any <head> start tag.
+  let headTag: string | RegExp = "<head>\n";
 
   let csp: string;
   switch (policy.status) {
@@ -109,9 +112,10 @@ Please update to a newer version of ${packageName} to view this content.
     case "valid":
       // Fail closed: without the insertion point the page would carry no
       // policy at all once the viewer's own CSP meta is stripped.
-      if (!indexHtml.includes(headTag)) {
+      headTag = kHeadStartTag;
+      if (!headTag.test(indexHtml)) {
         return getMessagePanelHtml(
-          `${packageName} view could not be loaded because its index.html has no <head> element to carry the Content-Security-Policy.`
+          `${packageName} view could not be loaded because the insertion point for its Content-Security-Policy (the <head> start tag) was not found in its index.html.`
         );
       }
       csp = buildWebviewCsp(policy.policy, cspSource, nonce);
@@ -134,15 +138,16 @@ Please update to a newer version of ${packageName} to view this content.
 
   // add content security policy
   indexHtml = stripCspMeta(indexHtml);
-  indexHtml = indexHtml.replace(
-    headTag,
-    `<head>
+  const headInsert = `
           <meta name="inspect-extension:version" content="${extensionVersion}">
     <meta http-equiv="Content-Security-Policy" content="${csp}">
     ${overrideCssHtml}
     <!--inspect-extra-head-->
 
-    `
+    `;
+  indexHtml = indexHtml.replace(
+    headTag,
+    (tag) => tag.replace(/\r?\n$/, "") + headInsert
   );
 
   // nonces for scripts. Match the `<script` start tag followed by a tag
