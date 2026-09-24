@@ -18,9 +18,10 @@ on:
       - "scripts/proxy-routes/**"
       - ".github/workflows/proxy-routes.yml"
 
+# Read-only for every job that runs this repository's code. Only report-failure,
+# which checks out nothing and runs only on unattended runs, can write issues.
 permissions:
   contents: read
-  issues: write
 
 jobs:
   check-routes:
@@ -62,9 +63,16 @@ jobs:
       - name: Check routes against the proxy table
         run: node scripts/proxy-routes/check.mjs
 
+  report-failure:
+    # Only for unattended runs; a pull request already shows the failure.
+    needs: check-routes
+    if: failure() && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+
+    steps:
       - name: Open or update a tracking issue
-        # Only for unattended runs; a pull request already shows the failure.
-        if: failure() && github.event_name != 'pull_request'
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
