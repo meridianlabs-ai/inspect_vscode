@@ -394,6 +394,42 @@ size 1217`;
       );
     });
 
+    test("never widens 'none' or empty source lists", () => {
+      const build = (directives: Record<string, string[]>) =>
+        buildWebviewCsp(
+          {
+            version: 1,
+            directives: {
+              "default-src": ["'none'"],
+              "script-src": ["'self'"],
+              ...directives,
+            },
+          },
+          "https://cdn.test",
+          "NONCE"
+        );
+      const base =
+        "default-src 'none'; script-src 'self' https://cdn.test 'nonce-NONCE'";
+      assert.strictEqual(
+        build({ "worker-src": ["'none'"] }),
+        `${base}; worker-src 'none'`
+      );
+      assert.strictEqual(build({ "worker-src": [] }), `${base}; worker-src`);
+      assert.strictEqual(
+        build({ "worker-src": ["https://w.test"] }),
+        `${base}; worker-src https://w.test`,
+        "blob: only accompanies 'self'"
+      );
+      assert.strictEqual(
+        build({
+          "script-src": ["'none'"],
+          "worker-src": [],
+          "upgrade-insecure-requests": [],
+        }),
+        "default-src 'none'; script-src 'none'; worker-src; upgrade-insecure-requests"
+      );
+    });
+
     test("never widens the viewer's policy beyond the translation", () => {
       const csp = buildWebviewCsp(kPolicy, kCspSource, "NONCE");
       assert.ok(!csp.includes("'unsafe-eval'"));

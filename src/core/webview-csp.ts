@@ -90,10 +90,12 @@ export function parseViewerCsp(text: string): ViewerCspFile {
  * - `script-src` (and `script-src-elem`, if the viewer splits it out) gets
  *   `'nonce-<nonce>'`, which the extension stamps on every `<script>` in the
  *   viewer's index.html;
- * - `worker-src` gets `blob:`, for the viewer's fallback of starting a
- *   cross-origin worker script from a Blob URL.
+ * - `worker-src` gets `blob:` when it lists `'self'`: the viewer's own worker
+ *   scripts are cross-origin in a webview, so it starts them from Blob URLs.
  *
- * Every other directive and source is kept as the viewer ships it.
+ * A directive whose list is empty (it takes no sources, e.g.
+ * `upgrade-insecure-requests`) or contains `'none'` is never widened. Every
+ * other directive and source is kept as the viewer ships it.
  *
  * @param cspSource `webview.cspSource`; may hold several space-separated sources.
  * @throws ViewerCspError if `policy` is not a valid policy.
@@ -114,21 +116,25 @@ export function buildWebviewCsp(
 
   return Object.entries(directives)
     .map(([name, sources]) => {
+      const lower = sources.map((s) => s.toLowerCase());
+      if (sources.length === 0 || lower.includes("'none'")) {
+        return [name, ...sources].join(" ");
+      }
       const out: string[] = [];
       const add = (source: string) => {
         if (!out.includes(source)) {
           out.push(source);
         }
       };
-      for (const source of sources) {
+      for (const [i, source] of sources.entries()) {
         out.push(source);
-        if (source.toLowerCase() === "'self'") {
+        if (lower[i] === "'self'") {
           hostSources.filter((s) => !sources.includes(s)).forEach(add);
         }
       }
       if (kNonceDirectives.includes(name)) {
         add(`'nonce-${nonce}'`);
-      } else if (name === "worker-src") {
+      } else if (name === "worker-src" && lower.includes("'self'")) {
         add("blob:");
       }
       return [name, ...out].join(" ");
