@@ -7,6 +7,17 @@ import { Uri } from "vscode";
 
 import { toAbsolutePath } from "../../core/path";
 import { getWebviewPanelHtml } from "../../core/webview";
+import {
+  buildWebviewCsp,
+  kViewerCspFileName,
+  loadViewerCsp,
+  parseViewerCsp,
+  stripCspMeta,
+  ViewerCspError,
+  ViewerCspFile,
+  ViewerCspLoad,
+} from "../../core/webview-csp";
+import { legacyWebviewCsp, renderWebviewHtml } from "../../core/webview-render";
 import { HostWebviewPanel } from "../../hooks";
 
 /**
@@ -38,12 +49,22 @@ function createMockPanel(): HostWebviewPanel {
  * Create a temporary directory with test fixture files.
  * Returns the path and a cleanup function.
  */
-function createTempViewDir(indexContent: string): {
+function createTempViewDir(
+  indexContent: string,
+  policyContent?: string
+): {
   viewDir: string;
   cleanup: () => void;
 } {
   const viewDir = fs.mkdtempSync(path.join(os.tmpdir(), "webview-test-"));
   fs.writeFileSync(path.join(viewDir, "index.html"), indexContent, "utf-8");
+  if (policyContent !== undefined) {
+    fs.writeFileSync(
+      path.join(viewDir, kViewerCspFileName),
+      policyContent,
+      "utf-8"
+    );
+  }
   return {
     viewDir,
     cleanup: () => fs.rmSync(viewDir, { recursive: true, force: true }),
@@ -265,6 +286,649 @@ size 1217`;
         result.includes("view is not available"),
         "Should show not available message"
       );
+    });
+  });
+
+  suite("Content-Security-Policy", () => {
+    const kCspSource = "https://file+.vscode-resource.vscode-cdn.net";
+    const kPolicy: ViewerCspFile = {
+      version: 1,
+      directives: {
+        "default-src": ["'none'"],
+        "script-src": [
+          "'self'",
+          "'sha256-dh/kDr+xuzejmjkOpzVExtX8ZIgsN1sFWP5R9yk1x24='",
+          "'sha256-hTEVLGs7U/evjCQ3XH4NKheOkIqC/G7OvOjQBCIXFrw='",
+          "'wasm-unsafe-eval'",
+        ],
+        "worker-src": ["'self'"],
+        "style-src-elem": ["'self'"],
+        "style-src-attr": ["'unsafe-inline'"],
+        "img-src": ["'self'", "data:"],
+        "media-src": ["data:"],
+        "font-src": ["'self'"],
+        "connect-src": ["'self'"],
+        "object-src": ["'none'"],
+        "frame-src": ["'none'"],
+        "base-uri": ["'none'"],
+        "form-action": ["'none'"],
+      },
+    };
+    const kExpectedCsp =
+      "default-src 'none'; " +
+      `script-src 'self' ${kCspSource} 'sha256-dh/kDr+xuzejmjkOpzVExtX8ZIgsN1sFWP5R9yk1x24=' 'sha256-hTEVLGs7U/evjCQ3XH4NKheOkIqC/G7OvOjQBCIXFrw=' 'wasm-unsafe-eval' 'nonce-NONCE'; ` +
+      `worker-src 'self' ${kCspSource} blob:; ` +
+      `style-src-elem 'self' ${kCspSource}; ` +
+      "style-src-attr 'unsafe-inline'; " +
+      `img-src 'self' ${kCspSource} data:; ` +
+      "media-src data:; " +
+      `font-src 'self' ${kCspSource}; ` +
+      `connect-src 'self' ${kCspSource}; ` +
+      "object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'";
+
+    const kBundledIndex = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>window.inline = true;</script>
+<script type="module" src="./assets/index.js"></script>
+<link rel="stylesheet" href="./assets/index.css">
+</head>
+<body style="min-width: 450px"></body>
+</html>`;
+
+    const cspMetas = (html: string): string[] =>
+      [
+        ...html.matchAll(
+          /<meta http-equiv="Content-Security-Policy" content="([^"]*)">/g
+        ),
+      ].map((m) => m[1] ?? "");
+
+    const nonceOf = (html: string): string => {
+      const match = /<script nonce="([^"]+)"/.exec(html);
+      assert.ok(match?.[1], "Expected a nonced script");
+      return match[1];
+    };
+
+    test("builds the webview policy from the viewer's policy", () => {
+      assert.strictEqual(
+        buildWebviewCsp(kPolicy, kCspSource, "NONCE"),
+        kExpectedCsp
+      );
+    });
+
+    test("adds each cspSource token once, keeping viewer sources", () => {
+      const csp = buildWebviewCsp(
+        {
+          version: 1,
+          directives: {
+            "default-src": ["'none'"],
+            "script-src": ["'self'", "https://*.vscode-cdn.net"],
+            "worker-src": ["'self'", "blob:"],
+          },
+        },
+        "'self' https://*.vscode-cdn.net",
+        "NONCE"
+      );
+      assert.strictEqual(
+        csp,
+        "default-src 'none'; script-src 'self' https://*.vscode-cdn.net 'nonce-NONCE'; worker-src 'self' https://*.vscode-cdn.net blob:"
+      );
+    });
+
+    test("adds the nonce to script-src-elem when the viewer splits it out", () => {
+      assert.strictEqual(
+        buildWebviewCsp(
+          {
+            version: 1,
+            directives: {
+              "default-src": ["'none'"],
+              "script-src": ["'self'"],
+              "script-src-elem": ["'self'", "'sha256-abc='"],
+              "worker-src": ["'self'"],
+            },
+          },
+          "https://cdn.test",
+          "NONCE"
+        ),
+        "default-src 'none'; script-src 'self' https://cdn.test 'nonce-NONCE'; script-src-elem 'self' https://cdn.test 'sha256-abc=' 'nonce-NONCE'; worker-src 'self' https://cdn.test blob:"
+      );
+    });
+
+    test("never widens 'none' or empty source lists", () => {
+      const build = (directives: Record<string, string[]>) =>
+        buildWebviewCsp(
+          {
+            version: 1,
+            directives: {
+              "default-src": ["'none'"],
+              "script-src": ["'self'"],
+              ...directives,
+            },
+          },
+          "https://cdn.test",
+          "NONCE"
+        );
+      const base =
+        "default-src 'none'; script-src 'self' https://cdn.test 'nonce-NONCE'";
+      assert.strictEqual(
+        build({ "worker-src": ["'none'"] }),
+        `${base}; worker-src 'none'`
+      );
+      assert.strictEqual(build({ "worker-src": [] }), `${base}; worker-src`);
+      assert.strictEqual(
+        build({ "worker-src": ["https://w.test"] }),
+        `${base}; worker-src https://w.test`,
+        "blob: only accompanies 'self'"
+      );
+      assert.strictEqual(
+        build({
+          "script-src": ["'none'"],
+          "worker-src": [],
+          "upgrade-insecure-requests": [],
+        }),
+        "default-src 'none'; script-src 'none'; worker-src; upgrade-insecure-requests"
+      );
+    });
+
+    test("never widens the viewer's policy beyond the translation", () => {
+      const csp = buildWebviewCsp(kPolicy, kCspSource, "NONCE");
+      assert.ok(!csp.includes("'unsafe-eval'"));
+      assert.ok(!/script-src[^;]*'unsafe-inline'/.test(csp));
+      assert.ok(!/style-src-elem[^;]*'unsafe-inline'/.test(csp));
+      assert.ok(!/(img|font|media)-src[^;]*blob:/.test(csp));
+    });
+
+    test("uses the legacy policy when the policy file is absent", () => {
+      const { viewDir, cleanup } = createTempViewDir(kBundledIndex);
+      try {
+        assert.deepStrictEqual(loadViewerCsp(viewDir), { status: "absent" });
+        const result = getWebviewPanelHtml(
+          toAbsolutePath(viewDir),
+          mockPanel,
+          "1.0.0"
+        );
+        assert.deepStrictEqual(cspMetas(result), [
+          legacyWebviewCsp(mockPanel.webview.cspSource, nonceOf(result)),
+        ]);
+      } finally {
+        cleanup();
+      }
+    });
+
+    test("keeps the legacy policy string unchanged", () => {
+      assert.strictEqual(
+        legacyWebviewCsp("SRC", "N"),
+        "default-src 'none'; img-src SRC data:; font-src SRC data:; style-src SRC 'unsafe-inline'; worker-src 'self' SRC blob:; script-src 'nonce-N' 'unsafe-eval'; script-src-elem 'nonce-N' SRC; connect-src SRC blob:;"
+      );
+    });
+
+    test("uses the translated policy when the policy file is present", () => {
+      const { viewDir, cleanup } = createTempViewDir(
+        kBundledIndex,
+        JSON.stringify(kPolicy, null, 2)
+      );
+      try {
+        const result = getWebviewPanelHtml(
+          toAbsolutePath(viewDir),
+          mockPanel,
+          "1.0.0"
+        );
+        assert.deepStrictEqual(cspMetas(result), [
+          buildWebviewCsp(
+            kPolicy,
+            mockPanel.webview.cspSource,
+            nonceOf(result)
+          ),
+        ]);
+      } finally {
+        cleanup();
+      }
+    });
+
+    test("stamps the policy's nonce on every template script", () => {
+      const result = renderWebviewHtml({
+        indexHtml: kBundledIndex,
+        policy: { status: "valid", policy: kPolicy },
+        cspSource: kCspSource,
+        nonce: "NONCE",
+        resourceUri: (p) => `${kCspSource}/dist/${p}`,
+        extensionVersion: "1.0.0",
+        extraHead: '<script id="state" type="application/json">{}</script>',
+      });
+      assert.deepStrictEqual(cspMetas(result), [kExpectedCsp]);
+      assert.ok(
+        result.includes('<script nonce="NONCE">window.inline = true;</script>')
+      );
+      assert.ok(
+        result.includes(
+          `<script nonce="NONCE" type="module" src="${kCspSource}/dist/./assets/index.js">`
+        )
+      );
+      assert.ok(
+        result.includes('<script id="state" type="application/json">'),
+        "extraHead data blocks stay un-nonced"
+      );
+      assert.ok(result.includes('content="1.0.0"'));
+    });
+
+    test("strips a CSP meta tag shipped in the viewer's index.html", () => {
+      const indexHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'">
+<META HTTP-EQUIV=content-security-policy CONTENT="script-src 'self'" />
+<meta http-equiv="Content-Security-Policy-Report-Only" content="default-src 'self'">
+</head>
+<body></body>
+</html>`;
+      const policies: ViewerCspLoad[] = [
+        { status: "absent" },
+        { status: "valid", policy: kPolicy },
+      ];
+      for (const policy of policies) {
+        const result = renderWebviewHtml({
+          indexHtml,
+          policy,
+          cspSource: kCspSource,
+          nonce: "NONCE",
+          resourceUri: (p) => p,
+          extensionVersion: "1.0.0",
+        });
+        assert.strictEqual(
+          (result.match(/content-security-policy"/gi) ?? []).length,
+          1,
+          "Only the extension's policy should remain"
+        );
+        assert.deepStrictEqual(cspMetas(result), [
+          policy.status === "valid"
+            ? kExpectedCsp
+            : legacyWebviewCsp(kCspSource, "NONCE"),
+        ]);
+        assert.ok(result.includes("Content-Security-Policy-Report-Only"));
+      }
+    });
+
+    test("refuses a policy-carrying index.html with no <head> start tag", () => {
+      const result = renderWebviewHtml({
+        indexHtml:
+          '<!DOCTYPE html><html lang="en"><meta http-equiv="Content-Security-Policy" content="default-src \'self\'"><script src="./a.js"></script></html>',
+        policy: { status: "valid", policy: kPolicy },
+        cspSource: kCspSource,
+        nonce: "NONCE",
+        resourceUri: (p) => p,
+        extensionVersion: "1.0.0",
+        packageName: "Inspect AI",
+      });
+      assert.ok(
+        result.includes(
+          "Inspect AI view could not be loaded because the insertion point for its Content-Security-Policy (the &lt;head&gt; start tag) was not found in its index.html."
+        ),
+        result
+      );
+      assert.ok(!result.includes("a.js"));
+    });
+
+    const headCases: [string, string][] = [
+      [
+        "CRLF line endings",
+        '<!DOCTYPE html>\r\n<html lang="en">\r\n<head>\r\n<script src="./a.js"></script>\r\n</head>\r\n</html>',
+      ],
+      [
+        "a <head> tag with attributes",
+        '<!DOCTYPE html><html lang="en"><head data-x="1"><script src="./a.js"></script></head></html>',
+      ],
+    ];
+    for (const [name, indexHtml] of headCases) {
+      test(`inserts the policy into an index.html with ${name}`, () => {
+        const result = renderWebviewHtml({
+          indexHtml,
+          policy: { status: "valid", policy: kPolicy },
+          cspSource: kCspSource,
+          nonce: "NONCE",
+          resourceUri: (p) => `${kCspSource}/${p}`,
+          extensionVersion: "1.0.0",
+        });
+        assert.deepStrictEqual(cspMetas(result), [kExpectedCsp]);
+        assert.ok(result.includes('content="1.0.0"'));
+        assert.ok(
+          /<head[^>]*>\s*<meta name="inspect-extension:version"/.test(result),
+          "Policy goes right after the <head> start tag"
+        );
+        assert.ok(
+          result.includes(`<script nonce="NONCE" src="${kCspSource}/./a.js">`)
+        );
+      });
+    }
+
+    test("renders an error page for an invalid cspSource or nonce", () => {
+      const render = (cspSource: string, nonce: string) =>
+        renderWebviewHtml({
+          indexHtml: kBundledIndex,
+          policy: { status: "valid", policy: kPolicy },
+          cspSource,
+          nonce,
+          resourceUri: (p) => p,
+          extensionVersion: "1.0.0",
+          packageName: "Inspect AI",
+        });
+      const badSource = render('https://cdn.test"><script>', "NONCE");
+      assert.ok(
+        badSource.includes(
+          "Inspect AI view could not be loaded: Invalid webview cspSource:"
+        ),
+        badSource
+      );
+      assert.ok(!badSource.includes("window.inline"));
+      const badNonce = render(kCspSource, "bad nonce");
+      assert.ok(
+        badNonce.includes(
+          "Inspect AI view could not be loaded: Invalid CSP nonce."
+        ),
+        badNonce
+      );
+      assert.ok(!badNonce.includes("window.inline"));
+    });
+
+    test("stripCspMeta leaves other meta tags alone", () => {
+      const html =
+        '<head><meta charset="utf-8"><meta http-equiv=\'Content-Security-Policy\' content="x"><meta name="robots" content="noindex"></head>';
+      assert.strictEqual(
+        stripCspMeta(html),
+        '<head><meta charset="utf-8"><meta name="robots" content="noindex"></head>'
+      );
+    });
+
+    test("stripCspMeta leaves script text and the body alone", () => {
+      const meta = '<meta http-equiv="Content-Security-Policy" content="x">';
+      const html = `<html><head>
+<script>const tag = '${meta}';</script>
+${meta}
+<SCRIPT type="module">document.head.innerHTML += '${meta}';</SCRIPT>
+</head><body>${meta}<script>'${meta}'</script></body></html>`;
+      assert.strictEqual(
+        stripCspMeta(html),
+        `<html><head>
+<script>const tag = '${meta}';</script>
+
+<SCRIPT type="module">document.head.innerHTML += '${meta}';</SCRIPT>
+</head><body>${meta}<script>'${meta}'</script></body></html>`
+      );
+    });
+
+    suite("legacy output (golden, generated from main)", () => {
+      const kScoutIndex = `<!doctype html>
+<html lang="en" data-bs-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Inspect Scout</title>
+    <link rel="icon" type="image/svg+xml" href="./assets/favicon-CLlGywfF.svg" />
+    <script>window.__APPLY_BROWSER_THEME__ = () => {};</script>
+    <script type="module" crossorigin src="./assets/index-Cb7Sop5M.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/rolldown-runtime-Dd_uD5pT.js">
+    <link rel="stylesheet" crossorigin href="./assets/index-DUKcGSFa.css">
+  </head>
+
+  <body style="min-width: 450px">
+    <script>
+      window.__APPLY_BROWSER_THEME__?.();
+    </script>
+    <div id="app"></div>
+  </body>
+</html>
+`;
+      const kUnbundledIndex = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="./App.css">
+<script type="importmap">
+{ "imports": { "preact": "./lib/preact/preact.mjs?v=10", "htm": "./lib/htm/htm.mjs" } }
+</script>
+</head>
+<body>
+<div id="app"></div>
+<script type="module" src="./App.mjs"></script>
+<script type="module">import { App } from "./App.mjs";</script>
+</body>
+</html>
+`;
+      const legacy = (
+        indexHtml: string,
+        unbundledCssOverride: string | null,
+        extraHead: string,
+        packageName: string
+      ) =>
+        renderWebviewHtml({
+          indexHtml,
+          policy: { status: "absent" },
+          cspSource: kCspSource,
+          nonce: "NONCE",
+          resourceUri: (p) => `RES(${p})`,
+          extensionVersion: "0.9.19",
+          unbundledCssOverride,
+          extraHead,
+          packageName,
+        });
+
+      test("bundled index.html (Scout)", () => {
+        const expected = [
+          "<!doctype html>",
+          '<html class="vscode" lang="en" data-bs-theme="light">',
+          "  <head>",
+          '          <meta name="inspect-extension:version" content="0.9.19">',
+          "    <meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; img-src https://file+.vscode-resource.vscode-cdn.net data:; font-src https://file+.vscode-resource.vscode-cdn.net data:; style-src https://file+.vscode-resource.vscode-cdn.net 'unsafe-inline'; worker-src 'self' https://file+.vscode-resource.vscode-cdn.net blob:; script-src 'nonce-NONCE' 'unsafe-eval'; script-src-elem 'nonce-NONCE' https://file+.vscode-resource.vscode-cdn.net; connect-src https://file+.vscode-resource.vscode-cdn.net blob:;\">",
+          "    ",
+          '    <script id="scanview-state" type="application/json">{"type":"updateState","url":"/scans"}</script>',
+          "",
+          '        <meta charset="utf-8" />',
+          '    <meta name="viewport" content="width=device-width, initial-scale=1" />',
+          "    <title>Inspect Scout</title>",
+          '    <link rel="icon" type="image/svg+xml" href="RES(./assets/favicon-CLlGywfF.svg)" />',
+          '    <script nonce="NONCE">window.__APPLY_BROWSER_THEME__ = () => {};</script>',
+          '    <script nonce="NONCE" type="module" crossorigin src="RES(./assets/index-Cb7Sop5M.js)"></script>',
+          '    <link rel="modulepreload" crossorigin href="RES(./assets/rolldown-runtime-Dd_uD5pT.js)">',
+          '    <link rel="stylesheet" crossorigin href="RES(./assets/index-DUKcGSFa.css)">',
+          "  </head>",
+          "",
+          '  <body style="min-width: 450px">',
+          '    <script nonce="NONCE">',
+          "      window.__APPLY_BROWSER_THEME__?.();",
+          "    </script>",
+          '    <div id="app"></div>',
+          "  </body>",
+          "</html>",
+          "",
+        ].join("\n");
+        assert.strictEqual(
+          legacy(
+            kScoutIndex,
+            null,
+            '<script id="scanview-state" type="application/json">{"type":"updateState","url":"/scans"}</script>',
+            "Inspect Scout"
+          ),
+          expected
+        );
+      });
+
+      test("unbundled index.html with an import map and override CSS", () => {
+        const expected = [
+          "<!DOCTYPE html>",
+          '<html class="vscode" lang="en">',
+          "<head>",
+          '          <meta name="inspect-extension:version" content="0.9.19">',
+          "    <meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; img-src https://file+.vscode-resource.vscode-cdn.net data:; font-src https://file+.vscode-resource.vscode-cdn.net data:; style-src https://file+.vscode-resource.vscode-cdn.net 'unsafe-inline'; worker-src 'self' https://file+.vscode-resource.vscode-cdn.net blob:; script-src 'nonce-NONCE' 'unsafe-eval'; script-src-elem 'nonce-NONCE' https://file+.vscode-resource.vscode-cdn.net; connect-src https://file+.vscode-resource.vscode-cdn.net blob:;\">",
+          '    <link rel="stylesheet" type ="text/css" href="https://file+.vscode-resource.vscode-cdn.net/ext/assets/www/view/view-overrides.css" >',
+          '    <script id="logview-state" type="application/json">{"type":"updateState","url":"file:///logs/a.eval"}</script><script id="inspect-host-capabilities" type="application/json">["http_request"]</script>',
+          "",
+          '    <meta charset="utf-8">',
+          '<link rel="stylesheet" href="RES(/App.css)">',
+          '<script nonce="NONCE" type="importmap">',
+          '{ "imports": { "preact": "RES(/lib/preact/preact.mjs)?v=10", "htm": "RES(/lib/htm/htm.mjs)" } }',
+          "</script>",
+          "</head>",
+          "<body>",
+          '<div id="app"></div>',
+          '<script nonce="NONCE" type="module" src="RES(/App.mjs)"></script>',
+          '<script nonce="NONCE" type="module">import { App } from "RES(/App.mjs)";</script>',
+          "</body>",
+          "</html>",
+          "",
+        ].join("\n");
+        assert.strictEqual(
+          legacy(
+            kUnbundledIndex,
+            `${kCspSource}/ext/assets/www/view/view-overrides.css`,
+            '<script id="logview-state" type="application/json">{"type":"updateState","url":"file:///logs/a.eval"}</script><script id="inspect-host-capabilities" type="application/json">["http_request"]</script>',
+            "Inspect AI"
+          ),
+          expected
+        );
+      });
+    });
+
+    suite("malformed policy file", () => {
+      const withDirectives = (directives: unknown) =>
+        JSON.stringify({ version: 1, directives });
+      const minimal = {
+        "default-src": ["'none'"],
+        "script-src": ["'self'"],
+        "worker-src": ["'self'"],
+      };
+      const cases: [string, string][] = [
+        ["not JSON", "{"],
+        ["not an object", "[]"],
+        ["wrong version", JSON.stringify({ version: 2, directives: minimal })],
+        ["missing version", JSON.stringify({ directives: minimal })],
+        [
+          "directives not an object",
+          JSON.stringify({ version: 1, directives: [] }),
+        ],
+        [
+          "sources not an array",
+          withDirectives({ ...minimal, "img-src": "data:" }),
+        ],
+        ["non-string source", withDirectives({ ...minimal, "img-src": [1] })],
+        ["bad directive name", withDirectives({ ...minimal, "img src": [] })],
+        ["semicolon", withDirectives({ ...minimal, "img-src": ["data:;"] })],
+        ["comma", withDirectives({ ...minimal, "img-src": ["a,b"] })],
+        ["double quote", withDirectives({ ...minimal, "img-src": ['x"y'] })],
+        ["stray quote", withDirectives({ ...minimal, "img-src": ["'self"] })],
+        ["inner quote", withDirectives({ ...minimal, "img-src": ["'a'b'"] })],
+        ["whitespace", withDirectives({ ...minimal, "img-src": ["a b"] })],
+        [
+          "control char",
+          withDirectives({ ...minimal, "img-src": ["a\u0007"] }),
+        ],
+        [
+          "missing script-src",
+          withDirectives({ "default-src": ["'none'"], "worker-src": [] }),
+        ],
+        [
+          "frame-ancestors",
+          withDirectives({ ...minimal, "frame-ancestors": ["'none'"] }),
+        ],
+        [
+          "duplicate directive",
+          '{"version":1,"directives":{"default-src":["\'none\'"],"script-src":["\'self\'"],"worker-src":[],"script-src":["*"]}}',
+        ],
+        [
+          "duplicate top-level key",
+          `{"version":1,"directives":${JSON.stringify(minimal)},"version":1}`,
+        ],
+        [
+          "missing default-src",
+          withDirectives({ "script-src": [], "worker-src": [] }),
+        ],
+      ];
+
+      for (const [name, text] of cases) {
+        test(`rejects ${name}`, () => {
+          assert.throws(() => parseViewerCsp(text), ViewerCspError);
+        });
+      }
+
+      test("accepts repeated keys in different objects and escaped keys", () => {
+        const text = `{"version":1,"meta":{"version":2,"a\\"b":[{"x":1},{"x":2}],"a\\"c":"}{,["},"directives":${JSON.stringify(minimal)}}`;
+        assert.deepStrictEqual(parseViewerCsp(text).directives, minimal);
+      });
+
+      test("accepts an empty source list", () => {
+        const directives = { ...minimal, "upgrade-insecure-requests": [] };
+        assert.deepStrictEqual(
+          parseViewerCsp(withDirectives(directives)).directives,
+          directives
+        );
+      });
+
+      test("accepts the minimal valid policy", () => {
+        assert.deepStrictEqual(parseViewerCsp(withDirectives(minimal)), {
+          version: 1,
+          directives: minimal,
+        });
+      });
+
+      test("shows an error page instead of the viewer", () => {
+        const { viewDir, cleanup } = createTempViewDir(
+          kBundledIndex,
+          JSON.stringify({ version: 2, directives: minimal })
+        );
+        try {
+          const load = loadViewerCsp(viewDir);
+          assert.strictEqual(load.status, "invalid");
+          const result = getWebviewPanelHtml(
+            toAbsolutePath(viewDir),
+            mockPanel,
+            "1.0.0",
+            null,
+            "",
+            "Inspect AI"
+          );
+          assert.ok(
+            result.includes(
+              "Inspect AI view could not be loaded because its content-security-policy.json is invalid: unsupported version 2 (expected 1)."
+            ),
+            result
+          );
+          assert.ok(!result.includes("window.inline"), "Viewer not rendered");
+          assert.ok(!result.includes("nonce"), "No viewer scripts allowed");
+        } finally {
+          cleanup();
+        }
+      });
+
+      test("treats an unreadable policy path as invalid, not absent", () => {
+        const { viewDir, cleanup } = createTempViewDir(kBundledIndex);
+        try {
+          const policyPath = path.join(viewDir, kViewerCspFileName);
+          fs.mkdirSync(policyPath);
+          const load = loadViewerCsp(viewDir);
+          assert.strictEqual(load.status, "invalid");
+          const result = getWebviewPanelHtml(
+            toAbsolutePath(viewDir),
+            mockPanel,
+            "1.0.0",
+            null,
+            "",
+            "Inspect AI"
+          );
+          assert.ok(
+            result.includes(
+              "<p>Inspect AI view could not be loaded because its content-security-policy.json is invalid: could not be read (EISDIR"
+            ),
+            result
+          );
+          assert.ok(result.includes(`<p>File: ${policyPath}</p>`), result);
+          assert.ok(
+            result.includes(
+              "<p>Reinstall or upgrade Inspect AI in the active Python interpreter, then try again.</p>"
+            )
+          );
+          assert.ok(!result.includes("window.inline"), "Viewer not rendered");
+        } finally {
+          cleanup();
+        }
+      });
     });
   });
 });
