@@ -151,15 +151,27 @@ export function buildWebviewCsp(
     .join("; ");
 }
 
+const kHeadSpan = /(<head(?:\s[^>]*)?>)([\s\S]*?)(<\/head\s*>)/i;
+// Scripts are matched (and kept) so text inside them is never touched.
+const kScriptOrCspMeta =
+  /(<script\b[\s\S]*?<\/script\s*>)|<meta\b[^>]*\bhttp-equiv\s*=\s*(["']?)content-security-policy\2(?=[\s/>])[^>]*>/gi;
+
 /**
- * Remove any `<meta http-equiv="Content-Security-Policy">` from a viewer's
- * index.html. Every policy on a page is enforced, and a viewer's own `'self'`
- * would block every webview asset.
+ * Remove any `<meta http-equiv="Content-Security-Policy">` from the `<head>` of
+ * a viewer's index.html (browsers only honour a CSP meta there). Every policy
+ * on a page is enforced, and a viewer's own `'self'` would block every webview
+ * asset. Script text is left alone.
  */
 export function stripCspMeta(html: string): string {
   return html.replace(
-    /<meta\b[^>]*\bhttp-equiv\s*=\s*(["']?)content-security-policy\1(?=[\s/>])[^>]*>/gi,
-    ""
+    kHeadSpan,
+    (_match: string, open: string, content: string, close: string) =>
+      open +
+      content.replace(
+        kScriptOrCspMeta,
+        (_meta: string, script: string | undefined) => script ?? ""
+      ) +
+      close
   );
 }
 

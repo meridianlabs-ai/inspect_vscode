@@ -602,10 +602,27 @@ size 1217`;
 
     test("stripCspMeta leaves other meta tags alone", () => {
       const html =
-        '<meta charset="utf-8"><meta http-equiv=\'Content-Security-Policy\' content="x"><meta name="robots" content="noindex">';
+        '<head><meta charset="utf-8"><meta http-equiv=\'Content-Security-Policy\' content="x"><meta name="robots" content="noindex"></head>';
       assert.strictEqual(
         stripCspMeta(html),
-        '<meta charset="utf-8"><meta name="robots" content="noindex">'
+        '<head><meta charset="utf-8"><meta name="robots" content="noindex"></head>'
+      );
+    });
+
+    test("stripCspMeta leaves script text and the body alone", () => {
+      const meta = '<meta http-equiv="Content-Security-Policy" content="x">';
+      const html = `<html><head>
+<script>const tag = '${meta}';</script>
+${meta}
+<SCRIPT type="module">document.head.innerHTML += '${meta}';</SCRIPT>
+</head><body>${meta}<script>'${meta}'</script></body></html>`;
+      assert.strictEqual(
+        stripCspMeta(html),
+        `<html><head>
+<script>const tag = '${meta}';</script>
+
+<SCRIPT type="module">document.head.innerHTML += '${meta}';</SCRIPT>
+</head><body>${meta}<script>'${meta}'</script></body></html>`
       );
     });
 
