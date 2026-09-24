@@ -655,6 +655,138 @@ ${meta}
       );
     });
 
+    suite("legacy output (golden, generated from main)", () => {
+      const kScoutIndex = `<!doctype html>
+<html lang="en" data-bs-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Inspect Scout</title>
+    <link rel="icon" type="image/svg+xml" href="./assets/favicon-CLlGywfF.svg" />
+    <script>window.__APPLY_BROWSER_THEME__ = () => {};</script>
+    <script type="module" crossorigin src="./assets/index-Cb7Sop5M.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/rolldown-runtime-Dd_uD5pT.js">
+    <link rel="stylesheet" crossorigin href="./assets/index-DUKcGSFa.css">
+  </head>
+
+  <body style="min-width: 450px">
+    <script>
+      window.__APPLY_BROWSER_THEME__?.();
+    </script>
+    <div id="app"></div>
+  </body>
+</html>
+`;
+      const kUnbundledIndex = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="./App.css">
+<script type="importmap">
+{ "imports": { "preact": "./lib/preact/preact.mjs?v=10", "htm": "./lib/htm/htm.mjs" } }
+</script>
+</head>
+<body>
+<div id="app"></div>
+<script type="module" src="./App.mjs"></script>
+<script type="module">import { App } from "./App.mjs";</script>
+</body>
+</html>
+`;
+      const legacy = (
+        indexHtml: string,
+        unbundledCssOverride: string | null,
+        extraHead: string,
+        packageName: string
+      ) =>
+        renderWebviewHtml({
+          indexHtml,
+          policy: { status: "absent" },
+          cspSource: kCspSource,
+          nonce: "NONCE",
+          resourceUri: (p) => `RES(${p})`,
+          extensionVersion: "0.9.19",
+          unbundledCssOverride,
+          extraHead,
+          packageName,
+        });
+
+      test("bundled index.html (Scout)", () => {
+        const expected = [
+          "<!doctype html>",
+          '<html class="vscode" lang="en" data-bs-theme="light">',
+          "  <head>",
+          '          <meta name="inspect-extension:version" content="0.9.19">',
+          "    <meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; img-src https://file+.vscode-resource.vscode-cdn.net data:; font-src https://file+.vscode-resource.vscode-cdn.net data:; style-src https://file+.vscode-resource.vscode-cdn.net 'unsafe-inline'; worker-src 'self' https://file+.vscode-resource.vscode-cdn.net blob:; script-src 'nonce-NONCE' 'unsafe-eval'; script-src-elem 'nonce-NONCE' https://file+.vscode-resource.vscode-cdn.net; connect-src https://file+.vscode-resource.vscode-cdn.net blob:;\">",
+          "    ",
+          '    <script id="scanview-state" type="application/json">{"type":"updateState","url":"/scans"}</script>',
+          "",
+          '        <meta charset="utf-8" />',
+          '    <meta name="viewport" content="width=device-width, initial-scale=1" />',
+          "    <title>Inspect Scout</title>",
+          '    <link rel="icon" type="image/svg+xml" href="RES(./assets/favicon-CLlGywfF.svg)" />',
+          '    <script nonce="NONCE">window.__APPLY_BROWSER_THEME__ = () => {};</script>',
+          '    <script nonce="NONCE" type="module" crossorigin src="RES(./assets/index-Cb7Sop5M.js)"></script>',
+          '    <link rel="modulepreload" crossorigin href="RES(./assets/rolldown-runtime-Dd_uD5pT.js)">',
+          '    <link rel="stylesheet" crossorigin href="RES(./assets/index-DUKcGSFa.css)">',
+          "  </head>",
+          "",
+          '  <body style="min-width: 450px">',
+          '    <script nonce="NONCE">',
+          "      window.__APPLY_BROWSER_THEME__?.();",
+          "    </script>",
+          '    <div id="app"></div>',
+          "  </body>",
+          "</html>",
+          "",
+        ].join("\n");
+        assert.strictEqual(
+          legacy(
+            kScoutIndex,
+            null,
+            '<script id="scanview-state" type="application/json">{"type":"updateState","url":"/scans"}</script>',
+            "Inspect Scout"
+          ),
+          expected
+        );
+      });
+
+      test("unbundled index.html with an import map and override CSS", () => {
+        const expected = [
+          "<!DOCTYPE html>",
+          '<html class="vscode" lang="en">',
+          "<head>",
+          '          <meta name="inspect-extension:version" content="0.9.19">',
+          "    <meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; img-src https://file+.vscode-resource.vscode-cdn.net data:; font-src https://file+.vscode-resource.vscode-cdn.net data:; style-src https://file+.vscode-resource.vscode-cdn.net 'unsafe-inline'; worker-src 'self' https://file+.vscode-resource.vscode-cdn.net blob:; script-src 'nonce-NONCE' 'unsafe-eval'; script-src-elem 'nonce-NONCE' https://file+.vscode-resource.vscode-cdn.net; connect-src https://file+.vscode-resource.vscode-cdn.net blob:;\">",
+          '    <link rel="stylesheet" type ="text/css" href="https://file+.vscode-resource.vscode-cdn.net/ext/assets/www/view/view-overrides.css" >',
+          '    <script id="logview-state" type="application/json">{"type":"updateState","url":"file:///logs/a.eval"}</script><script id="inspect-host-capabilities" type="application/json">["http_request"]</script>',
+          "",
+          '    <meta charset="utf-8">',
+          '<link rel="stylesheet" href="RES(/App.css)">',
+          '<script nonce="NONCE" type="importmap">',
+          '{ "imports": { "preact": "RES(/lib/preact/preact.mjs)?v=10", "htm": "RES(/lib/htm/htm.mjs)" } }',
+          "</script>",
+          "</head>",
+          "<body>",
+          '<div id="app"></div>',
+          '<script nonce="NONCE" type="module" src="RES(/App.mjs)"></script>',
+          '<script nonce="NONCE" type="module">import { App } from "RES(/App.mjs)";</script>',
+          "</body>",
+          "</html>",
+          "",
+        ].join("\n");
+        assert.strictEqual(
+          legacy(
+            kUnbundledIndex,
+            `${kCspSource}/ext/assets/www/view/view-overrides.css`,
+            '<script id="logview-state" type="application/json">{"type":"updateState","url":"file:///logs/a.eval"}</script><script id="inspect-host-capabilities" type="application/json">["http_request"]</script>',
+            "Inspect AI"
+          ),
+          expected
+        );
+      });
+    });
+
     suite("malformed policy file", () => {
       const withDirectives = (directives: unknown) =>
         JSON.stringify({ version: 1, directives });
@@ -768,8 +900,31 @@ ${meta}
       test("treats an unreadable policy path as invalid, not absent", () => {
         const { viewDir, cleanup } = createTempViewDir(kBundledIndex);
         try {
-          fs.mkdirSync(path.join(viewDir, kViewerCspFileName));
-          assert.strictEqual(loadViewerCsp(viewDir).status, "invalid");
+          const policyPath = path.join(viewDir, kViewerCspFileName);
+          fs.mkdirSync(policyPath);
+          const load = loadViewerCsp(viewDir);
+          assert.strictEqual(load.status, "invalid");
+          const result = getWebviewPanelHtml(
+            toAbsolutePath(viewDir),
+            mockPanel,
+            "1.0.0",
+            null,
+            "",
+            "Inspect AI"
+          );
+          assert.ok(
+            result.includes(
+              "<p>Inspect AI view could not be loaded because its content-security-policy.json is invalid: could not be read (EISDIR"
+            ),
+            result
+          );
+          assert.ok(result.includes(`<p>File: ${policyPath}</p>`), result);
+          assert.ok(
+            result.includes(
+              "<p>Reinstall or upgrade Inspect AI in the active Python interpreter, then try again.</p>"
+            )
+          );
+          assert.ok(!result.includes("window.inline"), "Viewer not rendered");
         } finally {
           cleanup();
         }
