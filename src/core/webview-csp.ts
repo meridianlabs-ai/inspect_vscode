@@ -31,11 +31,16 @@ const kForbiddenSourceChars = /[;,"<>&\\`]/;
 const kQuotedSource = /^'[^']+'$/;
 const kNonce = /^[A-Za-z0-9+/_=-]+$/;
 
-// The translation augments script-src and worker-src, and a policy without
-// default-src would leave everything it doesn't list unrestricted.
 const kNonceDirectives = ["script-src", "script-src-elem"];
 
+// default-src: without it, everything the policy doesn't list is
+// unrestricted. script-src: carries the nonce. worker-src: the viewer's
+// contract makes it explicit so hosts can rely on it, rather than falling
+// back to script-src, and the blob: worker fallback is added there.
 const kRequiredDirectives = ["default-src", "script-src", "worker-src"];
+
+// The host owns framing, and a <meta> policy ignores frame-ancestors anyway.
+const kHostOwnedDirectives = ["frame-ancestors"];
 
 /**
  * Read `<viewDir>/content-security-policy.json`. A missing file means the dist
@@ -78,6 +83,10 @@ export function parseViewerCsp(text: string): ViewerCspFile {
     raw = JSON.parse(text);
   } catch (error) {
     throw new ViewerCspError(`not valid JSON (${errorMessage(error)})`);
+  }
+  const duplicate = findDuplicateKey(text);
+  if (duplicate !== undefined) {
+    throw new ViewerCspError(`duplicate key ${JSON.stringify(duplicate)}`);
   }
   return validateViewerCsp(raw);
 }
@@ -176,6 +185,11 @@ function validateViewerCsp(raw: unknown): ViewerCspFile {
         `invalid directive name ${JSON.stringify(name)}`
       );
     }
+    if (kHostOwnedDirectives.includes(name)) {
+      throw new ViewerCspError(
+        `\`${name}\` is set by the host, not the viewer dist`
+      );
+    }
     if (!Array.isArray(value)) {
       throw new ViewerCspError(`\`${name}\` must be an array of sources`);
     }
@@ -200,12 +214,60 @@ function validateViewerCsp(raw: unknown): ViewerCspFile {
   return { version: 1, directives };
 }
 
+/**
+ * Whether `source` is a single CSP source expression we can carry.
+ *
+ * Stricter than inspect_ai's loader (`_view/_csp.py`, which only rejects
+ * non-printable ASCII, whitespace, `;` and `,`): the policy lands in a
+ * `<meta>` content attribute, so `"`, `<`, `>`, `&`, `\\` and backticks are
+ * rejected too, and `'` may only wrap a whole keyword, hash or nonce.
+ */
 function isValidSource(source: string): boolean {
   if (!kSourceChars.test(source) || kForbiddenSourceChars.test(source)) {
     return false;
   }
   // Quotes only as a keyword/hash/nonce wrapper: 'self', 'sha256-…'.
   return !source.includes("'") || kQuotedSource.test(source);
+}
+
+/**
+ * First key repeated within one object anywhere in `text`, which must already
+ * be valid JSON. `JSON.parse` silently keeps the last duplicate; inspect_ai's
+ * loader rejects them, so this does too.
+ */
+function findDuplicateKey(text: string): string | undefined {
+  // One entry per open container: the keys seen so far, or null for arrays.
+  const stack: (Set<string> | null)[] = [];
+  let expectKey = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text.charAt(i);
+    if (ch === '"') {
+      let end = i + 1;
+      while (text.charAt(end) !== '"') {
+        end += text.charAt(end) === "\\" ? 2 : 1;
+      }
+      const keys = stack[stack.length - 1];
+      if (keys && expectKey) {
+        const key = String(JSON.parse(text.slice(i, end + 1)));
+        if (keys.has(key)) {
+          return key;
+        }
+        keys.add(key);
+        expectKey = false;
+      }
+      i = end;
+    } else if (ch === "{") {
+      stack.push(new Set());
+      expectKey = true;
+    } else if (ch === "[") {
+      stack.push(null);
+    } else if (ch === "}" || ch === "]") {
+      stack.pop();
+    } else if (ch === ",") {
+      expectKey = !!stack[stack.length - 1];
+    }
+  }
+  return undefined;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

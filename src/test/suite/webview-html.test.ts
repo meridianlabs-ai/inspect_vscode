@@ -647,6 +647,18 @@ size 1217`;
           withDirectives({ "default-src": ["'none'"], "worker-src": [] }),
         ],
         [
+          "frame-ancestors",
+          withDirectives({ ...minimal, "frame-ancestors": ["'none'"] }),
+        ],
+        [
+          "duplicate directive",
+          '{"version":1,"directives":{"default-src":["\'none\'"],"script-src":["\'self\'"],"worker-src":[],"script-src":["*"]}}',
+        ],
+        [
+          "duplicate top-level key",
+          `{"version":1,"directives":${JSON.stringify(minimal)},"version":1}`,
+        ],
+        [
           "missing default-src",
           withDirectives({ "script-src": [], "worker-src": [] }),
         ],
@@ -657,6 +669,19 @@ size 1217`;
           assert.throws(() => parseViewerCsp(text), ViewerCspError);
         });
       }
+
+      test("accepts repeated keys in different objects and escaped keys", () => {
+        const text = `{"version":1,"meta":{"version":2,"a\\"b":[{"x":1},{"x":2}],"a\\"c":"}{,["},"directives":${JSON.stringify(minimal)}}`;
+        assert.deepStrictEqual(parseViewerCsp(text).directives, minimal);
+      });
+
+      test("accepts an empty source list", () => {
+        const directives = { ...minimal, "upgrade-insecure-requests": [] };
+        assert.deepStrictEqual(
+          parseViewerCsp(withDirectives(directives)).directives,
+          directives
+        );
+      });
 
       test("accepts the minimal valid policy", () => {
         assert.deepStrictEqual(parseViewerCsp(withDirectives(minimal)), {
