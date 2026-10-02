@@ -6,7 +6,6 @@
 import {
   buildWebviewCsp,
   kViewerCspFileName,
-  stripCspMeta,
   ViewerCspLoad,
 } from "./webview-csp";
 
@@ -66,8 +65,7 @@ export function legacyWebviewCsp(cspSource: string, nonce: string): string {
 
 /**
  * Render the webview page for a viewer dist's `index.html`: tags the html
- * element, replaces any CSP meta with the webview's policy, injects the version
- * meta, stamps script nonces, inserts `extraHead` and rewrites asset references
+ * element, injects the webview's policy and the version meta, stamps script nonces, inserts `extraHead` and rewrites asset references
  * through `resourceUri`.
  */
 export function renderWebviewHtml(options: RenderWebviewHtmlOptions): string {
@@ -111,7 +109,7 @@ Please update to a newer version of ${packageName} to view this content.
       break;
     case "valid":
       // Fail closed: without the insertion point the page would carry no
-      // policy at all once the viewer's own CSP meta is stripped.
+      // policy at all.
       headTag = kHeadStartTag;
       if (!headTag.test(indexHtml)) {
         return getMessagePanelHtml(
@@ -145,7 +143,6 @@ Please update to a newer version of ${packageName} to view this content.
   indexHtml = indexHtml.replace("<html ", '<html class="vscode" ');
 
   // add content security policy
-  indexHtml = stripCspMeta(indexHtml);
   const headInsert = `
           <meta name="inspect-extension:version" content="${extensionVersion}">
     <meta http-equiv="Content-Security-Policy" content="${csp}">

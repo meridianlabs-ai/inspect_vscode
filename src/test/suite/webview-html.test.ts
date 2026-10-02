@@ -12,10 +12,8 @@ import {
   kViewerCspFileName,
   loadViewerCsp,
   parseViewerCsp,
-  stripCspMeta,
   ViewerCspError,
   ViewerCspFile,
-  ViewerCspLoad,
 } from "../../core/webview-csp";
 import { legacyWebviewCsp, renderWebviewHtml } from "../../core/webview-render";
 import { HostWebviewPanel } from "../../hooks";
@@ -511,43 +509,6 @@ size 1217`;
       assert.ok(result.includes('content="1.0.0"'));
     });
 
-    test("strips a CSP meta tag shipped in the viewer's index.html", () => {
-      const indexHtml = `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'">
-<META HTTP-EQUIV=content-security-policy CONTENT="script-src 'self'" />
-<meta http-equiv="Content-Security-Policy-Report-Only" content="default-src 'self'">
-</head>
-<body></body>
-</html>`;
-      const policies: ViewerCspLoad[] = [
-        { status: "absent" },
-        { status: "valid", policy: kPolicy },
-      ];
-      for (const policy of policies) {
-        const result = renderWebviewHtml({
-          indexHtml,
-          policy,
-          cspSource: kCspSource,
-          nonce: "NONCE",
-          resourceUri: (p) => p,
-          extensionVersion: "1.0.0",
-        });
-        assert.strictEqual(
-          (result.match(/content-security-policy"/gi) ?? []).length,
-          1,
-          "Only the extension's policy should remain"
-        );
-        assert.deepStrictEqual(cspMetas(result), [
-          policy.status === "valid"
-            ? kExpectedCsp
-            : legacyWebviewCsp(kCspSource, "NONCE"),
-        ]);
-        assert.ok(result.includes("Content-Security-Policy-Report-Only"));
-      }
-    });
-
     test("refuses a policy-carrying index.html with no <head> start tag", () => {
       const result = renderWebviewHtml({
         indexHtml:
@@ -627,32 +588,6 @@ size 1217`;
         badNonce
       );
       assert.ok(!badNonce.includes("window.inline"));
-    });
-
-    test("stripCspMeta leaves other meta tags alone", () => {
-      const html =
-        '<head><meta charset="utf-8"><meta http-equiv=\'Content-Security-Policy\' content="x"><meta name="robots" content="noindex"></head>';
-      assert.strictEqual(
-        stripCspMeta(html),
-        '<head><meta charset="utf-8"><meta name="robots" content="noindex"></head>'
-      );
-    });
-
-    test("stripCspMeta leaves script text and the body alone", () => {
-      const meta = '<meta http-equiv="Content-Security-Policy" content="x">';
-      const html = `<html><head>
-<script>const tag = '${meta}';</script>
-${meta}
-<SCRIPT type="module">document.head.innerHTML += '${meta}';</SCRIPT>
-</head><body>${meta}<script>'${meta}'</script></body></html>`;
-      assert.strictEqual(
-        stripCspMeta(html),
-        `<html><head>
-<script>const tag = '${meta}';</script>
-
-<SCRIPT type="module">document.head.innerHTML += '${meta}';</SCRIPT>
-</head><body>${meta}<script>'${meta}'</script></body></html>`
-      );
     });
 
     suite("legacy output (golden, generated from main)", () => {
