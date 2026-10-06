@@ -4,6 +4,11 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    # Wait a week after a release before proposing it, so a compromised
+    # release has time to be caught. Security updates skip the cooldown;
+    # it doesn't apply to transitive deps (dependabot-core#14683).
+    cooldown:
+      default-days: 7
     groups:
       dev-dependencies:
         dependency-type: "development"
