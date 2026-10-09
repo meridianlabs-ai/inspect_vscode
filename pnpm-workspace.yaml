@@ -1,0 +1,5 @@
+# Only resolve package versions published at least 7 days ago (10080
+# minutes), so a compromised release has time to be caught and yanked.
+# Matches the Dependabot npm cooldown. Kept here rather than .npmrc:
+# pnpm 11 ignores it in .npmrc.
+minimumReleaseAge: 10080

@@ -19,3 +19,4 @@ eslint.config.mjs
 .prettierrc
 .nvmrc
 *.vsix
+pnpm-workspace.yaml
