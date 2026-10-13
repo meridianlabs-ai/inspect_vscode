@@ -267,4 +267,124 @@ size 1217`;
       );
     });
   });
+
+  suite("Content-Security-Policy", () => {
+    const cspSource = "https://mock.vscode-resource.test";
+    const indexHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>window.theme = 1;</script>
+<script type="module" src="assets/index.js"></script>
+</head>
+<body><div id="app"></div></body>
+</html>`;
+
+    // The policy the inspect viewer ships, with shortened hashes.
+    const viewerPolicy = {
+      version: 1,
+      directives: {
+        "default-src": ["'none'"],
+        "script-src": ["'self'", "'sha256-AAAA'", "'wasm-unsafe-eval'"],
+        "worker-src": ["'self'"],
+        "style-src-elem": ["'self'"],
+        "style-src-attr": ["'unsafe-inline'"],
+        "img-src": ["'self'", "data:"],
+        "media-src": ["data:"],
+        "font-src": ["'self'"],
+        "connect-src": ["'self'"],
+        "object-src": ["'none'"],
+        "frame-src": ["'none'"],
+        "base-uri": ["'none'"],
+        "form-action": ["'none'"],
+      },
+    };
+
+    /** Render a dist with `policyFile` (written verbatim when a string) and
+     *  return the page's CSP meta content and script nonce. */
+    function render(policyFile?: unknown): { csp: string; nonce: string } {
+      const { viewDir, cleanup } = createTempViewDir(indexHtml);
+      try {
+        if (policyFile !== undefined) {
+          fs.writeFileSync(
+            path.join(viewDir, "content-security-policy.json"),
+            typeof policyFile === "string"
+              ? policyFile
+              : JSON.stringify(policyFile),
+            "utf-8"
+          );
+        }
+        const result = getWebviewPanelHtml(
+          toAbsolutePath(viewDir),
+          mockPanel,
+          "1.0.0"
+        );
+        const csp =
+          /<meta http-equiv="Content-Security-Policy" content="([^"]*)">/.exec(
+            result
+          )?.[1];
+        const nonce = /<script nonce="([^"]+)"/.exec(result)?.[1];
+        assert.ok(csp !== undefined, "Should inject a CSP meta");
+        assert.ok(nonce !== undefined, "Should nonce the template scripts");
+        return { csp, nonce };
+      } finally {
+        cleanup();
+      }
+    }
+
+    const legacy = (nonce: string) =>
+      `default-src 'none'; img-src ${cspSource} data:; font-src ${cspSource} data:; style-src ${cspSource} 'unsafe-inline'; worker-src 'self' ${cspSource} blob:; script-src 'nonce-${nonce}' 'unsafe-eval'; script-src-elem 'nonce-${nonce}' ${cspSource}; connect-src ${cspSource} blob:;`;
+
+    test("translates the viewer's policy file for the webview", () => {
+      const { csp, nonce } = render(viewerPolicy);
+      assert.strictEqual(
+        csp,
+        [
+          "default-src 'none'",
+          `script-src 'self' 'sha256-AAAA' 'wasm-unsafe-eval' ${cspSource} 'nonce-${nonce}'`,
+          `worker-src 'self' ${cspSource} blob:`,
+          `style-src-elem 'self' ${cspSource}`,
+          "style-src-attr 'unsafe-inline'",
+          `img-src 'self' data: ${cspSource}`,
+          "media-src data:",
+          `font-src 'self' ${cspSource}`,
+          `connect-src 'self' ${cspSource}`,
+          "object-src 'none'",
+          "frame-src 'none'",
+          "base-uri 'none'",
+          "form-action 'none'",
+        ].join("; ")
+      );
+    });
+
+    test("keeps the legacy policy for a dist without a policy file", () => {
+      const { csp, nonce } = render();
+      assert.strictEqual(csp, legacy(nonce));
+    });
+
+    for (const [name, file] of [
+      ["invalid JSON", "{"],
+      ["an unknown version", { ...viewerPolicy, version: 2 }],
+      [
+        "a non-array source list",
+        { version: 1, directives: { "img-src": "x" } },
+      ],
+    ] as const) {
+      test(`falls back to the legacy policy for ${name}`, () => {
+        const { csp, nonce } = render(file);
+        assert.strictEqual(csp, legacy(nonce));
+      });
+    }
+
+    test("escapes the policy for the meta attribute", () => {
+      const { csp } = render({
+        version: 1,
+        directives: { "img-src": ['"><script>x</script>$&'] },
+      });
+      assert.strictEqual(
+        csp,
+        // `$&` survives: not expanded as a replacement pattern.
+        "img-src &quot;&gt;&lt;script&gt;x&lt;/script&gt;$&amp;"
+      );
+    });
+  });
 });
