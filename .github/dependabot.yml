@@ -4,6 +4,11 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    # Wait a week after a release before proposing it, so a compromised
+    # release has time to be caught. Security updates skip the cooldown;
+    # it doesn't apply to transitive deps (dependabot-core#14683).
+    cooldown:
+      default-days: 7
     groups:
       dev-dependencies:
         dependency-type: "development"
@@ -13,7 +18,17 @@ updates:
       # We don't want to force use of too new a version of VS Code.
       - dependency-name: "@types/vscode"
 
+  # Actions are pinned to commit SHAs with a `# vX.Y.Z` comment; Dependabot
+  # bumps both. The cooldown gives a compromised release time to be caught
+  # before it is proposed; security updates skip it.
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 7
+    # One PR per week for every action update, majors included.
+    groups:
+      github-actions:
+        patterns:
+          - "*"
