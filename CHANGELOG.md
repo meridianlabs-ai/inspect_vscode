@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.0](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.9.19...v0.10.0) (2026-10-15)
+
+
+### Features
+
+* use the log viewer's strict Content-Security-Policy in the webview ([#206](https://github.com/meridianlabs-ai/inspect_vscode/issues/206)) ([c88225f](https://github.com/meridianlabs-ai/inspect_vscode/commit/c88225fe255b20e2abd3b274cdfcbf6e53e3361c))
+
 ## [0.9.19](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.9.18...v0.9.19) (2026-09-13)
 
 
