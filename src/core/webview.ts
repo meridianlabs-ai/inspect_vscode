@@ -4,6 +4,7 @@ import { Disposable, env, MessageItem, Uri, window, workspace } from "vscode";
 
 import { HostWebviewPanel } from "../hooks";
 
+import { log } from "./log";
 import { getNonce } from "./nonce";
 import { AbsolutePath, workspacePath } from "./path";
 import { getRelativeUri } from "./uri";
@@ -88,19 +89,19 @@ Please update to a newer version of ${packageName} to view this content.
     indexHtml = indexHtml.replace("<html ", '<html class="vscode" ');
 
     // add content security policy
+    // Escaped so no source can end the attribute, or read as a `<script` tag
+    // when nonces are stamped below.
+    const csp = webviewCsp(viewDir, panel.webview.cspSource, nonce)
+      .replace(/&/g, "&amp;")
+      .replace(/"/g, "&quot;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
     indexHtml = indexHtml.replace(
       "<head>\n",
-      `<head>
+      // A function, so `$` in the policy isn't read as a replacement pattern.
+      () => `<head>
           <meta name="inspect-extension:version" content="${extensionVersion}">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${
-      panel.webview.cspSource
-    } data:; font-src ${panel.webview.cspSource} data:; style-src ${
-      panel.webview.cspSource
-    } 'unsafe-inline'; worker-src 'self' ${
-      panel.webview.cspSource
-    } blob:; script-src 'nonce-${nonce}' 'unsafe-eval'; script-src-elem 'nonce-${nonce}' ${
-      panel.webview.cspSource
-    }; connect-src ${panel.webview.cspSource} blob:;">
+    <meta http-equiv="Content-Security-Policy" content="${csp}">
     ${overrideCssHtml}
     <!--inspect-extra-head-->
 
@@ -175,6 +176,82 @@ Please update to a newer version of ${packageName} to view this content.
       `${packageName} view is not available.\n\nEnsure that the required Python package is installed in the active Python interpreter (or select a Python interpreter that includes it), then try again.`
     );
   }
+}
+
+/**
+ * The webview's Content-Security-Policy for a viewer dist.
+ *
+ * A dist that ships `content-security-policy.json` (version 1) gets that
+ * policy, translated for the webview: its assets load from `cspSource` rather
+ * than the document's origin, the extension nonces every `<script>`, and the
+ * viewer starts its cross-origin worker scripts from Blob URLs. Any other dist
+ * (older inspect_ai, inspect_scout) gets the legacy policy, which older viewers
+ * need. So does a policy file that can't be read: the viewer still works under
+ * the legacy policy.
+ */
+export function webviewCsp(
+  viewDir: AbsolutePath,
+  cspSource: string,
+  nonce: string
+): string {
+  try {
+    const file: unknown = JSON.parse(
+      readFileSync(viewDir.child(kViewerCspFile).path, "utf-8")
+    );
+    if (isViewerCspV1(file)) {
+      return Object.entries(file.directives)
+        .map(([name, sources]) => {
+          const out = [...sources];
+          if (sources.includes("'self'")) {
+            out.push(cspSource);
+          }
+          if (name === "script-src") {
+            out.push(`'nonce-${nonce}'`);
+          }
+          if (name === "worker-src") {
+            out.push("blob:");
+          }
+          return [name, ...out].join(" ");
+        })
+        .join("; ");
+    }
+    log.warn(`Ignoring ${kViewerCspFile}: unsupported format`);
+  } catch (error) {
+    if (!isMissingFile(error)) {
+      log.warn(`Ignoring ${kViewerCspFile}: ${String(error)}`);
+    }
+  }
+  return `default-src 'none'; img-src ${cspSource} data:; font-src ${cspSource} data:; style-src ${cspSource} 'unsafe-inline'; worker-src 'self' ${cspSource} blob:; script-src 'nonce-${nonce}' 'unsafe-eval'; script-src-elem 'nonce-${nonce}' ${cspSource}; connect-src ${cspSource} blob:;`;
+}
+
+const kViewerCspFile = "content-security-policy.json";
+
+function isViewerCspV1(
+  value: unknown
+): value is { version: 1; directives: Record<string, string[]> } {
+  if (
+    typeof value !== "object" ||
+    value === null ||
+    !("version" in value) ||
+    !("directives" in value)
+  ) {
+    return false;
+  }
+  const { version, directives } = value;
+  return (
+    version === 1 &&
+    typeof directives === "object" &&
+    directives !== null &&
+    Object.values(directives).every(
+      (sources) =>
+        Array.isArray(sources) &&
+        sources.every((source) => typeof source === "string")
+    )
+  );
+}
+
+function isMissingFile(error: unknown): boolean {
+  return error instanceof Error && "code" in error && error.code === "ENOENT";
 }
 
 /**
