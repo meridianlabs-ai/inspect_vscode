@@ -1,7 +1,8 @@
-import { SemVer } from "semver";
 import { ExtensionContext } from "vscode";
 
 import { PackageManager } from "../../core/package/manager";
+import { VersionDescriptor } from "../../core/package/props";
+import { hasMinimumPackageVersion } from "../../core/package/version";
 import { scoutBinPath, scoutVersionDescriptor } from "../../scout/props";
 
 // Activates the provider which tracks the availability of Scout
@@ -14,16 +15,10 @@ export function activateScoutManager(context: ExtensionContext) {
   );
 }
 
-const checkIsEnabled = () => {
-  const version = scoutVersionDescriptor();
-  if (!version) {
-    return false;
-  }
-  return supportsRouteMessages(version.version);
-};
+const checkIsEnabled = () =>
+  scoutSupportsRouteMessages(scoutVersionDescriptor());
 
-const supportsRouteMessages = (version: SemVer): boolean => {
-  // Whether the scout version supports route messaging, used in vscode
-  // extension version 0.9 and later
-  return version.major >= 0 && version.minor >= 4 && version.patch > 12;
-};
+// Route messaging, which extension 0.9 and later use, arrived in Scout 0.4.13.
+export const scoutSupportsRouteMessages = (
+  version: VersionDescriptor | null
+): boolean => hasMinimumPackageVersion("0.4.13", version);
