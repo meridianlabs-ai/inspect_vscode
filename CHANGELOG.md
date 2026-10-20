@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.1](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.10.0...v0.10.1) (2026-10-20)
+
+
+### Bug Fixes
+
+* show Scout commands for Scout 0.5 and later ([#219](https://github.com/meridianlabs-ai/inspect_vscode/issues/219)) ([89b6ff8](https://github.com/meridianlabs-ai/inspect_vscode/commit/89b6ff8a6a435a29a56e2554ef61a70a031c5b78))
+
 ## [0.10.0](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.9.19...v0.10.0) (2026-10-15)
 
 
