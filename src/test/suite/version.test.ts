@@ -1,19 +1,10 @@
 import * as assert from "assert";
 
-import { coerce } from "semver";
-
-import { VersionDescriptor } from "../../core/package/props";
 import {
   hasMinimumPackageVersion,
   withMinimumPackageVersion,
 } from "../../core/package/version";
-
-// Parsed the way packageVersionDescriptor parses `<package> info version`.
-const installed = (raw: string): VersionDescriptor => {
-  const version = coerce(raw);
-  assert.ok(version, raw);
-  return { raw, version, isDeveloperBuild: raw.includes(".dev") };
-};
+import { installed } from "../package-version-fixture";
 
 suite("Package version gates", () => {
   test("a release at or above the minimum passes, across minor versions", () => {
