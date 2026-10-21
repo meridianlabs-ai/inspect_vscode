@@ -29,13 +29,6 @@ export function withMinimumInspectVersion<T>(
   );
 }
 
-export function hasMinimumInspectVersion(
-  version: string,
-  strictDevCheck = false
-): boolean {
-  return hasMinimumPackageVersion(
-    version,
-    inspectVersionDescriptor(),
-    strictDevCheck
-  );
+export function hasMinimumInspectVersion(version: string): boolean {
+  return hasMinimumPackageVersion(version, inspectVersionDescriptor());
 }
