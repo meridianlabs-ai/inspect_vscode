@@ -1,16 +1,7 @@
 import * as assert from "assert";
 
-import { coerce } from "semver";
-
-import { VersionDescriptor } from "../../core/package/props";
 import { scoutSupportsRouteMessages } from "../../providers/scout/scout-manager";
-
-// Parsed the way packageVersionDescriptor parses `scout info version`.
-const installed = (raw: string): VersionDescriptor => {
-  const version = coerce(raw);
-  assert.ok(version, raw);
-  return { raw, version, isDeveloperBuild: raw.includes(".dev") };
-};
+import { installed } from "../package-version-fixture";
 
 suite("Scout version gate", () => {
   test("enables Scout from 0.4.13 on, including later minor releases", () => {
