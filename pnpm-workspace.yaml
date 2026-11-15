@@ -3,3 +3,16 @@
 # Matches the Dependabot npm cooldown. Kept here rather than .npmrc:
 # pnpm 11 ignores it in .npmrc.
 minimumReleaseAge: 10080
+
+# Force transitive dependencies onto patched releases. pnpm 11 reads overrides
+# only from this file, not from the `pnpm` field in package.json.
+overrides:
+  "serialize-javascript": ^7.1.3 # GHSA-m5mm-p8h7-m29v
+  # Patched only on minimatch 11, which dropped makeRe. Its consumers on ^10
+  # (eslint, typescript-estree, vsce, mocha, test-exclude) don't use it.
+  "minimatch@10": ^11.0.1 # GHSA-g3hv-75wg-m249
+
+# All false keeps pnpm 10's behavior, which skipped these build scripts.
+allowBuilds:
+  "@vscode/vsce-sign": false
+  unrs-resolver: false
