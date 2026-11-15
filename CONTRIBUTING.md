@@ -69,7 +69,7 @@ For continuous development, run `pnpm dev` in a terminal to automatically rebuil
 pnpm test
 ```
 
-Tests run in a headless VS Code environment using `@vscode/test-cli`.
+Tests run in a headless VS Code environment using `@vscode/test-electron`.
 
 ### Debugging
 
