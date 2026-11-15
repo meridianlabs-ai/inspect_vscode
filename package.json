@@ -20,7 +20,7 @@
   },
   "engines": {
     "vscode": "^1.93.0",
-    "node": ">=22.0.0"
+    "node": ">=22.13.0"
   },
   "capabilities": {
     "untrustedWorkspaces": {
