@@ -1,5 +1,19 @@
 # Only resolve package versions published at least 7 days ago (10080
 # minutes), so a compromised release has time to be caught and yanked.
 # Matches the Dependabot npm cooldown. Kept here rather than .npmrc:
-# pnpm 11 ignores it in .npmrc.
+# pnpm 11 ignores it in .npmrc. pnpm 11 also checks every lockfile entry
+# against it on each install, so CI fails on a lockfile with a younger version.
 minimumReleaseAge: 10080
+
+# Force transitive dependencies onto patched releases. pnpm 11 reads overrides
+# only from this file, not from the `pnpm` field in package.json.
+overrides:
+  "serialize-javascript": ^7.1.3 # GHSA-m5mm-p8h7-m29v
+  # Patched only on minimatch 11, which dropped makeRe. None of the packages
+  # that ask for ^10 call it.
+  "minimatch@10": ^11.0.1 # GHSA-g3hv-75wg-m249
+
+# All false keeps pnpm 10's behavior, which skipped these build scripts.
+allowBuilds:
+  "@vscode/vsce-sign": false
+  unrs-resolver: false

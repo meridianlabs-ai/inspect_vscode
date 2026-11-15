@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- [Node.js](https://nodejs.org/) >= 22.0.0
+- [Node.js](https://nodejs.org/) >= 22.13.0
 - [pnpm](https://pnpm.io/) package manager
 - [VS Code](https://code.visualstudio.com/) >= 1.85.0
 - Python with [Inspect AI](https://github.com/UKGovernmentBEIS/inspect_ai) and [Scout](https://github.com/meridianlabs-ai/inspect_scout) installed
