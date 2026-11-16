@@ -10,7 +10,7 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
-    uses: meridianlabs-ai/actions/.github/workflows/release-please-vscode.yml@6fe6acfaeb946d22dd4fb673c744a3591eab0d91 # main
+    uses: meridianlabs-ai/actions/.github/workflows/release-please-vscode.yml@65f1b6bdb9b1af7eb0bc89942c624dd4efef1316 # main
     with:
       extension-id: ukaisi.inspect-ai
     # Only the secrets the reusable workflow uses, not `secrets: inherit`, so
