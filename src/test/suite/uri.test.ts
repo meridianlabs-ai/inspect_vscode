@@ -156,6 +156,8 @@ suite("URI Utilities Test Suite", () => {
     });
 
     test("agrees with urllib.parse.unquote on a differential corpus", function () {
+      // Starting Python alone can take over mocha's 2s default on Windows CI.
+      this.timeout(30_000);
       // The predicate exists to judge a location the way the view server's
       // `normalize_uri`/`unquote` will read it, so check that directly against
       // the Python function rather than a JavaScript approximation of it.

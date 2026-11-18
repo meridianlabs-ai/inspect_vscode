@@ -848,6 +848,8 @@ suite("logview-panel Test Suite", () => {
     });
 
     test("Python unquote opens the BOM-named sibling the guard refuses", function () {
+      // Starting Python alone can take over mocha's 2s default on Windows CI.
+      this.timeout(30_000);
       // Same shape as the previous test, but the read is performed by Python's
       // `urllib.parse.unquote` (what the view server's `normalize_uri` calls)
       // on real fixture files, so multibyte behaviour is established against
