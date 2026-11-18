@@ -47,22 +47,21 @@ window.addEventListener("message", (e) => {
           let count = 1;
           for (const param of e.data.task.activeTask.params) {
             const id = `task-param-${count}`;
-            const label = document.createElement("vscode-label");
+            const label = document.createElement("label");
+            label.classList.add("field-label");
             label.htmlFor = id;
-            const labelText = document.createElement("span");
-            labelText.classList.add("normal");
-            labelText.textContent = param;
-            label.appendChild(labelText);
-            const textField = document.createElement("vscode-textfield");
-            textField.id = id;
-            textField.placeholder = "default";
+            label.textContent = param;
+            const input = document.createElement("input");
+            input.id = id;
+            input.classList.add("text-input");
+            input.placeholder = "default";
             const paramValue = e.data.state.params?.[param];
             if (paramValue) {
-              textField.value = paramValue;
+              input.value = paramValue;
             }
             const field = document.createElement("div");
             field.classList.add("field", "full-width");
-            field.append(label, textField);
+            field.append(label, input);
             taskArgContainer.appendChild(field);
             whenChanged(id, (value) => {
               setStateParam(param, value);
@@ -142,8 +141,8 @@ function validateFields() {
     ? "Cannot set both limit and sample ids. Please choose one."
     : "";
   errorMsgEl.classList.toggle("hidden", !conflict);
-  sampleIdsEl.toggleAttribute("invalid", conflict);
-  limitEl.toggleAttribute("invalid", conflict);
+  sampleIdsEl.setAttribute("aria-invalid", String(conflict));
+  limitEl.setAttribute("aria-invalid", String(conflict));
 }
 
 function main() {

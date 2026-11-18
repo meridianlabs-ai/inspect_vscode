@@ -158,8 +158,24 @@ test.describe("Task panel", () => {
 
     await typeInto(textbox(page, "Sample Ids"), "1,2");
     await expect(error).toBeVisible();
+    await expect(textbox(page, "Limit")).toHaveAttribute(
+      "aria-invalid",
+      "true"
+    );
+    await expect(textbox(page, "Sample Ids")).toHaveAttribute(
+      "aria-invalid",
+      "true"
+    );
 
     await typeInto(textbox(page, "Limit"), "");
     await expect(error).toBeHidden();
+    await expect(textbox(page, "Limit")).not.toHaveAttribute(
+      "aria-invalid",
+      "true"
+    );
+    await expect(textbox(page, "Sample Ids")).not.toHaveAttribute(
+      "aria-invalid",
+      "true"
+    );
   });
 });

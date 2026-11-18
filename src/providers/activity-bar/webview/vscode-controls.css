@@ -45,19 +45,23 @@ body {
   min-width: 55px;
 }
 
-/* Compact labels, as the old toolkit had: vscode-label sizes its text from
-   --vscode-font-size, and a .normal span drops its bold weight. */
-vscode-label {
-  --vscode-font-size: var(--type-ramp-minus1-font-size);
+/* Compact labels, as the old toolkit had */
+.field-label {
+  display: block;
+  color: var(--vscode-foreground, #cccccc);
+  font-family: var(--vscode-font-family, sans-serif);
+  font-size: var(--type-ramp-minus1-font-size);
+  line-height: 18px;
+  padding: 2px 0;
+  cursor: default;
 }
 
-.field vscode-textfield,
 .field .text-input,
 .field .select-input {
   width: 100%;
 }
 
-/* Native controls styled like vscode-textfield */
+/* Inputs and selects in the VS Code settings editor's style */
 .text-input,
 .select-input {
   box-sizing: border-box;
@@ -86,6 +90,10 @@ vscode-label {
 .text-input:focus,
 .select-input:focus {
   border-color: var(--vscode-focusBorder, #0078d4);
+}
+
+.text-input[aria-invalid="true"] {
+  border-color: var(--vscode-inputValidation-errorBorder, #be1100);
 }
 
 .text-input::placeholder {

@@ -80,36 +80,35 @@ function textField(options: TextFieldOptions): string {
   const titleAttr = title ? ` title="${title}"` : "";
   return `
     <div class="${classes}"${titleAttr}>
-      <vscode-label for="${id}"><span class="normal">${label}</span></vscode-label>
-      <vscode-textfield id="${id}" placeholder="${placeholder}"></vscode-textfield>
+      <label class="field-label" for="${id}">${label}</label>
+      <input id="${id}" class="text-input" placeholder="${placeholder}">
     </div>`;
 }
 
-// The provider picker and the log level are native controls: their popups
-// draw outside the webview, so the short Configuration view can't clip them.
 // The provider is free text, since Inspect accepts providers this list
-// doesn't know about (mockllm, or ones that packages register); a datalist
-// suggests the common ones.
+// doesn't know about (mockllm, or ones that packages register). A datalist
+// suggests the common ones; like the log level's <select>, its popup draws
+// outside the webview, so the short Configuration view can't clip it.
 function modelPickerHTML(): string {
   const providerOptions = kInspectProviders.map((provider) => {
     return `<option value="${provider}"></option>`;
   });
   return `
     <div class="field full-width">
-      <div id="provider-label-container"><vscode-label><span class="normal">Model</span></vscode-label></div>
+      <div id="provider-label-container"><span class="field-label">Model</span></div>
       <input id="provider" class="text-input" list="provider-list" aria-label="Provider" placeholder="Provider" autocomplete="off" spellcheck="false">
       <datalist id="provider-list">
         ${providerOptions.join("\n")}
       </datalist>
     </div>
     <div class="field full-width">
-      <vscode-textfield id="model" placeholder="Model Name"></vscode-textfield>
+      <input id="model" class="text-input" placeholder="Model Name">
     </div>
     <div id="show-base-url-container" class="full-width">
       <button type="button" id="show-base-url" class="icon-button" title="Model base URL"><i class="codicon codicon-ellipsis"></i></button>
     </div>
     <div id="model-base-url-container" class="field full-width hidden">
-      <vscode-textfield id="model-base-url" placeholder="Model Base Url"></vscode-textfield>
+      <input id="model-base-url" class="text-input" placeholder="Model Base Url">
     </div>`;
 }
 
@@ -147,8 +146,8 @@ export function inspectConfigBody(): string {
             <div class="rows full-width">
               ${textField({ id: "log-dir", label: "Log Directory", className: "full-width" })}
               <div class="field full-width">
-                <vscode-label id="log-level-label"><span class="normal">Log Level</span></vscode-label>
-                <select id="log-level" class="select-input" aria-labelledby="log-level-label">
+                <label class="field-label" for="log-level">Log Level</label>
+                <select id="log-level" class="select-input">
                   <option value="">default</option>
                   ${logLevelOptions.join("\n")}
                 </select>
