@@ -1,11 +1,6 @@
 import "./vscode-controls.css";
 import "./scout-panel-webview.css";
 
-import {
-  allComponents,
-  provideVSCodeDesignSystem,
-} from "@vscode/webview-ui-toolkit";
-
 import { isMessageFromHost } from "./webview-utils";
 
 // Declare the acquireVsCodeApi function
@@ -14,9 +9,6 @@ declare function acquireVsCodeApi(): {
 };
 
 function init() {
-  // Load the VS Code design system
-  provideVSCodeDesignSystem().register(allComponents);
-
   // Get access to the VS Code API
   const vscode = acquireVsCodeApi();
 

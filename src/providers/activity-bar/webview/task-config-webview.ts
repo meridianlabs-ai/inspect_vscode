@@ -1,15 +1,6 @@
 import "./vscode-controls.css";
 import "./task-config-webview.css";
-
-import {
-  fastCombobox,
-  fastOption,
-  provideFASTDesignSystem,
-} from "@microsoft/fast-components";
-import {
-  allComponents,
-  provideVSCodeDesignSystem,
-} from "@vscode/webview-ui-toolkit";
+import "./components";
 
 import { DocumentState } from "../../workspace/workspace-state-provider";
 
@@ -21,14 +12,8 @@ import {
   whenChanged,
 } from "./webview-utils";
 
-// Load the vscode design system
-provideVSCodeDesignSystem().register(allComponents);
-
 // Declare the acquireVsCodeApi function to tell TypeScript about it
 declare function acquireVsCodeApi(): any;
-
-// Use the function to get the VS Code API handle
-provideFASTDesignSystem().register(fastCombobox(), fastOption());
 
 // Get access to the VS Code API from within the webview context
 const vscode = acquireVsCodeApi();
@@ -62,18 +47,23 @@ window.addEventListener("message", (e) => {
           let count = 1;
           for (const param of e.data.task.activeTask.params) {
             const id = `task-param-${count}`;
-            const textField = document.createElement("vscode-text-field");
+            const label = document.createElement("vscode-label");
+            label.htmlFor = id;
+            const labelText = document.createElement("span");
+            labelText.classList.add("normal");
+            labelText.textContent = param;
+            label.appendChild(labelText);
+            const textField = document.createElement("vscode-textfield");
             textField.id = id;
-            textField.setAttribute("placeholder", "default");
-            textField.classList.add("full-width");
-            textField.innerText = param;
-            if (e.data.state.params) {
-              const paramValue = e.data.state.params[param];
-              if (paramValue) {
-                textField.setAttribute("value", paramValue);
-              }
+            textField.placeholder = "default";
+            const paramValue = e.data.state.params?.[param];
+            if (paramValue) {
+              textField.value = paramValue;
             }
-            taskArgContainer.appendChild(textField);
+            const field = document.createElement("div");
+            field.classList.add("field", "full-width");
+            field.append(label, textField);
+            taskArgContainer.appendChild(field);
             whenChanged(id, (value) => {
               setStateParam(param, value);
             });
@@ -141,26 +131,19 @@ function attachListeners() {
 }
 
 function validateFields() {
-  const sampleIdsEl = document.getElementById(
-    "sample_ids"
-  ) as HTMLSelectElement;
-  const limitEl = document.getElementById("limit") as HTMLSelectElement;
+  const sampleIdsEl = document.getElementById("sample_ids") as HTMLInputElement;
+  const limitEl = document.getElementById("limit") as HTMLInputElement;
   const errorMsgEl = document.getElementById(
     "validation-error"
   ) as HTMLInputElement;
 
-  if (limitEl.value !== "" && sampleIdsEl.value !== "") {
-    errorMsgEl.innerText =
-      "Cannot set both limit and sample ids. Please choose one.";
-    errorMsgEl.classList.remove("hidden");
-    sampleIdsEl.classList.add("error-border");
-    limitEl.classList.add("error-border");
-  } else {
-    errorMsgEl.innerText = "";
-    errorMsgEl.classList.add("hidden");
-    sampleIdsEl.classList.remove("error-border");
-    limitEl.classList.remove("error-border");
-  }
+  const conflict = limitEl.value !== "" && sampleIdsEl.value !== "";
+  errorMsgEl.innerText = conflict
+    ? "Cannot set both limit and sample ids. Please choose one."
+    : "";
+  errorMsgEl.classList.toggle("hidden", !conflict);
+  sampleIdsEl.toggleAttribute("invalid", conflict);
+  limitEl.toggleAttribute("invalid", conflict);
 }
 
 function main() {

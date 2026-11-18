@@ -66,105 +66,125 @@ const kInspectProviders = [
   "hf-inference-providers",
 ];
 
-function modelPickerHTML(modelCaption: string = "Model"): string {
-  const modelOptions = kInspectProviders.map((model) => {
-    return `<fast-option value="${model}">${model}</fast-option>`;
-  });
-  return `
-                      <div class="dropdown-container full-width">
-                        <div id="provider-label-container"><label id="provider-label" for="provider">${modelCaption}</label></div>
-                        <div class="cols full-width no-wrap">
-                          <fast-combobox autocomplete="both" id="provider" placeholder="Provider">
-                            <fast-option value="">(none)</fast-option>
-                            ${modelOptions.join("\n")}
-                          </fast>
-                        </div>
-                      </div>
-                      <div id="model-container">
-                        <vscode-text-field placeholder="Model Name" id="model"></vscode-text-field>
-                      </div>
-                      <div id="show-base-url-container">
-                        <vscode-link id="show-base-url"><i class="codicon codicon-ellipsis"></i></vscode-link>
-                      </div>
-                      <div id="model-base-url-container" class="hidden full-width">
-                        <vscode-text-field placeholder="Model Base Url" id="model-base-url" class="full-width"></vscode-text-field>
-                      </div>
-    `;
+interface TextFieldOptions {
+  id: string;
+  label: string;
+  placeholder?: string;
+  title?: string;
+  className?: string;
 }
 
-export function inspectConfigBody(): string {
+function textField(options: TextFieldOptions): string {
+  const { id, label, placeholder = "default", title, className } = options;
+  const classes = ["field", className].filter(Boolean).join(" ");
+  const titleAttr = title ? ` title="${title}"` : "";
   return `
-              <section class="component-container">
-                <form id="configuration-controls" class="hidden">
-                <vscode-panels>
-                  <vscode-panel-tab id="tab-1">Model</vscode-panel-tab>
-                  <vscode-panel-tab id="tab-2">Logging</vscode-panel-tab>
-                  <vscode-panel-view id="view-1">
+    <div class="${classes}"${titleAttr}>
+      <vscode-label for="${id}"><span class="normal">${label}</span></vscode-label>
+      <vscode-textfield id="${id}" placeholder="${placeholder}"></vscode-textfield>
+    </div>`;
+}
 
-                    <div class="group rows full-width" >
-                      ${modelPickerHTML()}
-                      <div class="cols control-column full-width">
-                        <vscode-text-field id="max-connections" size="3" placeholder="default" min="1">Connections</vscode-text-field>
-                        <vscode-text-field id="max-retries" size="3" placeholder="default" min="1">Retries</vscode-text-field>
-                        <vscode-text-field id="timeout" size="3" placeholder="default" min="1">Timeout</vscode-text-field>
-                      </div>
-                    </div>
-                  </vscode-panel-view>
-                  <vscode-panel-view id="view-2">
-                    <div class="rows full-width">
-                      <div class="cols full-width">
-                        <vscode-text-field placeholder="default" id="log-dir" size="16" class="full-width"
-                          >Log Directory</vscode-text-field
-                        >
+// The provider picker and the log level are native controls: their popups
+// draw outside the webview, so the short Configuration view can't clip them.
+// The provider is free text, since Inspect accepts providers this list
+// doesn't know about (mockllm, or ones that packages register); a datalist
+// suggests the common ones.
+function modelPickerHTML(): string {
+  const providerOptions = kInspectProviders.map((provider) => {
+    return `<option value="${provider}"></option>`;
+  });
+  return `
+    <div class="field full-width">
+      <div id="provider-label-container"><vscode-label><span class="normal">Model</span></vscode-label></div>
+      <input id="provider" class="text-input" list="provider-list" aria-label="Provider" placeholder="Provider" autocomplete="off" spellcheck="false">
+      <datalist id="provider-list">
+        ${providerOptions.join("\n")}
+      </datalist>
+    </div>
+    <div class="field full-width">
+      <vscode-textfield id="model" placeholder="Model Name"></vscode-textfield>
+    </div>
+    <div id="show-base-url-container" class="full-width">
+      <button type="button" id="show-base-url" class="icon-button" title="Model base URL"><i class="codicon codicon-ellipsis"></i></button>
+    </div>
+    <div id="model-base-url-container" class="field full-width hidden">
+      <vscode-textfield id="model-base-url" placeholder="Model Base Url"></vscode-textfield>
+    </div>`;
+}
 
-                        <div class="dropdown-container full-width">
-                          <label for="provider">Log Level</label>
-                          <vscode-dropdown id="log-level" position="below" class="full-width">
-                            <vscode-option value="">default</vscode-option>
-                            <vscode-option value="debug">debug</vscode-option>
-                            <vscode-option value="trace">trace</vscode-option>
-                            <vscode-option value="http">http</vscode-option>
-                            <vscode-option value="info">info</vscode-option>
-                            <vscode-option value="warning" selected="true">warning</vscode-option>
-                            <vscode-option value="error">error</vscode-option>
-                            <vscode-option value="critical">critical</vscode-option>
-                          </vscode-dropdown>
-                        </div>
-                      </div>
-                    </div>
-                  </vscode-panel-view>
-                </vscode-panels>
-                </form>
-              </section>`;
+const kLogLevels = [
+  "debug",
+  "trace",
+  "http",
+  "info",
+  "warning",
+  "error",
+  "critical",
+];
+
+export function inspectConfigBody(): string {
+  const logLevelOptions = kLogLevels.map((level) => {
+    return `<option value="${level}">${level}</option>`;
+  });
+  return `
+    <section class="component-container">
+      <div id="configuration-controls" class="hidden full-width">
+        <vscode-tabs>
+          <vscode-tab-header slot="header">Model</vscode-tab-header>
+          <vscode-tab-panel>
+            <div class="rows full-width">
+              ${modelPickerHTML()}
+              <div class="cols full-width three-cols">
+                ${textField({ id: "max-connections", label: "Connections" })}
+                ${textField({ id: "max-retries", label: "Retries" })}
+                ${textField({ id: "timeout", label: "Timeout" })}
+              </div>
+            </div>
+          </vscode-tab-panel>
+          <vscode-tab-header slot="header">Logging</vscode-tab-header>
+          <vscode-tab-panel>
+            <div class="rows full-width">
+              ${textField({ id: "log-dir", label: "Log Directory", className: "full-width" })}
+              <div class="field full-width">
+                <vscode-label id="log-level-label"><span class="normal">Log Level</span></vscode-label>
+                <select id="log-level" class="select-input" aria-labelledby="log-level-label">
+                  <option value="">default</option>
+                  ${logLevelOptions.join("\n")}
+                </select>
+              </div>
+            </div>
+          </vscode-tab-panel>
+        </vscode-tabs>
+      </div>
+    </section>`;
 }
 
 export function taskConfigBody(): string {
   return `
-              <section class="component-container">
-                <form id="configuration-controls" class="hidden">
-                  <vscode-panels>
-                  <vscode-panel-tab id="tab-1">Options</vscode-panel-tab>
-                  <vscode-panel-tab id="tab-2">Task Args</vscode-panel-tab>
-                  <vscode-panel-view id="view-1" class="flex-rows">
-                    <div class="cols full-width two-cols">
-                      <vscode-text-field id="limit" size="3" placeholder="default" title="Limit samples to evaluate e.g. 10 or 10-20">Limit</vscode-text-field>
-                      <vscode-text-field id="epochs" size="3" placeholder="default" title="Number of times to repeat dataset (defaults to 1)">Epochs</vscode-text-field>
-                      <vscode-text-field id="max_tokens" size="3" placeholder="default" title="The maximum number of tokens that can be generated in the completion (default is model specific).">Max Tokens</vscode-text-field>
-                      <vscode-text-field id="temperature" size="3" placeholder="default" title="What sampling temperature to use, between 0 and 2. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic.">Temperature</vscode-text-field>
-                      <vscode-text-field id="top_p" size="3" placeholder="default" title="An alternative to sampling with temperature, called nucleus sampling, where the model considers the results of the tokens with top_p probability mass.">Top P</vscode-text-field>
-                      <vscode-text-field id="top_k" size="3" placeholder="default" title="Randomly sample the next word from the top_k most likely next words. Anthropic, Google, HuggingFace, and vLLM only.">Top K</vscode-text-field>
-                      <vscode-text-field id="sample_ids" size="3" placeholder="none" class="span-cols" title="One or more sample ids to evaluate (comma separated)">Sample Ids</vscode-text-field>
-                    </div>
-                    <div id="validation-error" class="full-width cols hidden error">
-                    </div>
-                  </vscode-panel-view>
-                  <vscode-panel-view id="view-2">
-                    <div id="task-args" class="full-width cols">
-                    </div>
-                  </vscode-panel-view>
-                </vscode-panels>
-                </form>
-              </section>`;
+    <section class="component-container">
+      <div id="configuration-controls" class="hidden full-width">
+        <vscode-tabs>
+          <vscode-tab-header slot="header">Options</vscode-tab-header>
+          <vscode-tab-panel>
+            <div class="cols full-width two-cols">
+              ${textField({ id: "limit", label: "Limit", title: "Limit samples to evaluate e.g. 10 or 10-20" })}
+              ${textField({ id: "epochs", label: "Epochs", title: "Number of times to repeat dataset (defaults to 1)" })}
+              ${textField({ id: "max_tokens", label: "Max Tokens", title: "The maximum number of tokens that can be generated in the completion (default is model specific)." })}
+              ${textField({ id: "temperature", label: "Temperature", title: "What sampling temperature to use, between 0 and 2. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic." })}
+              ${textField({ id: "top_p", label: "Top P", title: "An alternative to sampling with temperature, called nucleus sampling, where the model considers the results of the tokens with top_p probability mass." })}
+              ${textField({ id: "top_k", label: "Top K", title: "Randomly sample the next word from the top_k most likely next words. Anthropic, Google, HuggingFace, and vLLM only." })}
+              ${textField({ id: "sample_ids", label: "Sample Ids", placeholder: "none", className: "span-cols", title: "One or more sample ids to evaluate (comma separated)" })}
+            </div>
+            <div id="validation-error" class="full-width cols hidden error"></div>
+          </vscode-tab-panel>
+          <vscode-tab-header slot="header">Task Args</vscode-tab-header>
+          <vscode-tab-panel>
+            <div id="task-args" class="full-width rows"></div>
+          </vscode-tab-panel>
+        </vscode-tabs>
+      </div>
+    </section>`;
 }
 
 export function scoutPanelBody(): string {

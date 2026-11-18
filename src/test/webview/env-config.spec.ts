@@ -28,11 +28,8 @@ const baseUrlField = (page: Page) =>
   page.getByRole("textbox").and(page.getByPlaceholder("Model Base Url"));
 const providerField = (page: Page) =>
   page.getByRole("combobox", { name: "Provider" });
-const logLevelField = (page: Page) => page.locator("#log-level");
-
-async function chooseOption(page: Page, name: string) {
-  await page.getByRole("option", { name, exact: true }).click();
-}
+const logLevelField = (page: Page) =>
+  page.getByRole("combobox", { name: "Log Level" });
 
 test.describe("Configuration (.env) panel", () => {
   let panel: Panel;
@@ -56,7 +53,7 @@ test.describe("Configuration (.env) panel", () => {
 
     await page.getByRole("tab", { name: "Logging" }).click();
     await expect(textbox(page, "Log Directory")).toHaveValue("logs");
-    await expect(logLevelField(page)).toHaveJSProperty("value", "info");
+    await expect(logLevelField(page)).toHaveValue("info");
   });
 
   test("saves what the user types", async ({ page }) => {
@@ -90,13 +87,11 @@ test.describe("Configuration (.env) panel", () => {
     await panel.expectLastSent(setEnv("logDir"), value, "other-logs");
   });
 
-  test("choosing a provider saves it and clears the model", async ({
-    page,
-  }) => {
+  test("typing a provider saves it and clears the model", async ({ page }) => {
     await panel.receive({ type: "initialize", message: { env: kEnv } });
 
-    await providerField(page).click();
-    await chooseOption(page, "anthropic");
+    await typeInto(providerField(page), "anthropic");
+    await providerField(page).press("Enter");
 
     await panel.expectLastSent(setEnv("provider"), value, "anthropic");
     await expect(modelField(page)).toHaveValue("");
@@ -109,26 +104,67 @@ test.describe("Configuration (.env) panel", () => {
     );
   });
 
-  test("choosing (none) clears the provider", async ({ page }) => {
-    // Known bug: the FAST combobox reports the option's text, so this sends
-    // "(none)" instead of "".
-    test.fail();
+  test("suggests the known providers", async ({ page }) => {
+    await panel.receive({ type: "initialize", message: { env: kEnv } });
+    const suggestions = page.locator(
+      `datalist#${await providerField(page).getAttribute("list")} option`
+    );
+    await expect(suggestions.first()).toHaveAttribute("value", "openai");
+    await expect(suggestions.nth(1)).toHaveAttribute("value", "anthropic");
+  });
+
+  test("clearing the provider removes it", async ({ page }) => {
     await panel.receive({ type: "initialize", message: { env: kEnv } });
     await expect(page.getByTitle("Available Models")).toHaveCount(1);
 
-    await providerField(page).click();
-    await chooseOption(page, "(none)");
+    await typeInto(providerField(page), "");
+    await providerField(page).press("Enter");
 
     await panel.expectLastSent(setEnv("provider"), value, "");
     await expect(page.getByTitle("Available Models")).toHaveCount(0);
+  });
+
+  test("shows a provider that isn't in the list", async ({ page }) => {
+    await panel.receive({
+      type: "initialize",
+      message: { env: { provider: "my-provider", model: "m" } },
+    });
+
+    await expect(providerField(page)).toHaveValue("my-provider");
+  });
+
+  test("saves a provider that isn't in the list", async ({ page }) => {
+    await panel.receive({ type: "initialize", message: { env: kEnv } });
+
+    await typeInto(providerField(page), "my-provider");
+    await providerField(page).press("Enter");
+
+    await panel.expectLastSent(setEnv("provider"), value, "my-provider");
+  });
+
+  test("saves a typed provider when focus moves on", async ({ page }) => {
+    await panel.receive({ type: "initialize", message: { env: kEnv } });
+
+    await typeInto(providerField(page), "my-provider");
+    await providerField(page).press("Tab");
+
+    await panel.expectLastSent(setEnv("provider"), value, "my-provider");
+  });
+
+  test("pressing Enter in a field saves it", async ({ page }) => {
+    await panel.receive({ type: "initialize", message: { env: kEnv } });
+
+    await typeInto(textbox(page, "Connections"), "8");
+    await textbox(page, "Connections").press("Enter");
+
+    await panel.expectLastSent(setEnv("maxConnections"), value, "8");
   });
 
   test("saves the chosen log level", async ({ page }) => {
     await panel.receive({ type: "initialize", message: { env: kEnv } });
 
     await page.getByRole("tab", { name: "Logging" }).click();
-    await logLevelField(page).click();
-    await chooseOption(page, "debug");
+    await logLevelField(page).selectOption("debug");
 
     await panel.expectLastSent(setEnv("logLevel"), value, "debug");
   });

@@ -94,6 +94,15 @@ test.describe("Task panel", () => {
     await panel.expectLastSent(setState("sampleIds"), value, "1,2");
   });
 
+  test("pressing Enter in an option saves it", async ({ page }) => {
+    await panel.receive({ type: "setActiveTask", task: task([]), state: {} });
+
+    await typeInto(textbox(page, "Limit"), "5");
+    await textbox(page, "Limit").press("Enter");
+
+    await panel.expectLastSent(setState("limit"), value, "5");
+  });
+
   test("lists the task's arguments and saves them", async ({ page }) => {
     await panel.receive({
       type: "setActiveTask",
