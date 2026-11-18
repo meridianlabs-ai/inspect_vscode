@@ -13,7 +13,7 @@ jobs:
       # The publish job exchanges a GitHub OIDC token for a Marketplace
       # credential (Trusted Publishing); no VSCE_PAT.
       id-token: write
-    uses: meridianlabs-ai/actions/.github/workflows/release-please-vscode.yml@7a91cfd058b9fd6a1b7099b558bde727f14ba37e # actions#190 (re-pin to main once merged)
+    uses: meridianlabs-ai/actions/.github/workflows/release-please-vscode.yml@ec90091486f0f28545b56f4178a2c982fe8c8265 # main
     with:
       extension-id: ukaisi.inspect-ai
     # Only the secrets the reusable workflow uses, not `secrets: inherit`, so
