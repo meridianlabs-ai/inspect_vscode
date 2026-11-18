@@ -38,7 +38,6 @@ window.addEventListener("message", (e) => {
         placeholderPanel.remove();
       }
       restoreState(e.data.state);
-      attachListeners();
 
       const taskArgContainer = document.getElementById("task-args");
       if (taskArgContainer) {
@@ -82,6 +81,11 @@ window.addEventListener("message", (e) => {
       break;
   }
 });
+
+// The option fields last as long as the panel, so they need listeners once.
+// (Task argument fields are rebuilt, with their listeners, per task.) This
+// module script runs after the HTML is parsed, so the fields exist.
+attachListeners();
 
 // Once loaded, initialize the process
 window.addEventListener("load", main);

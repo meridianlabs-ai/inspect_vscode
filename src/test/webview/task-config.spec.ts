@@ -138,6 +138,26 @@ test.describe("Task panel", () => {
     await expect(textbox(page, "dataset")).toHaveCount(0);
   });
 
+  test("saves an option once after switching tasks", async ({ page }) => {
+    for (const params of [["dataset"], ["seed"], []]) {
+      await panel.receive({
+        type: "setActiveTask",
+        task: task(params),
+        state: {},
+      });
+    }
+
+    await typeInto(textbox(page, "Limit"), "5");
+    await panel.expectLastSent(setState("limit"), value, "5");
+    // Past the panel's debounce, so any duplicates have been sent
+    await page.waitForTimeout(500);
+
+    const saves = (await panel.messages()).filter(
+      (m) => setState("limit")(m) && m.value === "5"
+    );
+    expect(saves).toHaveLength(1);
+  });
+
   test("says when the task has no arguments", async ({ page }) => {
     await panel.receive({ type: "setActiveTask", task: task([]), state: {} });
 
