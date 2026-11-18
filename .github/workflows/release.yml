@@ -4,22 +4,45 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      publish-tag:
+        description: "Publish an existing release tag that failed to publish (e.g. v0.10.2). Leave empty for a normal Release Please run."
+        type: string
+        default: ""
 
 jobs:
+  # Release Please and the credential-free build of the .vsix.
   release:
     permissions:
       contents: write
       pull-requests: write
-      # The publish job exchanges a GitHub OIDC token for a Marketplace
-      # credential (Trusted Publishing); no VSCE_PAT.
-      id-token: write
-    uses: meridianlabs-ai/actions/.github/workflows/release-please-vscode.yml@ec90091486f0f28545b56f4178a2c982fe8c8265 # main
+    uses: meridianlabs-ai/actions/.github/workflows/release-please-vscode.yml@8c93fd93e11b916f25c99f3357998903a067e016 # actions#191 (re-pin to main once merged)
     with:
-      extension-id: ukaisi.inspect-ai
+      publish-tag: ${{ inputs.publish-tag }}
     # Only the secrets the reusable workflow uses, not `secrets: inherit`, so
     # the other repository and organization secrets stay out of it.
     secrets:
       RELEASE_PLEASE_APP_ID: ${{ secrets.RELEASE_PLEASE_APP_ID }}
       RELEASE_PLEASE_APP_PRIVATE_KEY: ${{ secrets.RELEASE_PLEASE_APP_PRIVATE_KEY }}
-      OVSX_PAT: ${{ secrets.OVSX_PAT }}
       SLACK_APPROVALS_WEBHOOK_URL: ${{ secrets.SLACK_APPROVALS_WEBHOOK_URL }}
+
+  # Publish to the Marketplace (Trusted Publishing), Open VSX and the GitHub
+  # release. This job must live in this file, not in the reusable workflow:
+  # the Marketplace's Trusted Publishing policy for ukaisi names this repo,
+  # release.yml and the `marketplace` environment, and matches the workflow
+  # file the job itself comes from. It checks out nothing and runs no repo
+  # code; the `marketplace` environment's reviewers gate it.
+  publish:
+    needs: release
+    if: ${{ needs.release.outputs.release_created == 'true' }}
+    runs-on: ubuntu-latest
+    environment: marketplace
+    permissions:
+      contents: write # attach the .vsix to the GitHub release
+      id-token: write # Marketplace Trusted Publishing
+    steps:
+      - uses: meridianlabs-ai/actions/vscode-publish@8c93fd93e11b916f25c99f3357998903a067e016 # actions#191 (re-pin to main once merged)
+        with:
+          extension-id: ukaisi.inspect-ai
+          tag: ${{ needs.release.outputs.tag_name }}
+          ovsx-pat: ${{ secrets.OVSX_PAT }}
