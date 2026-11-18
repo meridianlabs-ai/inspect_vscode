@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.2](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.10.1...v0.10.2) (2026-11-18)
+
+
+### Bug Fixes
+
+* replace the deprecated webview UI toolkit in the sidebar panels ([#247](https://github.com/meridianlabs-ai/inspect_vscode/issues/247)) ([a793b32](https://github.com/meridianlabs-ai/inspect_vscode/commit/a793b3297a912b8d553b0c00cdfeefd65914a96c))
+
 ## [0.10.1](https://github.com/meridianlabs-ai/inspect_vscode/compare/v0.10.0...v0.10.1) (2026-11-18)
 
 
