@@ -32,7 +32,7 @@ export function getModelEl() {
   return document.getElementById("model") as HTMLInputElement;
 }
 export function getProviderEl() {
-  return document.getElementById("provider") as HTMLSelectElement;
+  return document.getElementById("provider") as HTMLInputElement;
 }
 export function getProviderText() {
   const providerEl = getProviderEl();
@@ -53,7 +53,9 @@ export function showProviderHelp(vscode: any) {
     if (providerEl.value) {
       if (kModelInfo[getProviderText()]) {
         if (!modelHelpEl) {
-          modelHelpEl = document.createElement("vscode-link");
+          modelHelpEl = document.createElement("button");
+          modelHelpEl.setAttribute("type", "button");
+          modelHelpEl.classList.add("icon-button");
           modelHelpEl.id = "model-help";
           modelHelpEl.setAttribute("title", "Available Models");
           const questionEl = document.createElement("div");
@@ -82,11 +84,7 @@ export function showProviderHelp(vscode: any) {
 }
 export const attachModelListeners = (vscode: any) => {
   const providerChanged = (e: Event) => {
-    // If the user chooses 'none' from the dropdown, this will fire
     const txt = getProviderText();
-    if (txt === "") {
-      getProviderEl().value = "";
-    }
     if (e.target) {
       setEnvValue(vscode, "provider", txt);
       resetModel();
@@ -94,9 +92,7 @@ export const attachModelListeners = (vscode: any) => {
     }
   };
 
-  const el = document.getElementById("provider") as HTMLSelectElement;
-
-  el.addEventListener("change", providerChanged);
+  getProviderEl().addEventListener("change", providerChanged);
 
   setEnvWhenKeyup(vscode, "model", "model");
 
@@ -104,7 +100,7 @@ export const attachModelListeners = (vscode: any) => {
 
   const showBaseUrlEl = document.getElementById(
     "show-base-url"
-  ) as HTMLAnchorElement;
+  ) as HTMLButtonElement;
   showBaseUrlEl.addEventListener("click", () => {
     toggleBaseUrl();
   });

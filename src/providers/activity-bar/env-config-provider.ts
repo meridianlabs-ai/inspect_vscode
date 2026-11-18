@@ -9,6 +9,7 @@ import {
   WebviewViewProvider,
 } from "vscode";
 
+import { getNonce } from "../../core/nonce";
 import {
   PackageChangedEvent,
   PackageManager,
@@ -16,6 +17,8 @@ import {
 import { inspectVersion } from "../../inspect";
 import { WorkspaceEnvManager } from "../workspace/workspace-env-provider";
 import { WorkspaceStateManager } from "../workspace/workspace-state-provider";
+
+import { PanelResources } from "./panel-html";
 
 export const kActiveTaskChanged = "activeTaskChanged";
 export const kInitialize = "initialize";
@@ -213,96 +216,18 @@ export class EnvConfigurationProvider<
   }
 }
 
-export function headHTML(
-  nonce: string,
+export function panelResources(
   webview: Webview,
-  extensionUri: Uri
-): string {
-  const codiconsUri = webview.asWebviewUri(
-    Uri.joinPath(extensionUri, "assets", "www", "codicon", "codicon.css")
-  );
-
-  const codiconsFontUri = webview.asWebviewUri(
-    Uri.joinPath(extensionUri, "assets", "www", "codicon", "codicon.ttf")
-  );
-
-  return `
-              <head>
-                <meta charset="UTF-8">
-
-                <!--
-                    Use a content security policy to only allow loading styles from our extension directory,
-                    and only allow scripts that have a specific nonce.
-                    (See the 'webview-sample' extension sample for img-src content security policy examples)
-                -->
-                <meta http-equiv="Content-Security-Policy" content="default-src 'none'; font-src ${
-                  webview.cspSource
-                }; style-src ${
-                  webview.cspSource
-                } 'unsafe-inline'; script-src 'nonce-${nonce}';">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <style type="text/css">
-                @font-face {
-                  font-family: "codicon";
-                  font-display: block;
-                  src: url("${codiconsFontUri.toString()}?939d3cf562f2f1379a18b5c3113b59cd") format("truetype");
-                }
-                </style>
-                <link rel="stylesheet" type="text/css" href="${codiconsUri.toString()}">                  
-                <title>Task Options</title>
-            </head>
-  
-  
-  `;
-}
-
-export function modelPickerHTML(modelCaption: string = "Model"): string {
-  const kInspectProviders = [
-    "openai",
-    "anthropic",
-    "google",
-    "mistral",
-    "deepseek",
-    "grok",
-    "bedrock",
-    "azureai",
-    "together",
-    "groq",
-    "fireworks",
-    "sambanova",
-    "cf",
-    "perplexity",
-    "hf",
-    "vllm",
-    "sglang",
-    "transformer_lens",
-    "ollama",
-    "llama-cpp-python",
-    "openai-api",
-    "openrouter",
-    "hf-inference-providers",
-  ];
-  const modelOptions = kInspectProviders.map((model) => {
-    return `<fast-option value="${model}">${model}</fast-option>`;
-  });
-  return `
-                      <div class="dropdown-container full-width">
-                        <div id="provider-label-container"><label id="provider-label" for="provider">${modelCaption}</label></div>
-                        <div class="cols full-width no-wrap">
-                          <fast-combobox autocomplete="both" id="provider" placeholder="Provider">
-                            <fast-option value="">(none)</fast-option>
-                            ${modelOptions.join("\n")}
-                          </fast>
-                        </div>
-                      </div>
-                      <div id="model-container">  
-                        <vscode-text-field placeholder="Model Name" id="model"></vscode-text-field>
-                      </div>
-                      <div id="show-base-url-container">
-                        <vscode-link id="show-base-url"><i class="codicon codicon-ellipsis"></i></vscode-link>
-                      </div>
-                      <div id="model-base-url-container" class="hidden full-width">
-                        <vscode-text-field placeholder="Model Base Url" id="model-base-url" class="full-width"></vscode-text-field>
-                      </div>
-    `;
+  extensionUri: Uri,
+  script: string
+): PanelResources {
+  const uri = (...segments: string[]) =>
+    webview.asWebviewUri(Uri.joinPath(extensionUri, ...segments)).toString();
+  return {
+    cspSource: webview.cspSource,
+    nonce: getNonce(),
+    scriptUri: uri("out", script),
+    codiconCssUri: uri("assets", "www", "codicon", "codicon.css"),
+    codiconFontUri: uri("assets", "www", "codicon", "codicon.ttf"),
+  };
 }

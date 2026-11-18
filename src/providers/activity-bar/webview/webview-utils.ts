@@ -17,27 +17,11 @@ export const restoreInputState = (id: string, value?: string) => {
   }
 };
 
-export const restoreSelectState = (id: string, value?: string) => {
-  const el = document.getElementById(id) as HTMLSelectElement;
-  if (value) {
-    el.value = value;
-  } else {
-    el.value = "";
-  }
-};
-
 export const whenChanged = (id: string, fn: (value: string) => void) => {
-  const el = document.getElementById(id) as HTMLSelectElement;
+  const el = document.getElementById(id) as HTMLInputElement;
   const handleEvent = (e: Event) => {
     if (e.target) {
-      const index = el.selectedIndex;
-      if (index) {
-        const value =
-          index > -1 ? (el.options[index]?.value ?? el.value) : el.value;
-        fn(value);
-      } else {
-        fn(el.value);
-      }
+      fn(el.value);
     }
   };
   el.addEventListener("change", handleEvent);
@@ -98,13 +82,10 @@ export const setEnvWhenValueChanged = (
   key: string,
   fn?: () => void
 ) => {
-  const el = document.getElementById(id) as HTMLSelectElement;
+  const el = document.getElementById(id) as HTMLInputElement;
   el.addEventListener("change", (e: Event) => {
     if (e.target) {
-      const index = el.selectedIndex;
-      const value =
-        index > -1 ? (el.options[index]?.value ?? el.value) : el.value;
-      setEnvValue(vscode, key, value);
+      setEnvValue(vscode, key, el.value);
     }
     if (fn) {
       fn();

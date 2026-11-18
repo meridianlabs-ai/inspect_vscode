@@ -7,7 +7,6 @@ import { initEnv } from "./env-utils";
 import { showProviderHelp } from "./env-utils-model";
 import {
   restoreInputState,
-  restoreSelectState,
   setEnvWhenKeyup,
   setEnvWhenValueChanged,
 } from "./webview-utils";
@@ -25,7 +24,7 @@ const attachListeners = (vscode: any) => {
 };
 
 const restoreEnv = (vscode: any, config: EnvConfiguration) => {
-  restoreSelectState("provider", config.provider);
+  restoreInputState("provider", config.provider);
   restoreInputState("model", config.model);
   restoreInputState("model-base-url", config.modelBaseUrl);
 
@@ -34,7 +33,7 @@ const restoreEnv = (vscode: any, config: EnvConfiguration) => {
   restoreInputState("timeout", config.timeout);
 
   restoreInputState("log-dir", config.logDir);
-  restoreSelectState("log-level", config.logLevel);
+  restoreInputState("log-level", config.logLevel);
 
   showProviderHelp(vscode);
 };

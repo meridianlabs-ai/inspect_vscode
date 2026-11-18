@@ -650,12 +650,14 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "node ./out/test/runTest.js",
+    "test:webview": "playwright test",
     "vsce:package": "vsce package --no-dependencies",
-    "check": "pnpm lint && pnpm format:check && pnpm typecheck && pnpm test"
+    "check": "pnpm lint && pnpm format:check && pnpm typecheck && pnpm test && pnpm test:webview"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@ianvs/prettier-plugin-sort-imports": "^4.7.1",
+    "@playwright/test": "^1.65.0",
     "@types/async-lock": "^1.4.2",
     "@types/lodash": "^4.17.27",
     "@types/mocha": "^10.0.10",
@@ -681,8 +683,7 @@
     "webpack-cli": "^7.3.1"
   },
   "dependencies": {
-    "@microsoft/fast-components": "^2.30.6",
-    "@vscode/webview-ui-toolkit": "^1.4.0",
+    "@vscode-elements/elements": "^2.5.1",
     "ajv": "^8.20.0",
     "async-lock": "^1.5.0",
     "date-fns": "^4.4.0",

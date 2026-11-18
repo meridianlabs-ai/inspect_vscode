@@ -10,7 +10,6 @@ import {
 } from "vscode";
 
 import { DocumentTaskInfo } from "../../components/task";
-import { getNonce } from "../../core/nonce";
 import { PackageManager } from "../../core/package/manager";
 import { inspectVersion } from "../../inspect";
 import {
@@ -21,6 +20,9 @@ import {
   DocumentState,
   WorkspaceStateManager,
 } from "../workspace/workspace-state-provider";
+
+import { panelResources } from "./env-config-provider";
+import { panelDocument, taskConfigBody } from "./panel-html";
 
 export type SetActiveTaskCommand = {
   type: "setActiveTask";
@@ -245,89 +247,10 @@ export class TaskConfigurationProvider implements WebviewViewProvider {
   }
 
   private htmlForWebview(webview: Webview) {
-    // Get the local path to main script run in the webview, then convert it to a uri we can use in the webview.
-    const scriptUri = webview.asWebviewUri(
-      Uri.joinPath(this.extensionUri_, "out", "task-config-webview.js")
+    return panelDocument(
+      panelResources(webview, this.extensionUri_, "task-config-webview.js"),
+      taskConfigBody()
     );
-    const codiconsUri = webview.asWebviewUri(
-      Uri.joinPath(
-        this.extensionUri_,
-        "assets",
-        "www",
-        "codicon",
-        "codicon.css"
-      )
-    );
-
-    const codiconsFontUri = webview.asWebviewUri(
-      Uri.joinPath(
-        this.extensionUri_,
-        "assets",
-        "www",
-        "codicon",
-        "codicon.ttf"
-      )
-    );
-
-    // Use a nonce to only allow a specific script to be run.
-    const nonce = getNonce();
-
-    return `<!DOCTYPE html>
-              <html lang="en">
-              <head>
-                  <meta charset="UTF-8">
-  
-                  <!--
-                      Use a content security policy to only allow loading styles from our extension directory,
-                      and only allow scripts that have a specific nonce.
-                      (See the 'webview-sample' extension sample for img-src content security policy examples)
-                  -->
-                  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; font-src ${
-                    webview.cspSource
-                  }; style-src ${
-                    webview.cspSource
-                  } 'unsafe-inline'; script-src 'nonce-${nonce}';">
-                  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                  <style type="text/css">
-                  @font-face {
-                    font-family: "codicon";
-                    font-display: block;
-                    src: url("${codiconsFontUri.toString()}?939d3cf562f2f1379a18b5c3113b59cd") format("truetype");
-                  }
-                  </style>
-                  <link rel="stylesheet" type="text/css" href="${codiconsUri.toString()}">                  
-                  <title>Task Options</title>
-              </head>
-              <body>
-              <section class="component-container">
-                <form id="configuration-controls" class="hidden">
-                  <vscode-panels>
-                  <vscode-panel-tab id="tab-1">Options</vscode-panel-tab>
-                  <vscode-panel-tab id="tab-2">Task Args</vscode-panel-tab>
-                  <vscode-panel-view id="view-1" class="flex-rows">
-                    <div class="cols full-width two-cols">
-                      <vscode-text-field id="limit" size="3" placeholder="default" title="Limit samples to evaluate e.g. 10 or 10-20">Limit</vscode-text-field>
-                      <vscode-text-field id="epochs" size="3" placeholder="default" title="Number of times to repeat dataset (defaults to 1)">Epochs</vscode-text-field>
-                      <vscode-text-field id="max_tokens" size="3" placeholder="default" title="The maximum number of tokens that can be generated in the completion (default is model specific).">Max Tokens</vscode-text-field>
-                      <vscode-text-field id="temperature" size="3" placeholder="default" title="What sampling temperature to use, between 0 and 2. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic.">Temperature</vscode-text-field>
-                      <vscode-text-field id="top_p" size="3" placeholder="default" title="An alternative to sampling with temperature, called nucleus sampling, where the model considers the results of the tokens with top_p probability mass.">Top P</vscode-text-field>
-                      <vscode-text-field id="top_k" size="3" placeholder="default" title="Randomly sample the next word from the top_k most likely next words. Anthropic, Google, HuggingFace, and vLLM only.">Top K</vscode-text-field>
-                      <vscode-text-field id="sample_ids" size="3" placeholder="none" class="span-cols" title="One or more sample ids to evaluate (comma separated)">Sample Ids</vscode-text-field>
-                    </div>
-                    <div id="validation-error" class="full-width cols hidden error">
-                    </div>
-                  </vscode-panel-view>
-                  <vscode-panel-view id="view-2">
-                    <div id="task-args" class="full-width cols">
-                    </div>
-                  </vscode-panel-view>
-                </vscode-panels>      
-                </form>
-              </section>
-            
-              <script type="module" nonce="${nonce}" src="${scriptUri.toString()}"></script>
-              </body>
-              </html>`;
   }
 }
 

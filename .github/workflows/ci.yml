@@ -65,6 +65,14 @@ jobs:
           VSCODE_TEST_VERSION: ${{ matrix.vscode }}
         run: pnpm test
 
+      # The panels' webview code doesn't vary by OS or VS Code version, so
+      # one leg runs these. `pnpm test` above has just built the bundles.
+      - name: Run webview tests
+        if: runner.os == 'Linux' && matrix.vscode == 'stable'
+        run: |
+          pnpm exec playwright install --with-deps --only-shell chromium
+          pnpm test:webview
+
       - name: Package extension
         run: pnpm vsce:package
 
