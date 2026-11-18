@@ -9,12 +9,13 @@ pnpm install          # install dependencies
 pnpm build            # build with webpack
 pnpm dev              # build and watch
 pnpm test             # run tests (runs build first)
+pnpm test:webview     # run the activity bar panel tests in Chromium (needs a build)
 pnpm typecheck        # tsc --noEmit
 pnpm lint             # eslint
 pnpm lint:fix         # eslint with auto-fix
 pnpm format           # format code
 pnpm format:check     # check formatting without writing
-pnpm check            # lint + format:check + typecheck + test (CI equivalent)
+pnpm check            # lint + format:check + typecheck + test + test:webview (CI equivalent)
 ```
 
 ## Key Patterns

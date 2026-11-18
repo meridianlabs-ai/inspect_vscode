@@ -5,3 +5,7 @@ node_modules
 .DS_Store
 
 *.vsix
+
+# Playwright webview tests
+/test-results
+/playwright-report

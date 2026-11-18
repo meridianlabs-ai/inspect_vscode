@@ -41,18 +41,19 @@ The Inspect Log Viewer and Scout Viewer web applications displayed within the ex
 
 ### Available Commands
 
-| Command             | Description                                           |
-| ------------------- | ----------------------------------------------------- |
-| `pnpm build`        | Build the extension with webpack                      |
-| `pnpm dev`          | Build and watch for changes                           |
-| `pnpm test`         | Run tests (compiles first)                            |
-| `pnpm lint`         | Run ESLint                                            |
-| `pnpm lint:fix`     | Run ESLint with auto-fix                              |
-| `pnpm format`       | Format code with Prettier                             |
-| `pnpm format:check` | Check formatting without writing                      |
-| `pnpm typecheck`    | Run TypeScript compiler (no emit)                     |
-| `pnpm check`        | Run lint + format:check + typecheck + test (CI equiv) |
-| `pnpm vsce:package` | Create production VSIX package                        |
+| Command             | Description                                            |
+| ------------------- | ------------------------------------------------------ |
+| `pnpm build`        | Build the extension with webpack                       |
+| `pnpm dev`          | Build and watch for changes                            |
+| `pnpm test`         | Run tests (compiles first)                             |
+| `pnpm test:webview` | Run the activity bar panel tests in Chromium           |
+| `pnpm lint`         | Run ESLint                                             |
+| `pnpm lint:fix`     | Run ESLint with auto-fix                               |
+| `pnpm format`       | Format code with Prettier                              |
+| `pnpm format:check` | Check formatting without writing                       |
+| `pnpm typecheck`    | Run TypeScript compiler (no emit)                      |
+| `pnpm check`        | Run lint, format:check, typecheck and both test suites |
+| `pnpm vsce:package` | Create production VSIX package                         |
 
 ### Running the Extension
 
@@ -70,6 +71,14 @@ pnpm test
 ```
 
 Tests run in a headless VS Code environment using `@vscode/test-electron`.
+
+The activity bar panels (Configuration, Task and Inspect Scout) have their own tests in `src/test/webview/`. They load each panel's HTML and webpack bundle in Chromium with Playwright and drive it like a user:
+
+```bash
+pnpm exec playwright install --only-shell chromium  # once
+pnpm build
+pnpm test:webview
+```
 
 ### Debugging
 
