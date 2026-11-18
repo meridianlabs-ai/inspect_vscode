@@ -7,13 +7,13 @@ import {
   WebviewViewProvider,
 } from "vscode";
 
-import { getNonce } from "../../core/nonce";
 import {
   PackageChangedEvent,
   PackageManager,
 } from "../../core/package/manager";
 
-import { headHTML } from "./env-config-provider";
+import { panelResources } from "./env-config-provider";
+import { panelDocument, scoutPanelBody } from "./panel-html";
 
 type NavigateCommand = {
   command: "navigate";
@@ -118,56 +118,10 @@ export class ScoutPanelProvider implements WebviewViewProvider {
   }
 
   private htmlForWebview(webview: Webview): string {
-    const scriptUri = webview.asWebviewUri(
-      Uri.joinPath(this.extensionUri_, "out", "scout-panel-webview.js")
+    return panelDocument(
+      panelResources(webview, this.extensionUri_, "scout-panel-webview.js"),
+      scoutPanelBody()
     );
-
-    const nonce = getNonce();
-
-    return `<!DOCTYPE html>
-      <html lang="en">
-      ${headHTML(nonce, webview, this.extensionUri_)}
-      <body>
-        <section class="component-container">
-          <div id="scout-panel" class="hidden">
-            <div class="nav-links">
-              <a class="nav-link" data-target="project">
-                <i class="codicon codicon-settings-gear"></i>
-                <div class="nav-text">
-                  <span class="nav-title">Project Config</span>
-                  <span class="nav-description">Edit project settings</span>
-                </div>
-              </a>
-              <a class="nav-link" data-target="transcripts">
-                <i class="codicon codicon-file-text"></i>
-                <div class="nav-text">
-                  <span class="nav-title">Transcripts</span>
-                  <span class="nav-description">Browse transcripts</span>
-                </div>
-              </a>
-              <a class="nav-link" data-target="scans">
-                <i class="codicon codicon-graph"></i>
-                <div class="nav-text">
-                  <span class="nav-title">Scans</span>
-                  <span class="nav-description">View scan results</span>
-                </div>
-              </a>
-              <a class="nav-link" data-target="validations">
-                <i class="codicon codicon-checklist"></i>
-                <div class="nav-text">
-                  <span class="nav-title">Validations</span>
-                  <span class="nav-description">Review validation sets</span>
-                </div>
-              </a>
-            </div>
-          </div>
-          <div id="no-package" class="hidden">
-            <p>Scout is not installed.</p>
-          </div>
-        </section>
-        <script type="module" nonce="${nonce}" src="${scriptUri.toString()}"></script>
-      </body>
-      </html>`;
   }
 
   public dispose() {

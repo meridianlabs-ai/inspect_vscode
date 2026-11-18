@@ -1,6 +1,5 @@
 import { Uri, Webview } from "vscode";
 
-import { getNonce } from "../../core/nonce";
 import { PackageManager } from "../../core/package/manager";
 import { kInspectEnvValues } from "../inspect/inspect-constants";
 import { WorkspaceEnvManager } from "../workspace/workspace-env-provider";
@@ -9,9 +8,9 @@ import { WorkspaceStateManager } from "../workspace/workspace-state-provider";
 import {
   EnvConfigManager,
   EnvConfigurationProvider,
-  headHTML,
-  modelPickerHTML,
+  panelResources,
 } from "./env-config-provider";
+import { inspectConfigBody, panelDocument } from "./panel-html";
 
 export interface EnvConfiguration {
   provider?: string;
@@ -146,63 +145,9 @@ export class InspectConfigurationProvider extends EnvConfigurationProvider<EnvCo
   }
 
   protected override htmlForWebview(webview: Webview) {
-    // Get the local path to main script run in the webview, then convert it to a uri we can use in the webview.
-    const scriptUri = webview.asWebviewUri(
-      Uri.joinPath(this.extensionUri_, "out", "env-config-webview.js")
+    return panelDocument(
+      panelResources(webview, this.extensionUri_, "env-config-webview.js"),
+      inspectConfigBody()
     );
-
-    // Use a nonce to only allow a specific script to be run.
-    const nonce = getNonce();
-
-    return `<!DOCTYPE html>
-              <html lang="en">
-              ${headHTML(nonce, webview, this.extensionUri_)}
-              <body>
-              <section class="component-container">
-                <form id="configuration-controls" class="hidden">
-                <vscode-panels>
-                  <vscode-panel-tab id="tab-1">Model</vscode-panel-tab>
-                  <vscode-panel-tab id="tab-2">Logging</vscode-panel-tab>
-                  <vscode-panel-view id="view-1">
-
-                    <div class="group rows full-width" >
-                      ${modelPickerHTML()}
-                      <div class="cols control-column full-width">
-                        <vscode-text-field id="max-connections" size="3" placeholder="default" min="1">Connections</vscode-text-field>
-                        <vscode-text-field id="max-retries" size="3" placeholder="default" min="1">Retries</vscode-text-field>
-                        <vscode-text-field id="timeout" size="3" placeholder="default" min="1">Timeout</vscode-text-field>
-                      </div>                      
-                    </div>
-                  </vscode-panel-view>
-                  <vscode-panel-view id="view-2">
-                    <div class="rows full-width">
-                      <div class="cols full-width">
-                        <vscode-text-field placeholder="default" id="log-dir" size="16" class="full-width"
-                          >Log Directory</vscode-text-field
-                        >
-                        
-                        <div class="dropdown-container full-width">
-                          <label for="provider">Log Level</label>  
-                          <vscode-dropdown id="log-level" position="below" class="full-width">
-                            <vscode-option value="">default</vscode-option>
-                            <vscode-option value="debug">debug</vscode-option>
-                            <vscode-option value="trace">trace</vscode-option>
-                            <vscode-option value="http">http</vscode-option>
-                            <vscode-option value="info">info</vscode-option>
-                            <vscode-option value="warning" selected="true">warning</vscode-option>
-                            <vscode-option value="error">error</vscode-option>
-                            <vscode-option value="critical">critical</vscode-option>
-                          </vscode-dropdown>
-                        </div>
-                      </div>
-                    </div>
-                  </vscode-panel-view>
-                </vscode-panels>
-                </form>
-              </section>
-            
-              <script type="module" nonce="${nonce}" src="${scriptUri.toString()}"></script>
-              </body>
-              </html>`;
   }
 }
