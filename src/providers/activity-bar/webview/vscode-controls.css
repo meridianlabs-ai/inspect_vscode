@@ -87,13 +87,14 @@ body {
   height: 26px;
 }
 
+.text-input[aria-invalid="true"] {
+  border-color: var(--vscode-inputValidation-errorBorder, #be1100);
+}
+
+/* After the invalid rule, so the field being typed in always shows focus */
 .text-input:focus,
 .select-input:focus {
   border-color: var(--vscode-focusBorder, #0078d4);
-}
-
-.text-input[aria-invalid="true"] {
-  border-color: var(--vscode-inputValidation-errorBorder, #be1100);
 }
 
 .text-input::placeholder {

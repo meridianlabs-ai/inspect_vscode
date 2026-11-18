@@ -166,6 +166,17 @@ test.describe("Task panel", () => {
       "aria-invalid",
       "true"
     );
+    // The test page has no theme, so the colours are the stylesheet's
+    // fallbacks: an error border on the invalid field, and the focus border on
+    // the invalid field being typed in.
+    await expect(textbox(page, "Limit")).toHaveCSS(
+      "border-color",
+      "rgb(190, 17, 0)"
+    );
+    await expect(textbox(page, "Sample Ids")).toHaveCSS(
+      "border-color",
+      "rgb(0, 120, 212)"
+    );
 
     await typeInto(textbox(page, "Limit"), "");
     await expect(error).toBeHidden();
