@@ -16,7 +16,7 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
-    uses: meridianlabs-ai/actions/.github/workflows/release-please-vscode.yml@6cfe46a92f2e882b92e6c79ff0fe33d045ba80b8 # main
+    uses: meridianlabs-ai/actions/.github/workflows/release-please-vscode.yml@e8167a6521fd94bf7950529e0fe9b63bf8d8e414 # main
     with:
       publish-tag: ${{ inputs.publish-tag }}
     # Only the secrets the reusable workflow uses, not `secrets: inherit`, so
@@ -26,22 +26,23 @@ jobs:
       RELEASE_PLEASE_APP_PRIVATE_KEY: ${{ secrets.RELEASE_PLEASE_APP_PRIVATE_KEY }}
       SLACK_APPROVALS_WEBHOOK_URL: ${{ secrets.SLACK_APPROVALS_WEBHOOK_URL }}
 
-  # Publish to the Marketplace (Trusted Publishing), Open VSX and the GitHub
-  # release. This job must live in this file, not in the reusable workflow:
-  # the Marketplace's Trusted Publishing policy for ukaisi names this repo,
-  # release.yml and the `marketplace` environment, and matches the workflow
-  # file the job itself comes from. It checks out nothing and runs no repo
-  # code; the `marketplace` environment's reviewers gate it.
+  # Publish to the Marketplace (Trusted Publishing) and Open VSX. No .vsix is
+  # attached to the GitHub release, so releases can be immutable. This job
+  # must live in this file, not in the reusable workflow: the Marketplace's
+  # Trusted Publishing policy for ukaisi names this repo, release.yml and the
+  # `marketplace` environment, and matches the workflow file the job itself
+  # comes from. It checks out nothing and runs no repo code; the
+  # `marketplace` environment's reviewers gate it.
   publish:
     needs: release
     if: ${{ needs.release.outputs.release_created == 'true' }}
     runs-on: ubuntu-latest
     environment: marketplace
     permissions:
-      contents: write # attach the .vsix to the GitHub release
+      contents: read
       id-token: write # Marketplace Trusted Publishing
     steps:
-      - uses: meridianlabs-ai/actions/vscode-publish@6cfe46a92f2e882b92e6c79ff0fe33d045ba80b8 # main
+      - uses: meridianlabs-ai/actions/vscode-publish@e8167a6521fd94bf7950529e0fe9b63bf8d8e414 # main
         with:
           extension-id: ukaisi.inspect-ai
           tag: ${{ needs.release.outputs.tag_name }}
