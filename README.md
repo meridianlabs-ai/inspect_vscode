@@ -12,7 +12,7 @@ VS Code extension for the [Inspect](https://inspect.aisi.org.uk/) framework for 
 
 ## Installation
 
-Install from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=ukaisi.inspect-ai) or [OpenVSX](https://open-vsx.org/extension/ukaisi/inspect-ai), or search for "Inspect AI" in the Extensions view (`Ctrl+Shift+X`). A `.vsix` package is also attached to each [GitHub release](https://github.com/meridianlabs-ai/inspect_vscode/releases).
+Install from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=ukaisi.inspect-ai) or [OpenVSX](https://open-vsx.org/extension/ukaisi/inspect-ai), or search for "Inspect AI" in the Extensions view (`Ctrl+Shift+X`).
 
 ### Prerequisites
 
