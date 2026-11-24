@@ -16,7 +16,7 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
-    uses: meridianlabs-ai/actions/.github/workflows/release-please-vscode.yml@56c6039ffc0f7809c5a7dd1cfc9265159867d382 # main
+    uses: meridianlabs-ai/actions/.github/workflows/release-please-vscode.yml@40b7c888e3a8c34a083e8354099b18d1d7e936a0 # main
     with:
       publish-tag: ${{ inputs.publish-tag }}
     # Only the secrets the reusable workflow uses, not `secrets: inherit`, so
@@ -42,7 +42,7 @@ jobs:
       contents: read
       id-token: write # Trusted Publishing (Marketplace and Open VSX)
     steps:
-      - uses: meridianlabs-ai/actions/vscode-publish@56c6039ffc0f7809c5a7dd1cfc9265159867d382 # main
+      - uses: meridianlabs-ai/actions/vscode-publish@40b7c888e3a8c34a083e8354099b18d1d7e936a0 # main
         with:
           extension-id: ukaisi.inspect-ai
           tag: ${{ needs.release.outputs.tag_name }}
