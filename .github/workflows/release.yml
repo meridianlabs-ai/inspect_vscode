@@ -27,12 +27,13 @@ jobs:
       SLACK_APPROVALS_WEBHOOK_URL: ${{ secrets.SLACK_APPROVALS_WEBHOOK_URL }}
 
   # Publish to the Marketplace and Open VSX, both with Trusted Publishing, so
-  # no publish token is stored. No .vsix is attached to the GitHub release, so
-  # releases can be immutable. This job must live in this file, not in the
-  # reusable workflow: each registry's trusted publisher for ukaisi names this
-  # repo, release.yml and the `marketplace` environment, and the Marketplace
-  # matches the workflow file the job itself comes from. It checks out nothing
-  # and runs no repo code; the `marketplace` environment's reviewers gate it.
+  # the job uses no stored publish token. No .vsix is attached to the GitHub
+  # release, so releases can be immutable. This job must live in this file,
+  # not in the reusable workflow: each registry's trusted publisher for ukaisi
+  # names this repo, release.yml and the `marketplace` environment, and the
+  # Marketplace matches the workflow file the job itself comes from. It checks
+  # out nothing and runs no repo code; the `marketplace` environment's
+  # reviewers gate it.
   publish:
     needs: release
     if: ${{ needs.release.outputs.release_created == 'true' }}
