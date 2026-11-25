@@ -16,7 +16,7 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
-    uses: meridianlabs-ai/actions/.github/workflows/release-please-vscode.yml@e8167a6521fd94bf7950529e0fe9b63bf8d8e414 # main
+    uses: meridianlabs-ai/actions/.github/workflows/release-please-vscode.yml@e702cf7ff758356c69904671719921fca1f3438c # main
     with:
       publish-tag: ${{ inputs.publish-tag }}
     # Only the secrets the reusable workflow uses, not `secrets: inherit`, so
@@ -26,13 +26,14 @@ jobs:
       RELEASE_PLEASE_APP_PRIVATE_KEY: ${{ secrets.RELEASE_PLEASE_APP_PRIVATE_KEY }}
       SLACK_APPROVALS_WEBHOOK_URL: ${{ secrets.SLACK_APPROVALS_WEBHOOK_URL }}
 
-  # Publish to the Marketplace (Trusted Publishing) and Open VSX. No .vsix is
-  # attached to the GitHub release, so releases can be immutable. This job
-  # must live in this file, not in the reusable workflow: the Marketplace's
-  # Trusted Publishing policy for ukaisi names this repo, release.yml and the
-  # `marketplace` environment, and matches the workflow file the job itself
-  # comes from. It checks out nothing and runs no repo code; the
-  # `marketplace` environment's reviewers gate it.
+  # Publish to the Marketplace and Open VSX, both with Trusted Publishing, so
+  # the job uses no stored publish token. No .vsix is attached to the GitHub
+  # release, so releases can be immutable. This job must live in this file,
+  # not in the reusable workflow: each registry's trusted publisher for ukaisi
+  # names this repo, release.yml and the `marketplace` environment, and the
+  # Marketplace matches the workflow file the job itself comes from. It checks
+  # out nothing and runs no repo code; the `marketplace` environment's
+  # reviewers gate it.
   publish:
     needs: release
     if: ${{ needs.release.outputs.release_created == 'true' }}
@@ -40,10 +41,9 @@ jobs:
     environment: marketplace
     permissions:
       contents: read
-      id-token: write # Marketplace Trusted Publishing
+      id-token: write # Trusted Publishing (Marketplace and Open VSX)
     steps:
-      - uses: meridianlabs-ai/actions/vscode-publish@e8167a6521fd94bf7950529e0fe9b63bf8d8e414 # main
+      - uses: meridianlabs-ai/actions/vscode-publish@e702cf7ff758356c69904671719921fca1f3438c # main
         with:
           extension-id: ukaisi.inspect-ai
           tag: ${{ needs.release.outputs.tag_name }}
-          ovsx-pat: ${{ secrets.OVSX_PAT }}
